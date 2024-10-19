@@ -1,0 +1,14 @@
+{
+    "get": {
+        "summary": "Welcome route",
+        "description": "Returns a welcome message for the Suno API",
+        "responses": {
+            "200": {
+                "description": "Successful response"
+            },
+            "500": {
+                "description": "Server error"
+            }
+        }
+    }
+}

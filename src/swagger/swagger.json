@@ -1,0 +1,22 @@
+{
+   "swagger": "2.0",
+   "info": {
+     "version": "1.0.0",
+     "title": "Suno API",
+     "description": "API Documentation for Suno Game"
+   },
+   "paths": {
+     "/": {
+       "get": {
+         "summary": "Welcome route",
+         "description": "Returns a welcome message for the Suno API",
+         "responses": {
+           "200": {
+             "description": "Successful response"
+           }
+         }
+       }
+     }
+   }
+ }
+ 
