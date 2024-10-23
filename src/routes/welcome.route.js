@@ -1,17 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const constants = require('../utils/responses/constants');
-const { SuccessResponse, InternalErrorResponse } = require('../utils/responses/apiResponse');
 
-// Welcome route
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Welcome route
+ *     description: Returns a welcome message for the Suno API
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *       500:
+ *         description: Server error
+ */
 router.get('/', (req, res) => {
-    try {
-        const response = new SuccessResponse(constants.success.welcome);
-        return res.send(response);
-    } catch (error) {
-        const errorResponse = new InternalErrorResponse(constants.error.internalServer);
-        return errorResponse.send(res);
-    }
+  res.send('Welcome to the Suno API!');
 });
 
 module.exports = router;

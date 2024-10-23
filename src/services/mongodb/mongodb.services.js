@@ -1,150 +1,125 @@
 /**
- * @description - This function is find one query
+ * @description - This function finds one document based on a condition.
  */
-const findOneForAwait = async (model, condition,projection) => {
-    //    console.log("model 123",model)
-        const data = await model.findOne(condition,projection).lean();
-        return data
-}
-/**
- * @description - This function is find many query
- */
-const findManyForAwait = async (model, condition, projection) => {
-      //  //console.log("model 123", model)
-    const data = await model.find(condition, projection).lean();
-    return data
-}
-/**
- * @description - This function is find one and update query
- */
-const findOneAndUpdateForAwait = async (model, condition, feilds) => {
-    console.log("model name",model)
-     const updated= await model.findOneAndUpdate(condition,feilds);
-     console.log(updated,"updated")
-    return 
-}
+const findOne = async (model, condition, projection) => {
+    return await model.findOne(condition, projection).lean();
+};
 
 /**
- * @description - This function is find many and update query
+ * @description - This function finds multiple documents based on a condition.
  */
-const findManyAndUpdateForAwait = async (model, condition, feilds) => {
-    // console.log("model name", model)
-    await model.updateMany(condition, feilds);
-    return
-}
+const findMany = async (model, condition, projection) => {
+    return await model.find(condition, projection).lean();
+};
 
 /**
- * @description - This function is find one with sort query
+ * @description - This function finds one document and updates it.
  */
-const findOneForAwaitWithSort = async (model, condition, projection,sort) => {
-    const data = await model.findOne(condition, projection).sort(sort);
-    return data
-}
-/**
- * @description - This function is used to insert new data 
- */
-const createForAwait = async (data) => {
-    await data.save();
-    return
-}
+const findOneAndUpdate = async (model, condition, fields) => {
+    return await model.findOneAndUpdate(condition, fields, { new: true });
+};
 
 /**
- * @description - This function is find one with populate query
+ * @description - This function updates multiple documents based on a condition.
  */
-const findOneForAwaitWithPopulate = async (model, condition, projection, populate) => {
-    const data = await model.findOne(condition, projection).populate(populate).lean();
-    return data
-}
+const updateMany = async (model, condition, fields) => {
+    return await model.updateMany(condition, fields);
+};
 
 /**
- * @description - This function is find many with populate query
+ * @description - This function finds one document with sorting.
  */
-const findManyForAwaitWithPopulate = async (model, condition, projection,populate) => {
-      //  //console.log("model 123", model)
-    const data = await model.find(condition, projection).populate(populate).lean();
-    return data
-}
+const findOneWithSort = async (model, condition, projection, sort) => {
+    return await model.findOne(condition, projection).sort(sort).lean();
+};
 
+/**
+ * @description - This function creates a new document.
+ */
+const create = async (data) => {
+    return await data.save();
+};
 
-const findManyForAwaitWithPopulateSelected = async (model, condition, projection, populate, selectFields) => {
-      //  //console.log("model 123", model);
-    const data = await model.find(condition, projection)
+/**
+ * @description - This function finds one document and populates referenced documents.
+ */
+const findOneWithPopulate = async (model, condition, projection, populate) => {
+    return await model.findOne(condition, projection).populate(populate).lean();
+};
+
+/**
+ * @description - This function finds multiple documents and populates referenced documents.
+ */
+const findManyWithPopulate = async (model, condition, projection, populate) => {
+    return await model.find(condition, projection).populate(populate).lean();
+};
+
+/**
+ * @description - This function finds multiple documents with selected fields in populated documents.
+ */
+const findManyWithPopulateSelected = async (model, condition, projection, populate, selectFields) => {
+    return await model.find(condition, projection)
         .populate({ path: populate, select: selectFields })
         .lean();
-    return data;
-};
-
-const findManyForAwaitWithPopulatemultiple = async (model, condition, projection, populateFields) => {
-      //  //console.log("model 123", model);
-    const populateQueries = populateFields.map(populate => ({
-        path: populate.path,
-        select: populate.select
-    }));
-
-    const data = await model.find(condition, projection)
-        .populate(populateQueries)
-        .lean();
-    return data;
 };
 
 /**
- * @description - This function is for get aggregate data
+ * @description - This function finds multiple documents and populates multiple fields.
  */
-const getAggrgateDataForAwait = async (model, aggregate) => {
-      //  //console.log("model 123", model)
-    const data = await model.aggregate(aggregate);
-    return data
-}
+const findManyWithPopulateMultiple = async (model, condition, projection, populateFields) => {
+    const populateQueries = populateFields.map(({ path, select }) => ({ path, select }));
+    return await model.find(condition, projection).populate(populateQueries).lean();
+};
 
 /**
- * @description - This function is find many with sort skip and populate query
+ * @description - This function retrieves aggregated data.
  */
-const findManyForAwaitWithSortPopulate = async (model, condition, projection, sort,populate) => {
-    // console.log("populate",condition,sort,populate);
-    const data = await model.find(condition, projection).populate(populate).sort(sort);
-    return data
-}
+const aggregateData = async (model, aggregate) => {
+    return await model.aggregate(aggregate);
+};
 
 /**
- * @description - This function is find many with sort skip limit and populate
+ * @description - This function finds multiple documents with sorting and population.
  */
-const findManyForAwaitWithSortSkipLimitPopulate = async (model, condition, projection, sort,skip,limit, populate) => {
-    // console.log("populate", condition, sort, populate);
-    const data = await model.find(condition, projection).populate(populate).sort(sort).skip(skip).limit(limit);
-    return data
-}
+const findManyWithSortAndPopulate = async (model, condition, projection, sort, populate) => {
+    return await model.find(condition, projection).populate(populate).sort(sort).lean();
+};
 
 /**
- * @description - This function is find many with sort skip limit
+ * @description - This function finds multiple documents with sorting, skipping, limiting, and population.
  */
-const findManyForAwaitWithSortSkipAndLimit = async (model, condition, projection, sort, skip, limit) => {
-    // console.log("condition", condition, sort);
-    const data = await model.find(condition, projection).sort(sort).skip(skip).limit(limit);
-    return data
-}
+const findManyWithSortSkipLimitAndPopulate = async (model, condition, projection, sort, skip, limit, populate) => {
+    return await model.find(condition, projection).populate(populate).sort(sort).skip(skip).limit(limit).lean();
+};
 
 /**
- * @description - This function is used to count document
+ * @description - This function finds multiple documents with sorting, skipping, and limiting.
  */
-const countingForAwait = async (model, condition) => {
-    const data = await model.countDocuments(condition);
-    return data
-}
+const findManyWithSortSkipAndLimit = async (model, condition, projection, sort, skip, limit) => {
+    return await model.find(condition, projection).sort(sort).skip(skip).limit(limit).lean();
+};
+
+/**
+ * @description - This function counts documents based on a condition.
+ */
+const countDocuments = async (model, condition) => {
+    return await model.countDocuments(condition);
+};
 
 module.exports = {
-    findOneForAwait,
-    findManyForAwait,
-    findOneAndUpdateForAwait,
-    findManyAndUpdateForAwait,
-    findOneForAwaitWithSort,
-    createForAwait,
-    findOneForAwaitWithPopulate,
-    findManyForAwaitWithPopulate,
-    getAggrgateDataForAwait,
-    findManyForAwaitWithSortPopulate,
-    countingForAwait,
-    findManyForAwaitWithSortSkipLimitPopulate,
-    findManyForAwaitWithSortSkipAndLimit,
-    findManyForAwaitWithPopulatemultiple,
-    findManyForAwaitWithPopulateSelected,
-}
+    findOne,
+    findMany,
+    findOneAndUpdate,
+    updateMany,
+    findOneWithSort,
+    create,
+    findOneWithPopulate,
+    findManyWithPopulate,
+    aggregateData,
+    findManyWithSortAndPopulate,
+    countDocuments,
+    findManyWithSortSkipLimitAndPopulate,
+    findManyWithSortSkipAndLimit,
+    findManyWithPopulateMultiple,
+    findManyWithPopulateSelected,
+};
