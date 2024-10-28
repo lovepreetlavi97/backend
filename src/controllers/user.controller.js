@@ -1,4 +1,4 @@
-const User = require('../../models/user.model'); // Replace with your actual model
+const User = require('../models/user.model'); // Replace with your actual model
 
 // Create a new user
 exports.createUser = async (req, res) => {
@@ -7,7 +7,7 @@ exports.createUser = async (req, res) => {
     await user.save();
     res.status(201).json(user);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: error.message });0
   }
 };
 

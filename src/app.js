@@ -1,6 +1,6 @@
 // src/app.js
 const express = require('express');
-const connectDB = require('./config/db'); // Ensure this file exists and is correct
+const connectDB = require('./config/db');
 const dotenv = require('dotenv');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
@@ -30,7 +30,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:5000/',
+        url: 'http://localhost:3000/api/v1',
       },
     ],
   },
@@ -44,10 +44,5 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 // Connect to MongoDB
 connectDB();
 
-// Start the server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
-
+// No need to start the server here
 module.exports = app; // Export the app

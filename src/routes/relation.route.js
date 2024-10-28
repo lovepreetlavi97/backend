@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const relationController = require('../../controllers/v1/relation.controller');
+const relationController = require('../controllers/relation.controller');
 
 /**
  * @swagger

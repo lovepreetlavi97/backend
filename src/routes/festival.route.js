@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const festivalController = require('../../controllers/v1/festival.controller');
+const festivalController = require('../controllers/festival.controller');
 
 /**
  * @swagger

@@ -1,5 +1,5 @@
 // controllers/v1/subcategory.controller.js
-const {Subcategory} = require('../../models/index'); // Assuming you have a Mongoose model
+const {Subcategory} = require('../models/index'); // Assuming you have a Mongoose model
 
 exports.createSubcategory = async (req, res) => {
   try {
