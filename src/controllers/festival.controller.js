@@ -1,4 +1,4 @@
-const Festival = require('../../models/festival.model'); // Replace with your actual model
+const Festival = require('../models/festival.model'); // Replace with your actual model
 
 // Create a new festival
 exports.createFestival = async (req, res) => {

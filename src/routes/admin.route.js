@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const adminController = require('../../controllers/v1/admin.controller');
+const adminController = require('../controllers/admin.controller');
 
 /**
  * @swagger
@@ -121,5 +121,60 @@ router.put('/:id', adminController.updateAdminById);
  *         description: Admin not found
  */
 router.delete('/:id', adminController.deleteAdminById);
-
+/**
+ * @swagger
+ * /admin/login:
+ *   post:
+ *     summary: Admin login
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       404:
+ *         description: Admin not found
+ *       401:
+ *         description: Invalid credentials
+ */
+router.post('/login', adminController.loginAdmin);
+/**
+ * @swagger
+ * /admin/password:
+ *   patch:
+ *     summary: Update the password of an admin
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Admin not found
+ *       401:
+ *         description: Invalid password
+ */
+router.patch('/password', adminController.updateAdminPassword);
 module.exports = router;

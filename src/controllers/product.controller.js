@@ -1,4 +1,4 @@
-const Product = require('../../models/product.model'); // Replace with your actual model
+const Product = require('../models/product.model'); // Replace with your actual model
 
 // Create a new product
 exports.createProduct = async (req, res) => {

@@ -1,6 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const categoryController = require('../../controllers/v1/category.controller');
+const categoryController = require('../controllers/category.controller');
+const authMiddleware = require('../middlewares/auth/auth.middleware'); // Adjust the path as necessary
+
+/**
+ * @swagger
+ * components:
+ *   securitySchemes:
+ *     BearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *       description: Enter your bearer token in the format **Bearer &lt;token&gt;**
+ */
 
 /**
  * @swagger
@@ -15,6 +27,8 @@ const categoryController = require('../../controllers/v1/category.controller');
  *   post:
  *     summary: Create a new category
  *     tags: [Category]
+ *     security:
+ *       - BearerAuth: [] 
  *     requestBody:
  *       required: true
  *       content:
@@ -30,7 +44,7 @@ const categoryController = require('../../controllers/v1/category.controller');
  *       400:
  *         description: Bad request
  */
-router.post('/', categoryController.createCategory);
+router.post('/', authMiddleware, categoryController.createCategory);
 
 /**
  * @swagger
@@ -38,11 +52,13 @@ router.post('/', categoryController.createCategory);
  *   get:
  *     summary: Get all categories
  *     tags: [Category]
+ *     security:
+ *       - BearerAuth: [] 
  *     responses:
  *       200:
  *         description: A list of categories
  */
-router.get('/', categoryController.getAllCategories);
+router.get('/', authMiddleware, categoryController.getAllCategories);
 
 /**
  * @swagger
@@ -50,6 +66,8 @@ router.get('/', categoryController.getAllCategories);
  *   get:
  *     summary: Get a category by ID
  *     tags: [Category]
+ *     security:
+ *       - BearerAuth: [] 
  *     parameters:
  *       - name: id
  *         in: path
@@ -63,7 +81,7 @@ router.get('/', categoryController.getAllCategories);
  *       404:
  *         description: Category not found
  */
-router.get('/:id', categoryController.getCategoryById);
+router.get('/:id', authMiddleware, categoryController.getCategoryById);
 
 /**
  * @swagger
@@ -71,6 +89,8 @@ router.get('/:id', categoryController.getCategoryById);
  *   put:
  *     summary: Update a category by ID
  *     tags: [Category]
+ *     security:
+ *       - BearerAuth: [] 
  *     parameters:
  *       - name: id
  *         in: path
@@ -93,7 +113,7 @@ router.get('/:id', categoryController.getCategoryById);
  *       404:
  *         description: Category not found
  */
-router.put('/:id', categoryController.updateCategoryById);
+router.put('/:id', authMiddleware, categoryController.updateCategoryById);
 
 /**
  * @swagger
@@ -101,6 +121,8 @@ router.put('/:id', categoryController.updateCategoryById);
  *   delete:
  *     summary: Delete a category by ID
  *     tags: [Category]
+ *     security:
+ *       - BearerAuth: [] 
  *     parameters:
  *       - name: id
  *         in: path
@@ -114,6 +136,6 @@ router.put('/:id', categoryController.updateCategoryById);
  *       404:
  *         description: Category not found
  */
-router.delete('/:id', categoryController.deleteCategoryById);
+router.delete('/:id', authMiddleware, categoryController.deleteCategoryById);
 
 module.exports = router;

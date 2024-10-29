@@ -1,4 +1,4 @@
-const Relation = require('../../models/relation.model'); // Replace with your actual model
+const Relation = require('../models/relation.model'); // Replace with your actual model
 
 // Create a new relation
 exports.createRelation = async (req, res) => {

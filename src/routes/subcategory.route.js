@@ -1,7 +1,6 @@
-// routes/v1/subcategory.routes.js
 const express = require('express');
 const router = express.Router();
-const subcategoryController = require('../../controllers/v1/subcategory.controller');
+const subcategoryController = require('../controllers/subcategory.controller');
 
 /**
  * @swagger
@@ -26,12 +25,26 @@ const subcategoryController = require('../../controllers/v1/subcategory.controll
  *              properties:
  *                name:
  *                  type: string
+ *                  example: "Jewelry"
  *                category:
  *                  type: string
  *                  format: ObjectId
+ *                  example: "60d5ec49c2e6b218a8c02011"  # Example category ID
  *      responses:
  *        201:
  *          description: Created subcategory
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  _id:
+ *                    type: string
+ *                    example: "60d5ec49c2e6b218a8c02012"
+ *                  name:
+ *                    type: string
+ *                  category:
+ *                    type: string
  *        400:
  *          description: Bad Request
  */
@@ -47,6 +60,19 @@ router.post('/', subcategoryController.createSubcategory);
  *      responses:
  *        200:
  *          description: List of subcategories
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: array
+ *                items:
+ *                  type: object
+ *                  properties:
+ *                    _id:
+ *                      type: string
+ *                    name:
+ *                      type: string
+ *                    category:
+ *                      type: string
  *        500:
  *          description: Server error
  */
@@ -69,8 +95,21 @@ router.get('/', subcategoryController.getAllSubcategories);
  *      responses:
  *        200:
  *          description: Subcategory found
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  _id:
+ *                    type: string
+ *                  name:
+ *                    type: string
+ *                  category:
+ *                    type: string
  *        404:
  *          description: Subcategory not found
+ *        500:
+ *          description: Server error
  */
 router.get('/:id', subcategoryController.getSubcategoryById);
 
