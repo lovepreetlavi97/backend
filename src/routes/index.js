@@ -7,6 +7,7 @@ const productRoute = require('./product.route');
 const relationRoute = require('./relation.route');
 const subcategoryRoute = require('./subcategory.route');
 const userRoute = require('./user.route');
+const promoRoute = require('./promocode.route');
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use('/products', productRoute);
 router.use('/relations', relationRoute);
 router.use('/subcategories', subcategoryRoute);
 router.use('/users', userRoute);
+router.use('/promocodes', promoRoute);
 
 module.exports = router;

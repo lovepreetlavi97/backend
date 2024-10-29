@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 
 const create = async (model, data) => {
+  console.log("create something")
   return model.create(data);
 };
 
