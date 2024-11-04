@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const festivalController = require('../controllers/festival.controller');
-
+const authMiddleware = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
  * tags:
@@ -33,7 +33,7 @@ const festivalController = require('../controllers/festival.controller');
  *       400:
  *         description: Bad request
  */
-router.post('/', festivalController.createFestival);
+router.post('/',festivalController.createFestival);
 
 /**
  * @swagger
@@ -66,7 +66,7 @@ router.get('/', festivalController.getAllFestivals);
  *       404:
  *         description: Festival not found
  */
-router.get('/:id', festivalController.getFestivalById);
+router.get('/:id',festivalController.getFestivalById);
 
 /**
  * @swagger
@@ -99,7 +99,7 @@ router.get('/:id', festivalController.getFestivalById);
  *       404:
  *         description: Festival not found
  */
-router.put('/:id', festivalController.updateFestivalById);
+router.put('/:id',festivalController.updateFestivalById);
 
 /**
  * @swagger

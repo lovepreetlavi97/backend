@@ -4,7 +4,7 @@ const connectDB = require('./config/db');
 const dotenv = require('dotenv');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
-
+const cors = require('cors');
 // Load environment variables
 dotenv.config();
 
@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware for parsing JSON
 app.use(express.json());
-
+app.use(cors());
 // Import versioned routes
 const v1Routes = require('./routes'); // Import the index.js in routes
 
@@ -33,9 +33,20 @@ const swaggerOptions = {
         url: 'http://localhost:3000/api/v1',
       },
     ],
+    components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+    security: [{ BearerAuth: [] }], // Apply BearerAuth globally
   },
-  apis: ['./src/routes/**/*.js'], // Adjusted to point to your route files
+  apis: ['./src/routes/**/*.js'], // Adjust path to match your routes
 };
+
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 console.log(swaggerDocs); // Log the generated Swagger docs to the console
