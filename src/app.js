@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cors());
 // Import versioned routes
 const v1Routes = require('./routes'); // Import the index.js in routes
-
+//////
 // Use the versioned routes
 app.use('/api/v1', v1Routes); // Mounting the routes under /api/v1
 
@@ -49,11 +49,10 @@ const swaggerOptions = {
 
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
-console.log(swaggerDocs); // Log the generated Swagger docs to the console
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Connect to MongoDB
 connectDB();
 
-// No need to start the server here
 module.exports = app; // Export the app

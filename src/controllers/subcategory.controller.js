@@ -1,63 +1,77 @@
-// controllers/v1/subcategory.controller.js
-const {Subcategory} = require('../models/index'); // Assuming you have a Mongoose model
+const { 
+  create, 
+  findOne, 
+  findMany, 
+  findAndUpdate, 
+  deleteOne 
+} = require('../services/mongodb/mongoService');
+const { Subcategory } = require('../models/index'); // Adjust the import based on your project structure
 
+// Create a new subcategory
 exports.createSubcategory = async (req, res) => {
   try {
-    const { name, category } = req.body;
-    const newSubcategory = new Subcategory({ name, category });
-    const savedSubcategory = await newSubcategory.save();
-    res.status(201).json(savedSubcategory);
+    const subcategoryData = req.body; // Get subcategory data from request body
+    const subcategory = await create(Subcategory, subcategoryData); // Use the create service function
+    res.status(201).json(subcategory); // Respond with the created subcategory
   } catch (error) {
-    res.status(400).json({ message: 'Bad Request', error: error.message });
+    res.status(400).json({ error: error.message }); // Handle errors
   }
 };
 
+// Get all subcategories
 exports.getAllSubcategories = async (req, res) => {
   try {
-    const subcategories = await Subcategory.find();
-    res.status(200).json(subcategories);
+    console.log("Fetching all subcategories with populated category");
+
+    // Query and projection
+    const query = {}; // Fetch all subcategories
+    const projection = {}; // Fetch all fields of subcategories
+
+    // Populate categoryId with only the name field of the category
+    const populate = { path: 'categoryId', select: 'name' };
+
+    const subcategories = await findMany(Subcategory, query, projection, {}, populate);
+
+    res.status(200).json(subcategories); // Respond with populated subcategories
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Error fetching subcategories:", error);
+    res.status(500).json({ error: error.message }); // Handle errors
   }
 };
 
+
+
+// Get a subcategory by ID
 exports.getSubcategoryById = async (req, res) => {
   try {
-    const subcategory = await Subcategory.findById(req.params.id);
-    if (!subcategory) {
-      return res.status(404).json({ message: 'Subcategory not found' });
-    }
-    res.status(200).json(subcategory);
+    const subcategory = await findOne(Subcategory, { _id: req.params.id }); // Use the findOne service function
+    if (!subcategory) return res.status(404).json({ message: 'Subcategory not found' });
+    res.status(200).json(subcategory); // Respond with the subcategory details
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: error.message }); // Handle errors
   }
 };
 
+// Update a subcategory by ID
 exports.updateSubcategoryById = async (req, res) => {
   try {
-    const { name, category } = req.body;
-    const updatedSubcategory = await Subcategory.findByIdAndUpdate(
-      req.params.id,
-      { name, category },
-      { new: true }
-    );
-    if (!updatedSubcategory) {
-      return res.status(404).json({ message: 'Subcategory not found' });
-    }
-    res.status(200).json(updatedSubcategory);
+    const subcategory = await findAndUpdate(Subcategory, { _id: req.params.id }, req.body); // Use the findAndUpdate service function
+    if (!subcategory) return res.status(404).json({ message: 'Subcategory not found' });
+    res.status(200).json(subcategory); // Respond with the updated subcategory
   } catch (error) {
-    res.status(400).json({ message: 'Bad Request', error: error.message });
+    res.status(400).json({ error: error.message }); // Handle errors
   }
 };
 
+// Delete a subcategory by ID
 exports.deleteSubcategoryById = async (req, res) => {
   try {
-    const deletedSubcategory = await Subcategory.findByIdAndDelete(req.params.id);
-    if (!deletedSubcategory) {
-      return res.status(404).json({ message: 'Subcategory not found' });
+    const result = await deleteOne(Subcategory, { _id: req.params.id }); // Use the deleteOne service function
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Subcategory not found' }); // Check if any document was deleted
     }
-    res.status(204).send(); // No content
+    res.status(204).send(); // Respond with no content on successful deletion
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: error.message }); // Handle errors
   }
 };

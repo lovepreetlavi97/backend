@@ -7,6 +7,7 @@ const Festival = require('./festival.model');
 const Relation = require('./relation.model');
 const Category = require('./category.model');
 const PromoCode = require('./promocode.model');
+const Subcategory = require('./subcategory.model');
 module.exports = {
   Admin,
   User,
@@ -14,5 +15,7 @@ module.exports = {
   Festival,
   Relation,
   Category,
-  PromoCode
+  PromoCode,
+  Subcategory
 };
+//////

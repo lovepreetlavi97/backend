@@ -18,7 +18,7 @@ router.use('/categories',adminAuth, categoryRoute);
 router.use('/festivals',adminAuth, festivalRoute);
 router.use('/products',adminAuth, productRoute);
 router.use('/relations',adminAuth, relationRoute);
-router.use('/subcategories',adminAuth, subcategoryRoute);
+router.use('/subcategories', subcategoryRoute);
 router.use('/users',adminAuth, userRoute);
 router.use('/promocodes',adminAuth, promoRoute);
 
