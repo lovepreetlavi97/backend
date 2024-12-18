@@ -24,17 +24,56 @@ const productController = require('../controllers/product.controller');
  *             properties:
  *               name:
  *                 type: string
- *               price:
+ *                 description: The name of the product.
+ *                 example: "Wireless Mouse"
+ *               actualPrice:
  *                 type: number
- *               category:
+ *                 description: The actual price of the product.
+ *                 example: 30.99
+ *               discountedPrice:
+ *                 type: number
+ *                 description: The discounted price of the product (if any).
+ *                 example: 25.99
+ *               weight:
+ *                 type: number
+ *                 description: The weight of the product in kilograms.
+ *                 example: 0.2
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: A list of image URLs of the product.
+ *                 example: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+ *               categoryId:
  *                 type: string
+ *                 description: The ID of the category the product belongs to.
+ *                 example: "607d1f77bcf86cd799439011"
+ *               subcategoryId:
+ *                 type: string
+ *                 description: The ID of the subcategory the product belongs to (optional).
+ *                 example: "607d1f77bcf86cd799439022"
+ *               festivalIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: A list of festival IDs associated with the product (optional).
+ *                 example: ["607d1f77bcf86cd799439033"]
+ *               relationIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: A list of related product IDs.
+ *                 example: ["607d1f77bcf86cd799439044"]
  *     responses:
  *       201:
  *         description: Product created successfully
  *       400:
  *         description: Bad request
+ *       500:
+ *         description: Internal server error
  */
 router.post('/', productController.createProduct);
+
 
 /**
  * @swagger

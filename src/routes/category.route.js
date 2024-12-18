@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/category.controller');
-const authMiddleware = require('../middlewares/auth/auth.middleware'); // Adjust the path as necessary
+
 
 /**
  * @swagger
@@ -44,7 +44,7 @@ const authMiddleware = require('../middlewares/auth/auth.middleware'); // Adjust
  *       400:
  *         description: Bad request
  */
-router.post('/', authMiddleware, categoryController.createCategory);
+router.post('/',  categoryController.createCategory);
 
 /**
  * @swagger
@@ -58,7 +58,7 @@ router.post('/', authMiddleware, categoryController.createCategory);
  *       200:
  *         description: A list of categories
  */
-router.get('/', authMiddleware, categoryController.getAllCategories);
+router.get('/', categoryController.getAllCategories);
 
 /**
  * @swagger
@@ -81,7 +81,7 @@ router.get('/', authMiddleware, categoryController.getAllCategories);
  *       404:
  *         description: Category not found
  */
-router.get('/:id', authMiddleware, categoryController.getCategoryById);
+router.get('/:id',  categoryController.getCategoryById);
 
 /**
  * @swagger
@@ -113,7 +113,7 @@ router.get('/:id', authMiddleware, categoryController.getCategoryById);
  *       404:
  *         description: Category not found
  */
-router.put('/:id', authMiddleware, categoryController.updateCategoryById);
+router.put('/:id', categoryController.updateCategoryById);
 
 /**
  * @swagger
@@ -136,6 +136,6 @@ router.put('/:id', authMiddleware, categoryController.updateCategoryById);
  *       404:
  *         description: Category not found
  */
-router.delete('/:id', authMiddleware, categoryController.deleteCategoryById);
+router.delete('/:id',  categoryController.deleteCategoryById);
 
 module.exports = router;

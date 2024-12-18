@@ -1,7 +1,7 @@
 const Festival = require('../models/festival.model'); // Replace with your actual model
 
 // Create a new festival
-exports.createFestival = async (req, res) => {
+const createFestival = async (req, res) => {
   try {
     const festival = new Festival(req.body);
     await festival.save();
@@ -12,7 +12,7 @@ exports.createFestival = async (req, res) => {
 };
 
 // Get all festivals
-exports.getAllFestivals = async (req, res) => {
+const getAllFestivals = async (req, res) => {
   try {
     const festivals = await Festival.find();
     res.status(200).json(festivals);
@@ -22,7 +22,7 @@ exports.getAllFestivals = async (req, res) => {
 };
 
 // Get a festival by ID
-exports.getFestivalById = async (req, res) => {
+const getFestivalById = async (req, res) => {
   try {
     const festival = await Festival.findById(req.params.id);
     if (!festival) return res.status(404).json({ message: 'Festival not found' });
@@ -33,7 +33,7 @@ exports.getFestivalById = async (req, res) => {
 };
 
 // Update a festival by ID
-exports.updateFestivalById = async (req, res) => {
+const updateFestivalById = async (req, res) => {
   try {
     const festival = await Festival.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!festival) return res.status(404).json({ message: 'Festival not found' });
@@ -44,7 +44,7 @@ exports.updateFestivalById = async (req, res) => {
 };
 
 // Delete a festival by ID
-exports.deleteFestivalById = async (req, res) => {
+const deleteFestivalById = async (req, res) => {
   try {
     const festival = await Festival.findByIdAndDelete(req.params.id);
     if (!festival) return res.status(404).json({ message: 'Festival not found' });
@@ -52,4 +52,13 @@ exports.deleteFestivalById = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+// Exporting functions
+module.exports = {
+  createFestival,
+  getAllFestivals,
+  getFestivalById,
+  updateFestivalById,
+  deleteFestivalById,
 };

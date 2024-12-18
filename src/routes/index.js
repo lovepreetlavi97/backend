@@ -8,7 +8,7 @@ const relationRoute = require('./relation.route');
 const subcategoryRoute = require('./subcategory.route');
 const userRoute = require('./user.route');
 const promoRoute = require('./promocode.route');
-
+const {adminAuth,userAuth} = require('../middlewares/auth/auth.middleware');
 const router = express.Router();
 
 // Register your routes
@@ -20,6 +20,6 @@ router.use('/products', productRoute);
 router.use('/relations', relationRoute);
 router.use('/subcategories', subcategoryRoute);
 router.use('/users', userRoute);
-router.use('/promocodes', promoRoute);
+router.use('/promocodes',promoRoute);
 
 module.exports = router;

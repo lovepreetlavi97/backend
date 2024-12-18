@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 
 const create = async (model, data) => {
-  console.log("create something")
+  console.log("create something",model, data)
   return model.create(data);
 };
 
@@ -9,10 +9,10 @@ const findOne = async (model, query, projection = {}) => {
   return model.findOne(query, projection);
 };
 
-const findMany = async (model, query = {}, projection = {}, options = {}) => {
-  return model.find(query, projection, options);
+const findMany = async (model, query = {}, projection = {}, options = {}, populate = '') => {
+  console.log(model, "model");
+  return model.find(query, projection, options).populate(populate);
 };
-
 const findAndUpdate = async (model, query, data, options = { new: true }) => {
   return model.findOneAndUpdate(query, data, options);
 };

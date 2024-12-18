@@ -6,13 +6,23 @@ const subcategorySchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  category: {
+  categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category', // Reference to the Category model
     required: true,
   },
+  image: {
+    type: Object,
+    default: {},
+  },
+  isDeleted: {
+    type: Boolean,
+    default:false,
+  },
+  isBlocked: {
+    type: Boolean,
+    default:false,
+  },
 }, { timestamps: true });
 
-const Subcategory = mongoose.model('Subcategory', subcategorySchema);
-
-module.exports = Subcategory;
+module.exports = mongoose.model('Subcategory', subcategorySchema);
