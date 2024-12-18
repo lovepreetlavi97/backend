@@ -11,18 +11,6 @@ const subcategorySchema = new mongoose.Schema({
     ref: 'Category', // Reference to the Category model
     required: true,
   },
-  originalPrice: {
-    type: Number,
-    required: true,
-  },
-  discountedPrice: {
-    type: Number,
-    required: true,
-  },
-  weight: {
-    type: Number,
-    required: true,
-  },
   image: {
     type: Object,
     default: {},

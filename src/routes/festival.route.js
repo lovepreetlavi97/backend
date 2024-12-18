@@ -2,16 +2,57 @@ const express = require('express');
 const router = express.Router();
 const festivalController = require('../controllers/festival.controller');
 const authMiddleware = require('../middlewares/auth/auth.middleware');
+const authRole = require('../middlewares/auth/authRole.middleware');
+
 /**
- * @swagger
- * tags:
- *   name: Festival
- *   description: Festival management
+ * User-facing routes (no authentication required)
  */
+const userRouter = express.Router();
 
 /**
  * @swagger
- * /festivals:
+ * /user/festivals:
+ *   get:
+ *     summary: Get all festivals (user-facing)
+ *     tags: [Festival]
+ *     responses:
+ *       200:
+ *         description: A list of festivals
+ */
+userRouter.get('/', festivalController.getAllFestivalsForUsers);
+
+/**
+ * @swagger
+ * /user/festivals/{id}:
+ *   get:
+ *     summary: Get a festival by ID (user-facing)
+ *     tags: [Festival]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: The ID of the festival
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Festival details
+ *       404:
+ *         description: Festival not found
+ */
+userRouter.get('/:id', festivalController.getFestivalByIdForUsers);
+
+/**
+ * Admin routes (require authentication and admin role)
+ */
+const adminRouter = express.Router();
+
+adminRouter.use(authMiddleware); // Authenticate all routes below
+adminRouter.use(authRole('admin')); // Authorize only admins
+
+/**
+ * @swagger
+ * /admin/festivals:
  *   post:
  *     summary: Create a new festival
  *     tags: [Festival]
@@ -33,25 +74,25 @@ const authMiddleware = require('../middlewares/auth/auth.middleware');
  *       400:
  *         description: Bad request
  */
-router.post('/',festivalController.createFestival);
+adminRouter.post('/', festivalController.createFestival);
 
 /**
  * @swagger
- * /festivals:
+ * /admin/festivals:
  *   get:
- *     summary: Get all festivals
+ *     summary: Get all festivals (admin-facing)
  *     tags: [Festival]
  *     responses:
  *       200:
- *         description: A list of festivals
+ *         description: A list of festivals for management
  */
-router.get('/', festivalController.getAllFestivals);
+adminRouter.get('/', festivalController.getAllFestivals);
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /admin/festivals/{id}:
  *   get:
- *     summary: Get a festival by ID
+ *     summary: Get a festival by ID (admin-facing)
  *     tags: [Festival]
  *     parameters:
  *       - name: id
@@ -66,11 +107,11 @@ router.get('/', festivalController.getAllFestivals);
  *       404:
  *         description: Festival not found
  */
-router.get('/:id',festivalController.getFestivalById);
+adminRouter.get('/:id', festivalController.getFestivalById);
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /admin/festivals/{id}:
  *   put:
  *     summary: Update a festival by ID
  *     tags: [Festival]
@@ -99,11 +140,11 @@ router.get('/:id',festivalController.getFestivalById);
  *       404:
  *         description: Festival not found
  */
-router.put('/:id',festivalController.updateFestivalById);
+adminRouter.put('/:id', festivalController.updateFestivalById);
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /admin/festivals/{id}:
  *   delete:
  *     summary: Delete a festival by ID
  *     tags: [Festival]
@@ -120,6 +161,12 @@ router.put('/:id',festivalController.updateFestivalById);
  *       404:
  *         description: Festival not found
  */
-router.delete('/:id', festivalController.deleteFestivalById);
+adminRouter.delete('/:id', festivalController.deleteFestivalById);
+
+/**
+ * Mount user and admin routers
+ */
+router.use('/user/festivals', userRouter);
+router.use('/admin/festivals', adminRouter);
 
 module.exports = router;
