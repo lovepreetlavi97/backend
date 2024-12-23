@@ -19,7 +19,7 @@ router.use('/festivals', festivalRoute);
 router.use('/products', productRoute);
 router.use('/relations', relationRoute);
 router.use('/subcategories', subcategoryRoute);
-router.use('/users', userRoute);
+router.use('/user', userRoute);
 router.use('/promocodes',promoRoute);
 
 module.exports = router;

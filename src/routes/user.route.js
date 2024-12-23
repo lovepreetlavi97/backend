@@ -121,5 +121,30 @@ router.put('/:id', userController.updateUserById);
  *         description: User not found
  */
 router.delete('/:id', userController.deleteUserById);
-
+/**
+ * @swagger
+ * /user/login:
+ *   post:
+ *     summary: User login with phone and OTP
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *               otp:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       404:
+ *         description: User not found
+ *       401:
+ *         description: Invalid OTP
+ */
+router.post('/login', userController.loginUser);
 module.exports = router;

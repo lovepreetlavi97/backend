@@ -13,7 +13,7 @@ const userRouter = express.Router();
  * /user/festivals:
  *   get:
  *     summary: Get all festivals (user-facing)
- *     tags: [Festival]
+ *     tags: [User - API's]
  *     responses:
  *       200:
  *         description: A list of festivals
@@ -25,7 +25,7 @@ userRouter.get('/', festivalController.getAllFestivals);
  * /user/festivals/{id}:
  *   get:
  *     summary: Get a festival by ID (user-facing)
- *     tags: [Festival]
+ *     tags: [User - API's]
  *     parameters:
  *       - name: id
  *         in: path
@@ -40,6 +40,7 @@ userRouter.get('/', festivalController.getAllFestivals);
  *         description: Festival not found
  */
 userRouter.get('/:id', festivalController.getFestivalById);
+
 
 
 /**

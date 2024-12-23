@@ -28,7 +28,9 @@ const softDelete = async (model, query) => {
 const findByEmail = async (model, email) => {
   return model.findOne({ email });
 };
-
+const findByPhone = async (model, phoneNumber) => {
+  return model.findOne({ phoneNumber });
+};
 const updatePassword = async (admin, newPassword) => {
   admin.password = await bcrypt.hash(newPassword, 10);
   return admin.save();
@@ -49,4 +51,5 @@ module.exports = {
   findByEmail,
   updatePassword,
   verifyPassword,
+  findByPhone
 };
