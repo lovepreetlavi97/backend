@@ -76,70 +76,60 @@ const deleteUserById = async (req, res) => {
 };
 const loginUser = async (req, res) => {
 	try {
-		const { phoneNumber, otp } = req.body;
+        const { phoneNumber } = req.body;
 
-		// Validate request data
-		if (!phoneNumber) {
-			return res.status(400).json({ message: "Phone number is required" });
-		}
+        // Validate request data
+        if (!phoneNumber) {
+            return res.status(400).json({ message: "Phone number is required" });
+        }
 
-		// Find user by phone number
-		let user = await findByPhone(User, phoneNumber);
+        // Generate a random OTP (for demonstration purposes)
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-		// If user exists, log them in
-		if (user) {
-			// Generate a JWT token
-			const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
-				expiresIn: "1h", // Token expiration time
-			});
+        // TODO: Integrate with an SMS service to send the OTP to the user's phone number
+        console.log(`OTP for ${phoneNumber}: ${otp}`); // Log the OTP for debugging
 
-			// Update the user's token in the database
-			user.token = token;
-			await user.save();
-
-			return res.status(200).json({
-				message: "Login successful",
-				token,
-				user: {
-					id: user._id,
-					name: user.name || null, // Handle cases where name might not exist
-					phoneNumber: user.phoneNumber,
-				},
-			});
-		}
-
-		// Create a new user
-		user = new User({
-			phoneNumber,
-			token: null, // Token will be generated after successful login
-		});
-		await user.save();
-
-		// Generate a JWT token
-		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
-			expiresIn: "1h",
-		});
-
-		// Update the user's token in the database
-		user.token = token;
-		await user.save();
-
-		// Respond with token and user details
-		res.status(201).json({
-			message: "User created and logged in successfully",
-			token,
-			user: {
-				id: user._id,
-				name: user.name || null,
-				phoneNumber: user.phoneNumber,
-			},
-		});
-	} catch (error) {
-		console.error("Failed to log in user:", error);
-		res.status(500).json({ message: "Internal Server Error" });
-	}
+        return res.status(200).json({
+			status:200,
+            message: "OTP sent successfully",
+            otp, // Provide OTP in the response for now (only for testing/demo purposes)
+        });
+    } catch (error) {
+        console.error("Failed to send OTP:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
 };
+const verifyOTP=  async (req, res) => {
+    try {
+        const { phoneNumber, otp } = req.body;
 
+        // Validate request data
+        if (!phoneNumber || !otp) {
+            return res.status(400).json({ message: "Phone number and OTP are required" });
+        }
+
+        // TODO: Validate the OTP (in production, retrieve and compare with stored OTP)
+        // For demonstration, assume OTP is always valid
+        const isValidOtp = true; // Replace with actual validation logic
+
+        if (!isValidOtp) {
+            return res.status(401).json({ message: "Invalid or expired OTP" });
+        }
+
+        // Generate a JWT token
+        const token = jwt.sign({ phoneNumber }, process.env.JWT_SECRET_KEY, {
+            expiresIn: "1h", // Token expiration time
+        });
+
+        return res.status(200).json({
+            message: "OTP verified successfully",
+            token,
+        });
+    } catch (error) {
+        console.error("Failed to verify OTP:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
 // // Example function to verify OTP with an external API
 // const verifyOtpWithExternalApi = async (phoneNumber, otp) => {
 //   try {
@@ -166,4 +156,5 @@ module.exports = {
 	getUserById,
 	getAllUsers,
 	createUser,
+	verifyOTP
 };

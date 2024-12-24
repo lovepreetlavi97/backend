@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 
 /**
  * @swagger
@@ -125,7 +126,7 @@ router.delete('/:id', userController.deleteUserById);
  * @swagger
  * /user/login:
  *   post:
- *     summary: User login with phone and OTP
+ *     summary: Send OTP to the user's phone number
  *     tags: [User]
  *     requestBody:
  *       required: true
@@ -136,15 +137,64 @@ router.delete('/:id', userController.deleteUserById);
  *             properties:
  *               phoneNumber:
  *                 type: string
- *               otp:
- *                 type: string
+ *                 description: User's phone number
  *     responses:
  *       200:
- *         description: Login successful
- *       404:
- *         description: User not found
- *       401:
- *         description: Invalid OTP
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 otp:
+ *                   type: string
+ *       400:
+ *         description: Bad request, phone number is required
+ *       500:
+ *         description: Internal Server Error
  */
 router.post('/login', userController.loginUser);
+
+
+/**
+ * @swagger
+ * /user/verify-otp:
+ *   post:
+ *     summary: Verify OTP and return JWT token
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: User's phone number
+ *               otp:
+ *                 type: string
+ *                 description: OTP received by the user
+ *     responses:
+ *       200:
+ *         description: OTP verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 token:
+ *                   type: string
+ *       400:
+ *         description: Bad request, missing or invalid data
+ *       401:
+ *         description: Invalid or expired OTP
+ *       500:
+ *         description: Internal Server Error
+ */
+router.post('/verifyOTP', userAuth, userController.verifyOTP);
 module.exports = router;
