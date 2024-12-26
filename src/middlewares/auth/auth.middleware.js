@@ -9,10 +9,11 @@ const authMiddleware = (requiredRole) => {
   return async (req, res, next) => {
     try {
       const token = req.headers.authorization?.split(' ')[1];
+      console.log(token,"tokentokentokentokentoken")
       if (!token) {
         return res.status(401).json({ message: 'No token provided' });
       }
-console.log(token,"token")
+      console.log(token,"token")
       const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
       let user;
 
@@ -23,6 +24,7 @@ console.log(token,"token")
         console.log(user,"user")
         if (!user) return res.status(404).json({ message: 'Admin not found' });
       } else if (requiredRole === 'user') {
+        console.log(decoded,"decodeddecodeddecodeddecoded")
         user = await findOne(User, { _id: decoded.id });
         if (!user) return res.status(404).json({ message: 'User not found' });
       }

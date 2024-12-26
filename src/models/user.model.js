@@ -22,6 +22,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'user',
   },
+  token: {
+    type: String,
+    required: false,
+  },
+  otp: {
+    type: String,
+    required: false,
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

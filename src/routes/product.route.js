@@ -161,4 +161,17 @@ router.put('/:id', productController.updateProductById);
  */
 router.delete('/:id', productController.deleteProductById);
 
+
+
+/**
+ * @swagger
+ * /user/products:
+ *   get:
+ *     summary: Get all products
+ *      tags: [User - API's]
+ *     responses:
+ *       200:
+ *         description: A list of products
+ */
+router.get('/products', productController.getAllProducts);
 module.exports = router;

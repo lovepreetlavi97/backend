@@ -1,160 +1,188 @@
 const {
-	create,
-	findOne,
-	findMany,
-	findByPhone,
-	findAndUpdate,
-	softDelete,
-	findByEmail,
-	updatePassword,
-	verifyPassword,
+  create,
+  findOne,
+  findMany,
+  findByPhone,
+  findAndUpdate,
+  softDelete,
+  findByEmail,
+  updatePassword,
+  verifyPassword,
 } = require("../services/mongodb/mongoService");
+const { User } = require("../models/index");
+const jwt = require("jsonwebtoken");
 
-const jwt = require("jsonwebtoken"); // Import JWT
-
-const User = require("../models/user.model"); // Replace with your actual model
 const { hashPassword } = require("../utils/bcrypt");
+const { successResponse, errorResponse } = require("../utils/responseUtil");
+const messages = require("../utils/messages");
+
 // Create a new user
 const createUser = async (req, res) => {
-	try {
-		const userData = req.body;
-		if (userData.password)
-			userData.password = await hashPassword(userData.password);
+  try {
+    const userData = req.body;
+    if (userData.password)
+      userData.password = await hashPassword(userData.password);
 
-		const user = await create(User, userData);
+    const user = await create(User, userData);
 
-		res.status(201).json(user);
-	} catch (error) {
-		res.status(400).json({ error: error.message });
-		0;
-	}
+    return successResponse(res, 201, messages.USER_CREATED, { user });
+  } catch (error) {
+    return errorResponse(res, 400, messages.USER_CREATION_FAILED, {
+      error: error.message,
+    });
+  }
 };
 
 // Get all users
 const getAllUsers = async (req, res) => {
-	try {
-		const users = await User.find();
-		res.status(200).json(users);
-	} catch (error) {
-		res.status(500).json({ error: error.message });
-	}
+  try {
+    const users = await User.find();
+    return successResponse(res, 200, messages.USERS_RETRIEVED, { users });
+  } catch (error) {
+    return errorResponse(res, 500, messages.USER_RETRIEVAL_FAILED, {
+      error: error.message,
+    });
+  }
 };
 
 // Get a user by ID
 const getUserById = async (req, res) => {
-	try {
-		const user = await User.findById(req.params.id);
-		if (!user) return res.status(404).json({ message: "User not found" });
-		res.status(200).json(user);
-	} catch (error) {
-		res.status(500).json({ error: error.message });
-	}
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return errorResponse(res, 404, messages.USER_NOT_FOUND);
+
+    return successResponse(res, 200, messages.USER_RETRIEVED, { user });
+  } catch (error) {
+    return errorResponse(res, 500, messages.USER_RETRIEVAL_FAILED, {
+      error: error.message,
+    });
+  }
 };
 
 // Update a user by ID
 const updateUserById = async (req, res) => {
-	try {
-		const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-			new: true,
-		});
-		if (!user) return res.status(404).json({ message: "User not found" });
-		res.status(200).json(user);
-	} catch (error) {
-		res.status(400).json({ error: error.message });
-	}
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    if (!user) return errorResponse(res, 404, messages.USER_NOT_FOUND);
+
+    return successResponse(res, 200, messages.USER_UPDATED, { user });
+  } catch (error) {
+    return errorResponse(res, 400, messages.USER_UPDATE_FAILED, {
+      error: error.message,
+    });
+  }
 };
 
 // Delete a user by ID
 const deleteUserById = async (req, res) => {
-	try {
-		const user = await User.findByIdAndDelete(req.params.id);
-		if (!user) return res.status(404).json({ message: "User not found" });
-		res.status(204).send();
-	} catch (error) {
-		res.status(500).json({ error: error.message });
-	}
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return errorResponse(res, 404, messages.USER_NOT_FOUND);
+
+    return successResponse(res, 204, messages.USER_DELETED);
+  } catch (error) {
+    return errorResponse(res, 500, messages.USER_DELETION_FAILED, {
+      error: error.message,
+    });
+  }
 };
+// Optimized Login User Controller
 const loginUser = async (req, res) => {
-	try {
-        const { phoneNumber } = req.body;
+  try {
+		let token
+    const { phoneNumber } = req.body;
 
-        // Validate request data
-        if (!phoneNumber) {
-            return res.status(400).json({ message: "Phone number is required" });
-        }
-
-        // Generate a random OTP (for demonstration purposes)
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // TODO: Integrate with an SMS service to send the OTP to the user's phone number
-        console.log(`OTP for ${phoneNumber}: ${otp}`); // Log the OTP for debugging
-
-        return res.status(200).json({
-			status:200,
-            message: "OTP sent successfully",
-            otp, // Provide OTP in the response for now (only for testing/demo purposes)
-        });
-    } catch (error) {
-        console.error("Failed to send OTP:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+    // Validate phone number
+    if (!phoneNumber) {
+      return errorResponse(res, 400, messages.PHONE_REQUIRED);
     }
+
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`Generated OTP for ${phoneNumber}: ${otp}`);
+
+    // Check if user exists
+    let user = await findByPhone(User, phoneNumber);
+
+    // Generate token
+     token = jwt.sign(
+      { id: user ? user._id : undefined },
+      process.env.JWT_SECRET_KEY,
+      {
+        // expiresIn: "1h", // Token expiration time
+      }
+    );
+
+    if (user) {
+      // Update existing user with token and OTP
+      user.token = token;
+      user.otp = otp;
+      await user.save();
+    } else {
+      // Create new user with token and OTP
+      user = await create(User, { phoneNumber, token, otp });
+      // Generate token
+       token = jwt.sign(
+        { id: user ? user._id : undefined },
+        process.env.JWT_SECRET_KEY,
+        {
+          // expiresIn: "1h", // Token expiration time
+        }
+      );
+      user.token = token;
+      await user.save();
+    }
+
+    // Return success response
+    return successResponse(res, 200, messages.OTP_SENT, { user });
+  } catch (error) {
+    console.error("Error during user login:", error);
+    return errorResponse(res, 500, messages.OTP_SEND_FAILED, {
+      error: error.message,
+    });
+  }
 };
-const verifyOTP=  async (req, res) => {
-    try {
-        const { phoneNumber, otp } = req.body;
 
-        // Validate request data
-        if (!phoneNumber || !otp) {
-            return res.status(400).json({ message: "Phone number and OTP are required" });
-        }
+// Verify OTP
+const verifyOTP = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
 
-        // TODO: Validate the OTP (in production, retrieve and compare with stored OTP)
-        // For demonstration, assume OTP is always valid
-        const isValidOtp = true; // Replace with actual validation logic
+    // if (!phoneNumber || !otp) {
+    // 	return errorResponse(res, 400, messages.PHONE_REQUIRED);
+    // }
+    // Check if user exists
+    console.log(req.user, "req.userreq.userreq.user");
+    let user = await findOne(User, { _id: req.user._id, otp: otp });
 
-        if (!isValidOtp) {
-            return res.status(401).json({ message: "Invalid or expired OTP" });
-        }
-
-        // Generate a JWT token
-        const token = jwt.sign({ phoneNumber }, process.env.JWT_SECRET_KEY, {
-            expiresIn: "1h", // Token expiration time
-        });
-
-        return res.status(200).json({
-            message: "OTP verified successfully",
-            token,
-        });
-    } catch (error) {
-        console.error("Failed to verify OTP:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+    if (!user) {
+      return errorResponse(res, 401, messages.OTP_INVALID);
     }
-}
-// // Example function to verify OTP with an external API
-// const verifyOtpWithExternalApi = async (phoneNumber, otp) => {
-//   try {
-//     // Replace this with your external API call
-//     // Example: Using Axios to call the external OTP verification API
-//     const response = await axios.post("https://example.com/verify-otp", {
-//       phoneNumber,
-//       otp,
-//     });
 
-//     // Check the response from the API
-//     return response.data.success; // Adjust according to your API's response format
-//   } catch (error) {
-//     console.error("OTP verification failed:", error);
-//     return false;
-//   }
-// };
+    const token = jwt.sign(
+      { id: req.user ? req.user._id : undefined },
+      process.env.JWT_SECRET_KEY,
+      {
+        // expiresIn: "1h",
+      }
+    );
 
-// Exporting functions
+    return successResponse(res, 200, messages.OTP_VERIFIED, { token });
+  } catch (error) {
+    return errorResponse(res, 500, messages.OTP_VERIFY_FAILED, {
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
-	loginUser,
-	updateUserById,
-	deleteUserById,
-	getUserById,
-	getAllUsers,
-	createUser,
-	verifyOTP
+  loginUser,
+  updateUserById,
+  deleteUserById,
+  getUserById,
+  getAllUsers,
+  createUser,
+  verifyOTP,
 };

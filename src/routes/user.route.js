@@ -171,9 +171,6 @@ router.post('/login', userController.loginUser);
  *           schema:
  *             type: object
  *             properties:
- *               phoneNumber:
- *                 type: string
- *                 description: User's phone number
  *               otp:
  *                 type: string
  *                 description: OTP received by the user
@@ -196,5 +193,5 @@ router.post('/login', userController.loginUser);
  *       500:
  *         description: Internal Server Error
  */
-router.post('/verifyOTP', userAuth, userController.verifyOTP);
+router.post('/verify-otp', userAuth, userController.verifyOTP);
 module.exports = router;
