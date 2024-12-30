@@ -9,7 +9,51 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *   name: User
  *   description: User management
  */
+/**
+ * @swagger
+ * /user/festivals:
+ *   get:
+ *     summary: Get all festivals (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of festivals
+ */
+router.get('/festivals',userAuth,userController.getAllFestivals);
 
+/**
+ * @swagger
+ * /user/subCategories:
+ *   get:
+ *     summary: Get all subCategories (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of subCategories
+ */
+router.get('/subCategories',userAuth,userController.getAllSubCategories);
+/**
+ * @swagger
+ * /user/categories:
+ *   get:
+ *     summary: Get all categories (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of categories
+ */
+router.get('/categories',userAuth,userController.getAllCategories);
+/**
+ * @swagger
+ * /user/products:
+ *   get:
+ *     summary: Get all products (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of products
+ */
+router.get('/products',userAuth,userController.getAllProducts);
 /**
  * @swagger
  * /user:
@@ -136,8 +180,11 @@ router.delete('/:id', userController.deleteUserById);
  *             type: object
  *             properties:
  *               phoneNumber:
- *                 type: string
+ *                 type: number
  *                 description: User's phone number
+ *               countryCode:
+ *                 type: string
+ *                 description: "+91"
  *     responses:
  *       200:
  *         description: OTP sent successfully
@@ -194,4 +241,6 @@ router.post('/login', userController.loginUser);
  *         description: Internal Server Error
  */
 router.post('/verify-otp', userAuth, userController.verifyOTP);
+
+
 module.exports = router;

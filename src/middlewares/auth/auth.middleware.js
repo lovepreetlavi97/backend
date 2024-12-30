@@ -1,44 +1,56 @@
 const jwt = require('jsonwebtoken');
-const { findOne } = require('../../services/mongodb/mongoService'); 
-// const Admin = require('../../models/admin.model'); // Admin model
+const { findOne } = require('../../services/mongodb/mongoService');
 const User = require('../../models/user.model'); // User model
 
 // Base authentication middleware
 const authMiddleware = (requiredRole) => {
-  console.log(requiredRole,"requiredRolerequiredRolerequiredRole")
   return async (req, res, next) => {
     try {
+      // Extract token from Authorization header
       const token = req.headers.authorization?.split(' ')[1];
-      console.log(token,"tokentokentokentokentoken")
       if (!token) {
-        return res.status(401).json({ message: 'No token provided' });
+        return res.status(401).json({ status: 'error', statusCode: 401, message: 'No token provided' });
       }
-      console.log(token,"token")
-      const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+      let decoded;
+      try {
+        // Verify JWT token
+        decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      } catch (error) {
+        return res.status(401).json({ status: 'error', statusCode: 401, message: 'Invalid or expired token' });
+      }
+
       let user;
-
-      // Check the role and query the appropriate model
       if (requiredRole === 'admin') {
-        console.log( decoded.id," decoded.id decoded.id decoded.id")
-        user = await findOne(User, { _id: decoded.id });
-        console.log(user,"user")
-        if (!user) return res.status(404).json({ message: 'Admin not found' });
+        // Fetch admin user
+        user = await findOne(User, { _id: decoded.id, token });
+        if (!user) {
+          return res.status(404).json({ status: 'error', statusCode: 404, message: 'Admin not found' });
+        }
       } else if (requiredRole === 'user') {
-        console.log(decoded,"decodeddecodeddecodeddecoded")
-        user = await findOne(User, { _id: decoded.id });
-        if (!user) return res.status(404).json({ message: 'User not found' });
+        // Fetch regular user
+        user = await findOne(User, { _id: decoded.id, token });
+        if (!user) {
+          return res.status(404).json({ status: 'error', statusCode: 404, message: 'User not found' });
+        }
       }
 
-      // Check if user role matches the required role
+      // Check if user's role matches the required role
       if (user.role !== requiredRole) {
-        return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+        return res.status(403).json({ status: 'error', statusCode: 403, message: 'Forbidden: Insufficient permissions' });
       }
 
-      req.user = user; // Attach user to request object
-      next(); // Proceed to next middleware or route handler
+      // Attach the authenticated user to the request object
+      req.user = user;
+      next(); // Proceed to the next middleware or route handler
     } catch (error) {
       console.error('Authentication error:', error);
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(500).json({
+        status: 'error',
+        statusCode: 500,
+        message: 'Internal server error',
+        error: error.message,
+      });
     }
   };
 };

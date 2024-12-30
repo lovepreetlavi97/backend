@@ -17,6 +17,18 @@ const messages = {
 	OTP_SEND_FAILED: "Failed to send OTP",
 	OTP_VERIFY_FAILED: "Failed to verify OTP",
 	INTERNAL_SERVER_ERROR: "Internal Server Error",
+	FESTIVALS_RETRIEVED: "Festivals retrieved successfully",
+  FESTIVALS_NOT_FOUND: "No festivals found",
+  FESTIVALS_RETRIEVAL_FAILED: "Failed to retrieve festivals",
+	SUBCATEGORIES_RETRIEVED: "Subcategories retrieved successfully",
+	SUBCATEGORIES_NOT_FOUND: "No subcategories found",
+	SUBCATEGORIES_RETRIEVAL_FAILED: "Failed to retrieve subcategories",
+	CATEGORIES_RETRIEVED: "Categories retrieved successfully",
+	CATEGORIES_NOT_FOUND: "No categories found",
+	CATEGORIES_RETRIEVAL_FAILED: "Failed to retrieve categories",
+	PRODUCTS_RETRIEVED: "Products retrieved successfully",
+	PRODUCTS_NOT_FOUND: "No products found",
+	PRODUCTS_RETRIEVAL_FAILED: "Failed to retrieve products",
 };
 
 module.exports = messages;

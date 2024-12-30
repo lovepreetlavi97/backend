@@ -8,38 +8,27 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  */
 const userRouter = express.Router();
 
-/**
- * @swagger
- * /user/festivals:
- *   get:
- *     summary: Get all festivals (user-facing)
- *     tags: [User - API's]
- *     responses:
- *       200:
- *         description: A list of festivals
- */
-userRouter.get('/', festivalController.getAllFestivals);
 
-/**
- * @swagger
- * /user/festivals/{id}:
- *   get:
- *     summary: Get a festival by ID (user-facing)
- *     tags: [User - API's]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: The ID of the festival
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Festival details
- *       404:
- *         description: Festival not found
- */
-userRouter.get('/:id', festivalController.getFestivalById);
+// /**
+//  * @swagger
+//  * /user/festivals/{id}:
+//  *   get:
+//  *     summary: Get a festival by ID (user-facing)
+//  *     tags: [User - API's]
+//  *     parameters:
+//  *       - name: id
+//  *         in: path
+//  *         required: true
+//  *         description: The ID of the festival
+//  *         schema:
+//  *           type: string
+//  *     responses:
+//  *       200:
+//  *         description: Festival details
+//  *       404:
+//  *         description: Festival not found
+//  */
+// userRouter.get('/:id', festivalController.getFestivalById);
 
 
 
@@ -161,10 +150,6 @@ adminRouter.put('/:id', adminAuth, festivalController.updateFestivalById);
  */
 adminRouter.delete('/:id', adminAuth, festivalController.deleteFestivalById);
 
-/**
- * Mount user and admin routers
- */
-router.use('/user/festivals', userRouter);
-router.use('/admin/festivals', adminRouter);
+
 
 module.exports = router;
