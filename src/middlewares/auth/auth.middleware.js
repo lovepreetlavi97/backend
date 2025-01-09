@@ -23,13 +23,15 @@ const authMiddleware = (requiredRole) => {
       let user;
       if (requiredRole === 'admin') {
         // Fetch admin user
-        user = await findOne(User, { _id: decoded.id, token });
+        user = await findOne(User, { _id: decoded.id,token:token });
         if (!user) {
           return res.status(404).json({ status: 'error', statusCode: 404, message: 'Admin not found' });
         }
       } else if (requiredRole === 'user') {
         // Fetch regular user
-        user = await findOne(User, { _id: decoded.id, token });
+        console.log(requiredRole,token,decoded.id,"requiredRole")
+        user = await findOne(User, { _id: decoded.id, token:token });
+        console.log(user,"useruser")
         if (!user) {
           return res.status(404).json({ status: 'error', statusCode: 404, message: 'User not found' });
         }

@@ -5,13 +5,13 @@ const {
   findAndUpdate, 
   deleteOne 
 } = require('../services/mongodb/mongoService');
-const { Subcategory } = require('../models/index'); // Adjust the import based on your project structure
+const { SubCategory } = require('../models/index'); // Adjust the import based on your project structure
 
 // Create a new subcategory
 exports.createSubcategory = async (req, res) => {
   try {
     const subcategoryData = req.body; // Get subcategory data from request body
-    const subcategory = await create(Subcategory, subcategoryData); // Use the create service function
+    const subcategory = await create(SubCategory, subcategoryData); // Use the create service function
     res.status(201).json(subcategory); // Respond with the created subcategory
   } catch (error) {
     res.status(400).json({ error: error.message }); // Handle errors
@@ -30,7 +30,7 @@ exports.getAllSubcategories = async (req, res) => {
     // Populate categoryId with only the name field of the category
     const populate = { path: 'categoryId', select: 'name' };
 
-    const subcategories = await findMany(Subcategory, query, projection, {}, populate);
+    const subcategories = await findMany(SubCategory, query, projection, {}, populate);
 
     res.status(200).json(subcategories); // Respond with populated subcategories
   } catch (error) {
@@ -44,7 +44,7 @@ exports.getAllSubcategories = async (req, res) => {
 // Get a subcategory by ID
 exports.getSubcategoryById = async (req, res) => {
   try {
-    const subcategory = await findOne(Subcategory, { _id: req.params.id }); // Use the findOne service function
+    const subcategory = await findOne(SubCategory, { _id: req.params.id }); // Use the findOne service function
     if (!subcategory) return res.status(404).json({ message: 'Subcategory not found' });
     res.status(200).json(subcategory); // Respond with the subcategory details
   } catch (error) {
@@ -55,7 +55,7 @@ exports.getSubcategoryById = async (req, res) => {
 // Update a subcategory by ID
 exports.updateSubcategoryById = async (req, res) => {
   try {
-    const subcategory = await findAndUpdate(Subcategory, { _id: req.params.id }, req.body); // Use the findAndUpdate service function
+    const subcategory = await findAndUpdate(SubCategory, { _id: req.params.id }, req.body); // Use the findAndUpdate service function
     if (!subcategory) return res.status(404).json({ message: 'Subcategory not found' });
     res.status(200).json(subcategory); // Respond with the updated subcategory
   } catch (error) {
@@ -66,7 +66,7 @@ exports.updateSubcategoryById = async (req, res) => {
 // Delete a subcategory by ID
 exports.deleteSubcategoryById = async (req, res) => {
   try {
-    const result = await deleteOne(Subcategory, { _id: req.params.id }); // Use the deleteOne service function
+    const result = await deleteOne(SubCategory, { _id: req.params.id }); // Use the deleteOne service function
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: 'Subcategory not found' }); // Check if any document was deleted
     }

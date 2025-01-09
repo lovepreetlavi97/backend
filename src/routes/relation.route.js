@@ -22,9 +22,7 @@ const relationController = require('../controllers/relation.controller');
  *           schema:
  *             type: object
  *             properties:
- *               userId:
- *                 type: string
- *               adminId:
+ *               name:
  *                 type: string
  *     responses:
  *       201:
@@ -87,9 +85,7 @@ router.get('/:id', relationController.getRelationById);
  *           schema:
  *             type: object
  *             properties:
- *               userId:
- *                 type: string
- *               adminId:
+ *               name:
  *                 type: string
  *     responses:
  *       200:

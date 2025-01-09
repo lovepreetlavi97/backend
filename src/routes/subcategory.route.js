@@ -31,6 +31,9 @@ const subcategoryController = require("../controllers/subcategory.controller");
  *                 type: string
  *                 description: ObjectId of the parent category
  *                 example: "60d5ec49c2e6b218a8c02011"
+ *               image:
+ *                 type: string
+ *                 description: Optional image URL. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Subcategory created successfully
@@ -140,6 +143,9 @@ router.get("/:id", subcategoryController.getSubcategoryById);
  *               category:
  *                 type: string
  *                 example: "60d5ec49c2e6b218a8c02011"
+ *               image:
+ *                 type: string
+ *                 description: Optional image URL. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Subcategory updated successfully
