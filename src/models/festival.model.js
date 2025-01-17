@@ -8,10 +8,9 @@ const festivalSchema = new mongoose.Schema({
   description: {
     type: String,
   },
-  image: {
-    type: String,
-
-    default:DEFAULT_IMAGE_URL
+  images: {
+    type: [String], // Declares it as an array of strings
+    default: [DEFAULT_IMAGE_URL] // Sets the default as an array with the default URL
   },
   isDeleted: {
     type: Boolean,

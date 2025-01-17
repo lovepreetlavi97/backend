@@ -11,10 +11,18 @@ const productController = require('../controllers/product.controller');
 
 /**
  * @swagger
- * /products:
- *   post:
- *     summary: Create a new product
+ * /products/{id}:
+ *   put:
+ *     summary: Update a product by ID
  *     tags: [Product]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: The ID of the product to be updated
+ *         schema:
+ *           type: string
+ *           example: "607d1f77bcf86cd799439011"
  *     requestBody:
  *       required: true
  *       content:
@@ -25,25 +33,24 @@ const productController = require('../controllers/product.controller');
  *               name:
  *                 type: string
  *                 description: The name of the product.
- *                 example: "Wireless Mouse"
+ *                 example: "Wireless Keyboard"
  *               actualPrice:
  *                 type: number
  *                 description: The actual price of the product.
- *                 example: 30.99
+ *                 example: 40.99
  *               discountedPrice:
  *                 type: number
  *                 description: The discounted price of the product (if any).
- *                 example: 25.99
+ *                 example: 35.99
  *               weight:
  *                 type: number
  *                 description: The weight of the product in kilograms.
- *                 example: 0.2
+ *                 example: 0.5
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: A list of image URLs of the product.
- *                 example: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *               categoryId:
  *                 type: string
  *                 description: The ID of the category the product belongs to.
@@ -65,14 +72,16 @@ const productController = require('../controllers/product.controller');
  *                 description: A list of related product IDs.
  *                 example: ["607d1f77bcf86cd799439044"]
  *     responses:
- *       201:
- *         description: Product created successfully
+ *       200:
+ *         description: Product updated successfully
  *       400:
  *         description: Bad request
+ *       404:
+ *         description: Product not found
  *       500:
  *         description: Internal server error
  */
-router.post('/', productController.createProduct);
+router.put('/:id', productController.updateProductById);
 
 
 /**
@@ -132,6 +141,11 @@ router.get('/:id', productController.getProductById);
  *                 type: string
  *               price:
  *                 type: number
+ *               image:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Product updated successfully

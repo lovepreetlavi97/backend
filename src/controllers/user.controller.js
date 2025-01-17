@@ -230,6 +230,30 @@ const getAllProducts = async (req, res) => {
     });
   }
 };
+// Upload Images
+const uploadImages = async (req, res) => {
+  try {
+    // Ensure images are uploaded
+    if (!req.files || req.files.length === 0) {
+      return errorResponse(res, 400, 'No images provided for upload.');
+    }
+
+    // Extract URLs of uploaded images from S3
+    const imageUrls = req.files.map((file) => file.location);
+
+    return successResponse(res, 200, 'Images uploaded successfully.', {
+      images: imageUrls,
+    });
+  } catch (error) {
+    return errorResponse(res, 500, 'Failed to upload images.', {
+      error: error.message,
+    });
+  }
+};
+
+module.exports = {
+  uploadImages,
+};
 
 module.exports = {
   loginUser,
@@ -243,4 +267,5 @@ module.exports = {
   getAllSubCategories,
   getAllCategories,
   getAllProducts,
+  uploadImages
 };

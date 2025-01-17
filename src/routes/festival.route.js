@@ -55,6 +55,11 @@ const adminRouter = express.Router();
  *               date:
  *                 type: string
  *                 format: date
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Festival created successfully
@@ -121,6 +126,11 @@ adminRouter.get('/:id', adminAuth, festivalController.getFestivalById);
  *               date:
  *                 type: string
  *                 format: date
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Festival updated successfully

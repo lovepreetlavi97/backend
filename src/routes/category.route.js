@@ -38,9 +38,11 @@ const categoryController = require('../controllers/category.controller');
  *             properties:
  *               name:
  *                 type: string
- *               image:
- *                 type: string
- *                 description: Optional image URL. If not provided, a default image will be used.
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Category created successfully
@@ -110,9 +112,11 @@ router.get('/:id',  categoryController.getCategoryById);
  *             properties:
  *               name:
  *                 type: string
- *               image:
- *                 type: string
- *                 description: Optional image URL. If not provided, a default image will be used.
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Category updated successfully

@@ -24,6 +24,11 @@ const relationController = require('../controllers/relation.controller');
  *             properties:
  *               name:
  *                 type: string
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Relation created successfully
@@ -87,6 +92,11 @@ router.get('/:id', relationController.getRelationById);
  *             properties:
  *               name:
  *                 type: string
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Relation updated successfully

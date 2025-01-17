@@ -12,10 +12,11 @@ const categorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category', // Assuming you have subcategories in the same collection
   }],
-  image: {
-    type: String,
-    default:DEFAULT_IMAGE_URL
-  },
+  images: {
+    type: [String], // Declares it as an array of strings
+    default: [DEFAULT_IMAGE_URL] // Sets the default as an array with the default URL
+  }
+,  
   isDeleted: {
     type: Boolean,
     default:false,

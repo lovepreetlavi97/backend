@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
-
+const { uploadImagesToBucket } = require('../middlewares/multerUploads');
 /**
  * @swagger
  * tags:
@@ -241,6 +241,44 @@ router.post('/login', userController.loginUser);
  *         description: Internal Server Error
  */
 router.post('/verify-otp', userAuth, userController.verifyOTP);
+/**
+ * @swagger
+ * /user/upload-images:
+ *   post:
+ *     summary: Upload multiple images to S3 bucket
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Images uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       400:
+ *         description: Bad request, error in upload
+ *       500:
+ *         description: Internal Server Error
+ */
+router.post('/upload-images',  uploadImagesToBucket, userController.uploadImages);
 
 
 module.exports = router;

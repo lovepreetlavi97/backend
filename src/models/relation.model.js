@@ -5,11 +5,10 @@ const relationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  photo: {
-    type: String,
-
-    default:DEFAULT_IMAGE_URL
-  },
+  images: {
+    type: [String], // Declares it as an array of strings
+    default: [DEFAULT_IMAGE_URL] // Sets the default as an array with the default URL
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Relation', relationSchema);
