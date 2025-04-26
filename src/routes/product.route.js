@@ -1,14 +1,78 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/product.controller');
-
+const { uploadMultipleImages } = require("../middlewares/multerUploads");
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
  * tags:
  *   name: Product
  *   description: Product management
  */
-
+/**
+ * @swagger
+ * /products:
+ *   post:
+ *     summary: Create a new product
+ *     tags: [Product]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: The name of the product.
+ *                 example: "Gold Chain"
+ *               actualPrice:
+ *                 type: number
+ *                 description: The actual price of the product.
+ *                 example: 50000
+ *               discountedPrice:
+ *                 type: number
+ *                 description: The discounted price of the product (optional).
+ *                 example: 45000
+ *               weight:
+ *                 type: number
+ *                 description: Weight of the product in grams.
+ *                 example: 10
+ *               categoryId:
+ *                 type: string
+ *                 description: The ID of the category the product belongs to.
+ *                 example: "64f5e3c5a2e1b6d7889a1234"
+ *               subcategoryId:
+ *                 type: string
+ *                 description: The ID of the subcategory (optional).
+ *                 example: "64f5e3c5a2e1b6d7889a5678"
+ *               festivalIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of festival IDs (optional).
+ *                 example: ["64f5e3c5a2e1b6d7889a6789"]
+ *               relationIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of related product IDs (optional).
+ *                 example: ["64f5e3c5a2e1b6d7889a9999"]
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Product images (multiple files allowed)
+ *     responses:
+ *       201:
+ *         description: Product created successfully
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/", adminAuth,uploadMultipleImages, productController.createProduct);
 /**
  * @swagger
  * /products/{id}:
@@ -26,7 +90,7 @@ const productController = require('../controllers/product.controller');
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -40,37 +104,38 @@ const productController = require('../controllers/product.controller');
  *                 example: 40.99
  *               discountedPrice:
  *                 type: number
- *                 description: The discounted price of the product (if any).
+ *                 description: The discounted price of the product (optional).
  *                 example: 35.99
  *               weight:
  *                 type: number
  *                 description: The weight of the product in kilograms.
  *                 example: 0.5
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
  *               categoryId:
  *                 type: string
  *                 description: The ID of the category the product belongs to.
  *                 example: "607d1f77bcf86cd799439011"
  *               subcategoryId:
  *                 type: string
- *                 description: The ID of the subcategory the product belongs to (optional).
+ *                 description: The ID of the subcategory (optional).
  *                 example: "607d1f77bcf86cd799439022"
  *               festivalIds:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: A list of festival IDs associated with the product (optional).
+ *                 description: Array of festival IDs (optional).
  *                 example: ["607d1f77bcf86cd799439033"]
  *               relationIds:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: A list of related product IDs.
+ *                 description: Array of related product IDs.
  *                 example: ["607d1f77bcf86cd799439044"]
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Product images (multiple files allowed)
  *     responses:
  *       200:
  *         description: Product updated successfully
@@ -81,7 +146,7 @@ const productController = require('../controllers/product.controller');
  *       500:
  *         description: Internal server error
  */
-router.put('/:id', productController.updateProductById);
+router.put('/:id',adminAuth, uploadMultipleImages, productController.updateProductById);
 
 
 /**
@@ -94,7 +159,7 @@ router.put('/:id', productController.updateProductById);
  *       200:
  *         description: A list of products
  */
-router.get('/', productController.getAllProducts);
+router.get('/',adminAuth, productController.getAllProducts);
 
 /**
  * @swagger
@@ -115,7 +180,7 @@ router.get('/', productController.getAllProducts);
  *       404:
  *         description: Product not found
  */
-router.get('/:id', productController.getProductById);
+router.get('/:id',adminAuth, productController.getProductById);
 
 /**
  * @swagger
@@ -152,7 +217,7 @@ router.get('/:id', productController.getProductById);
  *       404:
  *         description: Product not found
  */
-router.put('/:id', productController.updateProductById);
+router.put('/:id',adminAuth, productController.updateProductById);
 
 /**
  * @swagger
@@ -173,19 +238,31 @@ router.put('/:id', productController.updateProductById);
  *       404:
  *         description: Product not found
  */
-router.delete('/:id', productController.deleteProductById);
-
+router.delete('/:id',adminAuth, productController.deleteProductById);
 
 
 /**
  * @swagger
- * /user/products:
- *   get:
- *     summary: Get all products
- *      tags: [User - API's]
+ * /products/{id}/toggle-block:
+ *   put:
+ *     summary: Toggle block/unblock status of a product
+ *     tags: [Product]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: The ID of the product
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: A list of products
+ *         description: Product status updated successfully
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
  */
-router.get('/products', productController.getAllProducts);
+router.put('/:id/toggle-block', adminAuth, productController.toggleBlockStatus);
+
+
 module.exports = router;

@@ -9,10 +9,25 @@ const findOne = async (model, query, projection = {}) => {
   return model.findOne(query, projection);
 };
 
-const findMany = async (model, query = {}, projection = {}, options = {}, populate = '') => {
-  console.log(model, "model");
-  return model.find(query, projection, options).populate(populate);
+// const findMany = async (model, query = {}, projection = {}, options = {}, populate = '') => {
+//   console.log(model, "model");
+//   return model.find(query, projection, options).populate(populate);
+// };
+const findMany = async (model, query = {}, projection = {}, options = {}, populate = []) => {
+  console.log("Finding multiple documents in:", model.modelName, "with query:", query);
+  let queryExec = model.find(query, projection, options);
+
+  if (Array.isArray(populate)) {
+    populate.forEach((field) => {
+      queryExec = queryExec.populate(field);
+    });
+  } else if (typeof populate === 'string' && populate) {
+    queryExec = queryExec.populate(populate);
+  }
+
+  return queryExec;
 };
+
 const findAndUpdate = async (model, query, data, options = { new: true }) => {
   return model.findOneAndUpdate(query, data, options);
 };

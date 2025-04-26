@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const { adminAuth, superAdminAuth, adminOrSuperAdminAuth, checkPermission } = require('../middlewares/auth/auth.middleware');
+const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
 
 /**
  * @swagger
@@ -13,8 +15,10 @@ const adminController = require('../controllers/admin.controller');
  * @swagger
  * /admin:
  *   post:
- *     summary: Create a new admin
+ *     summary: Create a new admin (SuperAdmin only)
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -34,31 +38,34 @@ const adminController = require('../controllers/admin.controller');
  *       400:
  *         description: Bad request
  */
-router.post('/', adminController.createAdmin);
+router.post('/', superAdminAuth, adminController.createAdmin);
 
 /**
  * @swagger
  * /admin:
  *   get:
- *     summary: Get all admins
+ *     summary: Get all admins (requires manageAdmins permission)
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: A list of admins
  */
-router.get('/', adminController.getAllAdmins);
+router.get('/', adminOrSuperAdminAuth, checkPermission('manageAdmins'), cacheRoute(), adminController.getAllAdmins);
 
 /**
  * @swagger
  * /admin/{id}:
  *   get:
- *     summary: Get an admin by ID
+ *     summary: Get an admin by ID (requires manageAdmins permission)
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The ID of the admin
  *         schema:
  *           type: string
  *     responses:
@@ -67,19 +74,20 @@ router.get('/', adminController.getAllAdmins);
  *       404:
  *         description: Admin not found
  */
-router.get('/:id', adminController.getAdminById);
+router.get('/:id', adminOrSuperAdminAuth, checkPermission('manageAdmins'), cacheRoute(), adminController.getAdminById);
 
 /**
  * @swagger
  * /admin/{id}:
  *   put:
- *     summary: Update an admin by ID
+ *     summary: Update an admin (requires manageAdmins permission)
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The ID of the admin
  *         schema:
  *           type: string
  *     requestBody:
@@ -88,41 +96,65 @@ router.get('/:id', adminController.getAdminById);
  *         application/json:
  *           schema:
  *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
  *     responses:
  *       200:
  *         description: Admin updated successfully
  *       404:
  *         description: Admin not found
  */
-router.put('/:id', adminController.updateAdminById);
+router.put('/:id', adminOrSuperAdminAuth, checkPermission('manageAdmins'), clearRouteCache('route_/api/v1/admin*'), adminController.updateAdminById);
 
 /**
  * @swagger
  * /admin/{id}:
  *   delete:
- *     summary: Delete an admin by ID
+ *     summary: Delete an admin (SuperAdmin only)
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The ID of the admin
  *         schema:
  *           type: string
  *     responses:
- *       204:
+ *       200:
  *         description: Admin deleted successfully
  *       404:
  *         description: Admin not found
  */
-router.delete('/:id', adminController.deleteAdminById);
+router.delete('/:id', superAdminAuth, clearRouteCache('route_/api/v1/admin*'), adminController.deleteAdminById);
+
 /**
  * @swagger
+ * /admin/password:
+ *   put:
+ *     summary: Update admin password
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       401:
+ *         description: Invalid old password
+ */
+router.put('/password/update', adminOrSuperAdminAuth, adminController.updateAdminPassword);
+
+/**
+* @swagger
  * /admin/login:
  *   post:
  *     summary: Admin login
@@ -136,8 +168,10 @@ router.delete('/:id', adminController.deleteAdminById);
  *             properties:
  *               email:
  *                 type: string
+ *                 example: admin@example.com
  *               password:
  *                 type: string
+ *                 example: Password123
  *     responses:
  *       200:
  *         description: Login successful
@@ -147,12 +181,29 @@ router.delete('/:id', adminController.deleteAdminById);
  *         description: Invalid credentials
  */
 router.post('/login', adminController.loginAdmin);
+
 /**
- * @swagger
- * /admin/password:
- *   patch:
- *     summary: Update the password of an admin
+* @swagger
+ * /admin/logout:
+ *   post:
+ *     summary: Admin logout
  *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ */
+router.post('/logout', adminOrSuperAdminAuth, adminController.logoutAdmin);
+
+/**
+* @swagger
+ * /admin/user:
+ *   post:
+ *     summary: Create a new user (requires manageUsers permission)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -160,21 +211,24 @@ router.post('/login', adminController.loginAdmin);
  *           schema:
  *             type: object
  *             properties:
+ *               name:
+ *                 type: string
  *               email:
  *                 type: string
- *               oldPassword:
+ *               password:
  *                 type: string
- *               newPassword:
+ *               countryCode:
+ *                 type: string
+ *               phoneNumber:
  *                 type: string
  *     responses:
- *       200:
- *         description: Password updated successfully
- *       400:
- *         description: Bad request
- *       404:
- *         description: Admin not found
- *       401:
- *         description: Invalid password
+ *       201:
+ *         description: User created successfully
+ *       403:
+ *         description: Insufficient permissions
+ *       409:
+ *         description: User with this email/phone already exists
  */
-router.patch('/password', adminController.updateAdminPassword);
+router.post('/user', adminOrSuperAdminAuth, checkPermission('manageUsers'), adminController.createUser);
+
 module.exports = router;

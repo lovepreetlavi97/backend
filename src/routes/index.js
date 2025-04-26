@@ -8,18 +8,27 @@ const relationRoute = require('./relation.route');
 const subcategoryRoute = require('./subcategory.route');
 const userRoute = require('./user.route');
 const promoRoute = require('./promocode.route');
-const {adminAuth,userAuth} = require('../middlewares/auth/auth.middleware');
+const cartRoute = require('./cart.route');
+const wishlistRoute = require('./wishlist.route');
+const orderRoute = require('./order.route');
+const reviewRoute = require('./review.route');
+const superAdminRoute = require('./superAdmin.route');
 const router = express.Router();
 
 // Register your routes
 router.use('/', welcomeRoute);
 router.use('/admin', adminRoute);
-router.use('/categories', categoryRoute);
-router.use('/festivals', festivalRoute);
-router.use('/products', productRoute);
-router.use('/relations', relationRoute);
-router.use('/subcategories', subcategoryRoute);
+router.use('/superadmin', superAdminRoute);
+router.use('/category', categoryRoute);
+router.use('/festival', festivalRoute);
+router.use('/product', productRoute);
+router.use('/relation', relationRoute);
+router.use('/subcategory', subcategoryRoute);
 router.use('/user', userRoute);
-router.use('/promocodes',promoRoute);
+router.use('/promo', promoRoute);
+router.use('/cart', cartRoute);
+router.use('/wishlist', wishlistRoute);
+router.use('/order', orderRoute);
+router.use('/review', reviewRoute);
 
 module.exports = router;

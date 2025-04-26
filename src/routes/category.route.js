@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/category.controller');
-
-
+// const { uploadSingleImage } = require("../middlewares/multerUploads");
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
+const { uploadMultipleImages } = require("../middlewares/multerUploads");
 /**
  * @swagger
  * components:
@@ -28,29 +29,33 @@ const categoryController = require('../controllers/category.controller');
  *     summary: Create a new category
  *     tags: [Category]
  *     security:
- *       - BearerAuth: [] 
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The name of the category.
+ *                 example: "Rings"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Category created successfully
  *       400:
  *         description: Bad request
+ *       500:
+ *         description: Internal server error
  */
-router.post('/',  categoryController.createCategory);
-
+router.post('/',adminAuth, uploadMultipleImages, categoryController.createCategory);
 /**
  * @swagger
  * /categories:
@@ -63,7 +68,7 @@ router.post('/',  categoryController.createCategory);
  *       200:
  *         description: A list of categories
  */
-router.get('/', categoryController.getAllCategories);
+router.get('/',adminAuth, categoryController.getAllCategories);
 
 /**
  * @swagger
@@ -86,7 +91,7 @@ router.get('/', categoryController.getAllCategories);
  *       404:
  *         description: Category not found
  */
-router.get('/:id',  categoryController.getCategoryById);
+router.get('/:id', adminAuth, categoryController.getCategoryById);
 
 /**
  * @swagger
@@ -106,24 +111,29 @@ router.get('/:id',  categoryController.getCategoryById);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The updated name of the category.
+ *                 example: "Necklaces"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional updated array of image files. If not provided, the existing images will be retained.
  *     responses:
  *       200:
  *         description: Category updated successfully
  *       404:
  *         description: Category not found
+ *       400:
+ *         description: Bad request
  */
-router.put('/:id', categoryController.updateCategoryById);
+router.put('/:id',adminAuth,uploadMultipleImages, categoryController.updateCategoryById);
 
 /**
  * @swagger
@@ -146,6 +156,6 @@ router.put('/:id', categoryController.updateCategoryById);
  *       404:
  *         description: Category not found
  */
-router.delete('/:id',  categoryController.deleteCategoryById);
+router.delete('/:id', adminAuth, categoryController.deleteCategoryById);
 
 module.exports = router;

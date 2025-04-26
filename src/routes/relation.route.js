@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const relationController = require('../controllers/relation.controller');
-
+const { uploadMultipleImages } = require("../middlewares/multerUploads");
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
  * tags:
@@ -9,34 +10,39 @@ const relationController = require('../controllers/relation.controller');
  *   description: Relation management
  */
 
+
 /**
  * @swagger
  * /relations:
  *   post:
  *     summary: Create a new relation
  *     tags: [Relation]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The name of the relation.
+ *                 example: "Friend"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Relation created successfully
  *       400:
  *         description: Bad request
  */
-router.post('/', relationController.createRelation);
-
+router.post('/', adminAuth, uploadMultipleImages, relationController.createRelation);
 /**
  * @swagger
  * /relations:
@@ -47,7 +53,7 @@ router.post('/', relationController.createRelation);
  *       200:
  *         description: A list of relations
  */
-router.get('/', relationController.getAllRelations);
+router.get('/', adminAuth,relationController.getAllRelations);
 
 /**
  * @swagger
@@ -68,7 +74,9 @@ router.get('/', relationController.getAllRelations);
  *       404:
  *         description: Relation not found
  */
-router.get('/:id', relationController.getRelationById);
+router.get('/:id',adminAuth, relationController.getRelationById);
+
+
 
 /**
  * @swagger
@@ -76,6 +84,8 @@ router.get('/:id', relationController.getRelationById);
  *   put:
  *     summary: Update a relation by ID
  *     tags: [Relation]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - name: id
  *         in: path
@@ -86,24 +96,27 @@ router.get('/:id', relationController.getRelationById);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The updated name of the relation.
+ *                 example: "Colleague"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, the current images will be retained.
  *     responses:
  *       200:
  *         description: Relation updated successfully
  *       404:
  *         description: Relation not found
  */
-router.put('/:id', relationController.updateRelationById);
+router.put('/:id', adminAuth, uploadMultipleImages, relationController.updateRelationById);
 
 /**
  * @swagger
@@ -124,6 +137,6 @@ router.put('/:id', relationController.updateRelationById);
  *       404:
  *         description: Relation not found
  */
-router.delete('/:id', relationController.deleteRelationById);
+router.delete('/:id', adminAuth,relationController.deleteRelationById);
 
 module.exports = router;

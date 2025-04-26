@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const subcategoryController = require("../controllers/subcategory.controller");
-
+const { uploadMultipleImages } = require("../middlewares/multerUploads");
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
  * tags:
  *   - name: Subcategory
  *     description: Subcategory management endpoints
  */
-
 /**
  * @swagger
  * /subcategories:
@@ -20,14 +20,14 @@ const subcategoryController = require("../controllers/subcategory.controller");
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
  *                 example: "Jewelry"
- *               categoryId:
+ *               category:
  *                 type: string
  *                 description: ObjectId of the parent category
  *                 example: "60d5ec49c2e6b218a8c02011"
@@ -35,7 +35,8 @@ const subcategoryController = require("../controllers/subcategory.controller");
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Subcategory created successfully
@@ -44,7 +45,7 @@ const subcategoryController = require("../controllers/subcategory.controller");
  *       500:
  *         description: Server error
  */
-router.post("/", subcategoryController.createSubcategory);
+router.post("/",adminAuth,uploadMultipleImages, subcategoryController.createSubcategory);
 
 /**
  * @swagger
@@ -76,7 +77,7 @@ router.post("/", subcategoryController.createSubcategory);
  *       500:
  *         description: Server error
  */
-router.get("/", subcategoryController.getAllSubcategories);
+router.get("/",adminAuth, subcategoryController.getAllSubcategories);
 
 /**
  * @swagger
@@ -115,8 +116,7 @@ router.get("/", subcategoryController.getAllSubcategories);
  *       500:
  *         description: Server error
  */
-router.get("/:id", subcategoryController.getSubcategoryById);
-
+router.get("/:id",adminAuth, subcategoryController.getSubcategoryById);
 /**
  * @swagger
  * /subcategories/{id}:
@@ -135,7 +135,7 @@ router.get("/:id", subcategoryController.getSubcategoryById);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -149,7 +149,8 @@ router.get("/:id", subcategoryController.getSubcategoryById);
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, a default image will be used.
  *     responses:
  *       200:
  *         description: Subcategory updated successfully
@@ -160,7 +161,7 @@ router.get("/:id", subcategoryController.getSubcategoryById);
  *       500:
  *         description: Server error
  */
-router.put("/:id", subcategoryController.updateSubcategoryById);
+router.put("/:id",adminAuth,uploadMultipleImages, subcategoryController.updateSubcategoryById);
 
 /**
  * @swagger
@@ -185,6 +186,6 @@ router.put("/:id", subcategoryController.updateSubcategoryById);
  *       500:
  *         description: Server error
  */
-router.delete("/:id", subcategoryController.deleteSubcategoryById);
+router.delete("/:id",adminAuth, subcategoryController.deleteSubcategoryById);
 
 module.exports = router;

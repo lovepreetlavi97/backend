@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const promoCodeController = require('../controllers/promocode.controller');
-
+const promoCodeController = require('../controllers/promoCode.controller');
+const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
  * tags:
@@ -49,7 +49,7 @@ const promoCodeController = require('../controllers/promocode.controller');
  *       400:
  *         description: Bad request
  */
-router.post('/', promoCodeController.createPromoCode);
+router.post('/', adminAuth, promoCodeController.createPromoCode);
 
 /**
  * @swagger
@@ -61,7 +61,7 @@ router.post('/', promoCodeController.createPromoCode);
  *       200:
  *         description: A list of promo codes
  */
-router.get('/', promoCodeController.getAllPromoCodes);
+router.get('/',adminAuth, promoCodeController.getAllPromoCodes);
 
 /**
  * @swagger
@@ -82,7 +82,7 @@ router.get('/', promoCodeController.getAllPromoCodes);
  *       404:
  *         description: Promo code not found
  */
-router.get('/:id', promoCodeController.getPromoCodeById);
+router.get('/:id',adminAuth, promoCodeController.getPromoCodeById);
 
 /**
  * @swagger
@@ -131,7 +131,7 @@ router.get('/:id', promoCodeController.getPromoCodeById);
  *       404:
  *         description: Promo code not found
  */
-router.put('/:id', promoCodeController.updatePromoCodeById);
+router.put('/:id', adminAuth,promoCodeController.updatePromoCodeById);
 
 /**
  * @swagger
@@ -152,6 +152,6 @@ router.put('/:id', promoCodeController.updatePromoCodeById);
  *       404:
  *         description: Promo code not found
  */
-router.delete('/:id', promoCodeController.deletePromoCodeById);
+router.delete('/:id',adminAuth, promoCodeController.deletePromoCodeById);
 
 module.exports = router;

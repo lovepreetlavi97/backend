@@ -2,75 +2,53 @@ const express = require('express');
 const router = express.Router();
 const festivalController = require('../controllers/festival.controller');
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
-
-/**
- * User-facing routes (no authentication required)
- */
-const userRouter = express.Router();
-
-
-// /**
-//  * @swagger
-//  * /user/festivals/{id}:
-//  *   get:
-//  *     summary: Get a festival by ID (user-facing)
-//  *     tags: [User - API's]
-//  *     parameters:
-//  *       - name: id
-//  *         in: path
-//  *         required: true
-//  *         description: The ID of the festival
-//  *         schema:
-//  *           type: string
-//  *     responses:
-//  *       200:
-//  *         description: Festival details
-//  *       404:
-//  *         description: Festival not found
-//  */
-// userRouter.get('/:id', festivalController.getFestivalById);
+const { uploadMultipleImages } = require("../middlewares/multerUploads");
 
 
 
-/**
- * Admin-facing routes (authentication required)
- */
-const adminRouter = express.Router();
+
 
 /**
  * @swagger
- * /admin/festivals:
+ * /festivals:
  *   post:
  *     summary: Create a new festival
  *     tags: [Festival]
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The name of the festival.
+ *                 example: "Diwali"
  *               date:
  *                 type: string
  *                 format: date
+ *                 description: The date of the festival.
+ *                 example: "2025-11-12"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional array of image files. If not provided, a default image will be used.
  *     responses:
  *       201:
  *         description: Festival created successfully
  *       400:
  *         description: Bad request
+ *       500:
+ *         description: Internal server error
  */
-adminRouter.post('/', adminAuth, festivalController.createFestival);
+router.post('/', adminAuth, uploadMultipleImages, festivalController.createFestival);
 
 /**
  * @swagger
- * /admin/festivals:
+ * /festivals:
  *   get:
  *     summary: Get all festivals (admin-facing)
  *     tags: [Festival]
@@ -78,11 +56,11 @@ adminRouter.post('/', adminAuth, festivalController.createFestival);
  *       200:
  *         description: A list of festivals for management
  */
-adminRouter.get('/', adminAuth, festivalController.getAllFestivals);
+router.get('/', adminAuth, festivalController.getAllFestivals);
 
 /**
  * @swagger
- * /admin/festivals/{id}:
+ * /festivals/{id}:
  *   get:
  *     summary: Get a festival by ID (admin-facing)
  *     tags: [Festival]
@@ -99,11 +77,13 @@ adminRouter.get('/', adminAuth, festivalController.getAllFestivals);
  *       404:
  *         description: Festival not found
  */
-adminRouter.get('/:id', adminAuth, festivalController.getFestivalById);
+router.get('/:id', adminAuth, festivalController.getFestivalById);
+
+
 
 /**
  * @swagger
- * /admin/festivals/{id}:
+ * /festivals/{id}:
  *   put:
  *     summary: Update a festival by ID
  *     tags: [Festival]
@@ -117,31 +97,39 @@ adminRouter.get('/:id', adminAuth, festivalController.getFestivalById);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
+ *                 description: The updated name of the festival.
+ *                 example: "Holi"
  *               date:
  *                 type: string
  *                 format: date
+ *                 description: The updated date of the festival.
+ *                 example: "2025-03-21"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
+ *                   format: binary
+ *                 description: Optional updated array of image files. If not provided, the existing images will be retained.
  *     responses:
  *       200:
  *         description: Festival updated successfully
  *       404:
  *         description: Festival not found
+ *       400:
+ *         description: Bad request
  */
-adminRouter.put('/:id', adminAuth, festivalController.updateFestivalById);
+router.put('/:id', adminAuth,uploadMultipleImages, festivalController.updateFestivalById);
+
 
 /**
  * @swagger
- * /admin/festivals/{id}:
+ * /festivals/{id}:
  *   delete:
  *     summary: Delete a festival by ID
  *     tags: [Festival]
@@ -158,7 +146,7 @@ adminRouter.put('/:id', adminAuth, festivalController.updateFestivalById);
  *       404:
  *         description: Festival not found
  */
-adminRouter.delete('/:id', adminAuth, festivalController.deleteFestivalById);
+router.delete('/:id', adminAuth, festivalController.deleteFestivalById);
 
 
 

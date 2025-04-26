@@ -5,6 +5,8 @@ const festivalController = require('./festival.controller');
 const relationController = require('./relation.controller');
 const categoryController = require('./category.controller');
 const promoCodeController = require('./promoCode.controller');
+const cartController = require('./cart.controller');
+const wishlistController = require('./wishlist.controller');
 module.exports = {
   adminController,
   userController,
@@ -12,5 +14,7 @@ module.exports = {
   festivalController,
   relationController,
   categoryController,
-  promoCodeController
+  promoCodeController,
+  cartController,
+  wishlistController
 };
