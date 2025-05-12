@@ -5,42 +5,27 @@ const DEFAULT_IMAGE_URL = "https://plus.unsplash.com/premium_photo-1664124381855
 const categorySchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Category name is required'],
-    trim: true,
     unique: true,
   },
   description: {
     type: String,
-    trim: true,
   },
   slug: {
     type: String,
-    unique: true,
-    index: true,
+    unique: true
   },
   subcategories: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
   }],
   images: {
-    type: [String],
-    default: [DEFAULT_IMAGE_URL],
-    validate: [
-      {
-        validator: function(v) {
-          return v.length <= 5;
-        },
-        message: 'Cannot have more than 5 images per category'
-      }
-    ]
-  },
-  icon: {
     type: String,
-    default: null,
+    default: DEFAULT_IMAGE_URL
   },
-  isActive: {
+  isFeatured: {
     type: Boolean,
-    default: true,
+    default: false,
+    select: false,
   },
   isDeleted: {
     type: Boolean,
@@ -50,22 +35,6 @@ const categorySchema = new mongoose.Schema({
   isBlocked: {
     type: Boolean,
     default: false,
-  },
-  displayOrder: {
-    type: Number,
-    default: 0,
-  },
-  featuredImage: {
-    type: String,
-    default: null,
-  },
-  metaTitle: {
-    type: String,
-    trim: true,
-  },
-  metaDescription: {
-    type: String,
-    trim: true,
   },
   productCount: {
     type: Number,
@@ -88,8 +57,7 @@ const categorySchema = new mongoose.Schema({
 // Indexes for better performance
 categorySchema.index({ name: 1 });
 categorySchema.index({ slug: 1 });
-categorySchema.index({ isDeleted: 1, isBlocked: 1, isActive: 1 });
-categorySchema.index({ displayOrder: 1 });
+categorySchema.index({ isDeleted: 1, isBlocked: 1 });
 
 // Generate slug from name
 categorySchema.pre('save', function(next) {
@@ -105,12 +73,5 @@ categorySchema.pre(/^find/, function(next) {
   next();
 });
 
-// Add a virtual to get products count (use with populate)
-categorySchema.virtual('products', {
-  ref: 'Product',
-  localField: '_id',
-  foreignField: 'categoryId',
-  count: true,
-});
 
 module.exports = mongoose.model('Category', categorySchema);

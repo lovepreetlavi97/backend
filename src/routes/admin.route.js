@@ -17,8 +17,6 @@ const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.midd
  *   post:
  *     summary: Create a new admin (SuperAdmin only)
  *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -38,7 +36,7 @@ const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.midd
  *       400:
  *         description: Bad request
  */
-router.post('/', superAdminAuth, adminController.createAdmin);
+router.post('/', adminController.createAdmin);
 
 /**
  * @swagger

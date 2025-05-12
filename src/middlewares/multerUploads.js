@@ -3,8 +3,13 @@ const imageUpload = require("./multerS3Config");
 // Middleware Functions
 const uploadSingleImage = imageUpload.single("image");
 const uploadMultipleImages = imageUpload.array("images", 10); // Max 10 files
-const uploadImagesToBucket = imageUpload.array("images", 10); // Middleware for uploading images to bucket
-// 
+
+// New middleware for handling both main image and additional images
+const uploadProductImages = imageUpload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'images', maxCount: 10 }
+]);
+
 // Image Controller Functions
 const uploadSingle = async (req, res) => {
   try {
@@ -40,5 +45,5 @@ module.exports = {
   uploadMultipleImages,
   uploadSingle,
   uploadMultiple,
-  uploadImagesToBucket
+  uploadProductImages
 };

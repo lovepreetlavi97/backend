@@ -82,8 +82,26 @@ const createProduct = async (req, res) => {
     }
     
     // Process images
-    const imageUrls = req.files?.map(file => file.location) || [];
-    if (imageUrls.length === 0) {
+    // Extract main image and additional images
+    let mainImageUrl = '';
+    let additionalImageUrls = [];
+    
+    if (req.files) {
+      // Main image (single file)
+      if (req.files.image && req.files.image.length > 0) {
+        mainImageUrl = req.files.image[0].location;
+      }
+      
+      // Additional images (array of files)
+      if (req.files.images && req.files.images.length > 0) {
+        additionalImageUrls = req.files.images.map(file => file.location);
+      }
+    }
+    
+    // Combine main image with additional images for the images array
+    const allImageUrls = [mainImageUrl, ...additionalImageUrls].filter(url => url);
+    
+    if (allImageUrls.length === 0) {
       return errorResponse(res, 400, 'At least one product image is required');
     }
     
@@ -92,15 +110,9 @@ const createProduct = async (req, res) => {
     const randomStr = Math.random().toString(36).substring(2, 8);
     const slug = `${baseSlug}-${randomStr}`;
     
-    // Process tags
-    let processedTags = [];
-    if (tags) {
-      if (typeof tags === 'string') {
-        processedTags = tags.split(',').map(tag => tag.trim());
-      } else if (Array.isArray(tags)) {
-        processedTags = tags.map(tag => tag.trim());
-      }
-    }
+    // Validate tags
+    const validTags = ['New', 'Sale', 'Bestseller'];
+    const productTag = validTags.includes(tags) ? tags : 'New';
     
     // Process specifications
     let processedSpecs = [];
@@ -127,13 +139,14 @@ const createProduct = async (req, res) => {
       weight: parseFloat(weight),
       unit,
       stock: stock ? parseInt(stock) : 0,
-      images: imageUrls,
+      image: mainImageUrl || allImageUrls[0], // Set main image field
+      images: allImageUrls, // Set all images array
       categoryId: new mongoose.Types.ObjectId(categoryId),
       subcategoryId: subcategoryId ? new mongoose.Types.ObjectId(subcategoryId) : undefined,
       festivalIds: festivalIds ? (Array.isArray(festivalIds) ? festivalIds : [festivalIds]).filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id)) : [],
       relationIds: relationIds ? (Array.isArray(relationIds) ? relationIds : [relationIds]).filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id)) : [],
       specifications: processedSpecs,
-      tags: processedTags,
+      tags: productTag,
       isFeatured: isFeatured === 'true' || isFeatured === true,
       isInStock: stock ? parseInt(stock) > 0 : false,
       dimensions: dimensions ? (typeof dimensions === 'string' ? JSON.parse(dimensions) : dimensions) : undefined,
@@ -324,15 +337,36 @@ const updateProductById = async (req, res) => {
     const deletedImagesArray = Array.isArray(deletedImages) ? deletedImages : [deletedImages].filter(Boolean);
     
     // Handle new image uploads
-    const imageUrls = req.files?.map(file => file.location) || [];
+    let newMainImageUrl = '';
+    let newAdditionalImageUrls = [];
     
-    // Update the images array
-    if (imageUrls.length > 0 || deletedImagesArray.length > 0) {
+    if (req.files) {
+      // Main image (single file)
+      if (req.files.image && req.files.image.length > 0) {
+        newMainImageUrl = req.files.image[0].location;
+      }
+      
+      // Additional images (array of files)
+      if (req.files.images && req.files.images.length > 0) {
+        newAdditionalImageUrls = req.files.images.map(file => file.location);
+      }
+    }
+    
+    // Update the images array and main image
+    if (newMainImageUrl || newAdditionalImageUrls.length > 0 || deletedImagesArray.length > 0) {
       // Start with current images and remove deleted ones
       let currentImages = product.images.filter(img => !deletedImagesArray.includes(img));
       
       // Add new images
-      updatedData.images = [...currentImages, ...imageUrls];
+      updatedData.images = [...currentImages, ...newAdditionalImageUrls].filter(url => url);
+      
+      // Update main image if a new one was uploaded
+      if (newMainImageUrl) {
+        updatedData.image = newMainImageUrl;
+      } else if (updatedData.images.length > 0 && (!product.image || deletedImagesArray.includes(product.image))) {
+        // If main image was deleted and there are other images, use the first one as main image
+        updatedData.image = updatedData.images[0];
+      }
     }
     
     // Handle numeric fields
@@ -404,6 +438,14 @@ const updateProductById = async (req, res) => {
         } catch (e) {
           delete updatedData.specifications;
         }
+      }
+    }
+    
+    // Validate tags
+    if (updatedData.tags) {
+      const validTags = ['New', 'Sale', 'Bestseller'];
+      if (!validTags.includes(updatedData.tags)) {
+        updatedData.tags = 'New';
       }
     }
     

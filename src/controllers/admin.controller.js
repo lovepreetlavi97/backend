@@ -10,7 +10,7 @@ const {
 } = require("../services/mongodb/mongoService");
 const jwt = require("jsonwebtoken");
 const { Admin, User } = require("../models/index");
-const { hashPassword } = require("../utils/bcrypt");
+const { hashPassword,  } = require("../utils/bcrypt");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { cacheUtils } = require("../config/redis");
 
@@ -30,10 +30,10 @@ const loginAdmin = async (req, res) => {
 
     const isMatch = await verifyPassword(password, admin.password);
     if (!isMatch) {
-      return errorResponse(res, 401, "Invalid credentials");
+      return errorResponse(res, 401, "Invalid password");
     }
 
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET_KEY);
+    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
     
     // Update admin with token and last login time
     admin.token = token;

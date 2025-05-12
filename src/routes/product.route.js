@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/product.controller');
-const { uploadMultipleImages } = require("../middlewares/multerUploads");
+const { uploadProductImages } = require("../middlewares/multerUploads");
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
@@ -58,12 +58,33 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *                   type: string
  *                 description: Array of related product IDs (optional).
  *                 example: ["64f5e3c5a2e1b6d7889a9999"]
+ *               tags:
+ *                 type: string
+ *                 enum: [New, Sale, Bestseller]
+ *                 description: Product tag (New, Sale, or Bestseller).
+ *                 default: New
+ *                 example: "New"
+ *               specifications:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     value:
+ *                       type: string
+ *                 description: Array of product specifications.
+ *                 example: [{name: "Material", value: "Gold"}, {name: "Purity", value: "24K"}]
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Main product image
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Product images (multiple files allowed)
+ *                 description: Additional product images (multiple files allowed)
  *     responses:
  *       201:
  *         description: Product created successfully
@@ -72,7 +93,38 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *       500:
  *         description: Internal server error
  */
-router.post("/", adminAuth,uploadMultipleImages, productController.createProduct);
+router.post("/", adminAuth, uploadProductImages, productController.createProduct);
+/**
+ * @swagger
+ * /products:
+ *   get:
+ *     summary: Get all products
+ *     tags: [Product]
+ *     responses:
+ *       200:
+ *         description: A list of products
+ */
+router.get('/', adminAuth, productController.getAllProducts);
+/**
+ * @swagger
+ * /products/{id}:
+ *   get:
+ *     summary: Get a product by ID
+ *     tags: [Product]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: The ID of the product
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product details
+ *       404:
+ *         description: Product not found
+ */
+router.get('/:id', adminAuth, productController.getProductById);
 /**
  * @swagger
  * /products/{id}:
@@ -130,12 +182,33 @@ router.post("/", adminAuth,uploadMultipleImages, productController.createProduct
  *                   type: string
  *                 description: Array of related product IDs.
  *                 example: ["607d1f77bcf86cd799439044"]
+ *               tags:
+ *                 type: string
+ *                 enum: [New, Sale, Bestseller]
+ *                 description: Product tag (New, Sale, or Bestseller).
+ *                 default: New
+ *                 example: "New"
+ *               specifications:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     value:
+ *                       type: string
+ *                 description: Array of product specifications.
+ *                 example: [{name: "Material", value: "Gold"}, {name: "Purity", value: "24K"}]
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Main product image
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Product images (multiple files allowed)
+ *                 description: Additional product images (multiple files allowed)
  *     responses:
  *       200:
  *         description: Product updated successfully
@@ -146,79 +219,7 @@ router.post("/", adminAuth,uploadMultipleImages, productController.createProduct
  *       500:
  *         description: Internal server error
  */
-router.put('/:id',adminAuth, uploadMultipleImages, productController.updateProductById);
-
-
-/**
- * @swagger
- * /products:
- *   get:
- *     summary: Get all products
- *     tags: [Product]
- *     responses:
- *       200:
- *         description: A list of products
- */
-router.get('/',adminAuth, productController.getAllProducts);
-
-/**
- * @swagger
- * /products/{id}:
- *   get:
- *     summary: Get a product by ID
- *     tags: [Product]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: The ID of the product
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Product details
- *       404:
- *         description: Product not found
- */
-router.get('/:id',adminAuth, productController.getProductById);
-
-/**
- * @swagger
- * /products/{id}:
- *   put:
- *     summary: Update a product by ID
- *     tags: [Product]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: The ID of the product
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               price:
- *                 type: number
- *               image:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Optional array of image URLs. If not provided, a default image will be used.
- *     responses:
- *       200:
- *         description: Product updated successfully
- *       404:
- *         description: Product not found
- */
-router.put('/:id',adminAuth, productController.updateProductById);
-
+router.put('/:id', adminAuth, uploadProductImages, productController.updateProductById);
 /**
  * @swagger
  * /products/{id}:
@@ -238,9 +239,7 @@ router.put('/:id',adminAuth, productController.updateProductById);
  *       404:
  *         description: Product not found
  */
-router.delete('/:id',adminAuth, productController.deleteProductById);
-
-
+router.delete('/:id', adminAuth, productController.deleteProductById);
 /**
  * @swagger
  * /products/{id}/toggle-block:
@@ -263,6 +262,4 @@ router.delete('/:id',adminAuth, productController.deleteProductById);
  *         description: Internal server error
  */
 router.put('/:id/toggle-block', adminAuth, productController.toggleBlockStatus);
-
-
 module.exports = router;

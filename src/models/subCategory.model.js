@@ -15,8 +15,13 @@ const subcategorySchema = new mongoose.Schema({
     required: false, // Ensure every subcategory is tied to a category
   },
   images: {
-    type: [String], // Declares it as an array of strings
-    default: [DEFAULT_IMAGE_URL] // Sets the default as an array with the default URL
+    type: String,
+    default: DEFAULT_IMAGE_URL
+  },
+  isFeatured: {
+    type: Boolean,
+    default: false,
+    select: false,
   },
   isDeleted: {
     type: Boolean,

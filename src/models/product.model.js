@@ -55,6 +55,10 @@ const productSchema = new mongoose.Schema({
     min: [0, 'Stock cannot be negative'],
     default: 0,
   },
+  image: {
+    type: String,
+    default: DEFAULT_IMAGE_URL,
+  },
   images: {
     type: [String],
     default: [DEFAULT_IMAGE_URL],
@@ -96,7 +100,11 @@ const productSchema = new mongoose.Schema({
       required: true,
     }
   }],
-  tags: [String],
+  tags: {
+    type: String,
+    enum: ['New', 'Sale', 'Bestseller'],
+    default: 'New',
+  },
   isDeleted: {
     type: Boolean,
     default: false,

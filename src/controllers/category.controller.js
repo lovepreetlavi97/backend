@@ -5,7 +5,7 @@ const {
   findAndUpdate, 
   deleteOne 
 } = require('../services/mongodb/mongoService');
-const { Category, Product } = require('../models/index'); // Added Product to check for dependencies
+const { Category, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
@@ -15,10 +15,10 @@ const slugify = require('slugify');
 // Create a new category
 const createCategory = async (req, res) => {
   try {
-    const { name, description, isActive } = req.body;
+    const { name, description, isFeatured } = req.body;
     
     // Basic validation
-    if (!name || name.trim().length === 0) {
+    if (!name) {
       return errorResponse(res, 400, "Category name is required");
     }
     
@@ -31,10 +31,10 @@ const createCategory = async (req, res) => {
       return errorResponse(res, 409, "Category with this name already exists");
     }
     
-    // Handle images
-    const imageUrls = req.files?.map(file => file.location) || [];
-    if (imageUrls.length === 0) {
-      return errorResponse(res, 400, "At least one image is required");
+    // Handle image
+    const imageUrl = req.file.originalname;
+    if (!imageUrl) {
+      return errorResponse(res, 400, "Image is required");
     }
     
     // Create slug
@@ -45,8 +45,10 @@ const createCategory = async (req, res) => {
       name,
       slug,
       description,
-      images: imageUrls,
-      isActive: isActive === 'false' ? false : Boolean(isActive)
+      images: imageUrl,
+      isFeatured: isFeatured,
+      isBlocked: false,
+      productCount: 0
     };
     
     const category = await create(Category, categoryData);
@@ -70,12 +72,12 @@ const getAllCategories = async (req, res) => {
       limit = 10, 
       sortBy = 'name', 
       sortOrder = 'asc',
-      isActive,
+      isBlocked,
       search
     } = req.query;
     
     // Create cache key based on query parameters
-    const cacheKey = `categories_admin_${page}_${limit}_${sortBy}_${sortOrder}_${isActive || ''}_${search || ''}`;
+    const cacheKey = `categories_admin_${page}_${limit}_${sortBy}_${sortOrder}_${isBlocked || ''}_${search || ''}`;
     
     // Try to get from cache first
     const cachedData = await cacheUtils.get(cacheKey);
@@ -86,8 +88,8 @@ const getAllCategories = async (req, res) => {
     // Build query
     const query = {};
     
-    if (isActive !== undefined) {
-      query.isActive = isActive === 'true';
+    if (isBlocked !== undefined) {
+      query.isBlocked = isBlocked === 'true';
     }
     
     if (search) {
@@ -139,9 +141,9 @@ const getActiveCategories = async (req, res) => {
       return successResponse(res, 200, messages.CATEGORIES_RETRIEVED, { categories: cachedData });
     }
     
-    // Get only active and non-deleted categories
+    // Get only non-blocked and non-deleted categories
     const categories = await Category.find({ 
-      isActive: true,
+      isBlocked: false,
       isDeleted: false
     })
     .select('name slug description images')
@@ -182,19 +184,10 @@ const getCategoryById = async (req, res) => {
       return errorResponse(res, 404, messages.CATEGORY_NOT_FOUND);
     }
     
-    // Get product count for this category
-    const productCount = await Product.countDocuments({ categoryId: id, isDeleted: false });
-    
-    // Add product count to category object
-    const categoryWithStats = {
-      ...category,
-      productCount
-    };
-    
     // Cache the result
-    await cacheUtils.set(cacheKey, categoryWithStats, 600); // Cache for 10 minutes
+    await cacheUtils.set(cacheKey, category, 600); // Cache for 10 minutes
     
-    return successResponse(res, 200, messages.CATEGORY_RETRIEVED, { category: categoryWithStats });
+    return successResponse(res, 200, messages.CATEGORY_RETRIEVED, { category });
 
   } catch (error) {
     console.error("Get category error:", error);
@@ -206,7 +199,7 @@ const getCategoryById = async (req, res) => {
 const updateCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, isActive, deletedImages } = req.body;
+    const { name, description, isBlocked, isFeatured } = req.body;
     
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -237,28 +230,12 @@ const updateCategoryById = async (req, res) => {
     // Update text fields
     if (name) category.name = name;
     if (description !== undefined) category.description = description;
-    if (isActive !== undefined) category.isActive = isActive === 'true' || isActive === true;
-    
-    // Handle image updates
-    
-    // 1. Handle deleted images
-    const deletedImagesArray = Array.isArray(deletedImages) 
-      ? deletedImages 
-      : (deletedImages ? [deletedImages] : []);
-      
-    if (deletedImagesArray.length > 0) {
-      category.images = category.images.filter(img => !deletedImagesArray.includes(img));
-    }
-    
-    // 2. Add new images
-    const newImages = req.files?.map(file => file.location) || [];
-    if (newImages.length > 0) {
-      category.images = [...category.images, ...newImages];
-    }
-    
-    // Ensure we still have at least one image
-    if (category.images.length === 0) {
-      return errorResponse(res, 400, "Cannot remove all images. Category must have at least one image");
+    if (isBlocked !== undefined) category.isBlocked = isBlocked === 'true' || isBlocked === true;
+    if (isFeatured !== undefined) category.isFeatured = isFeatured === 'true' || isFeatured === true;
+    // Handle image update
+    const newImage = req.files?.[0]?.location;
+    if (newImage) {
+      category.images = newImage;
     }
     
     // Save the updated category
@@ -275,7 +252,7 @@ const updateCategoryById = async (req, res) => {
   }
 };
 
-// Toggle category active status
+// Toggle category blocked status
 const toggleCategoryStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -290,8 +267,8 @@ const toggleCategoryStatus = async (req, res) => {
       return errorResponse(res, 404, messages.CATEGORY_NOT_FOUND);
     }
     
-    // Toggle active status
-    category.isActive = !category.isActive;
+    // Toggle blocked status
+    category.isBlocked = !category.isBlocked;
     await category.save();
     
     // Clear related cache
@@ -299,7 +276,7 @@ const toggleCategoryStatus = async (req, res) => {
     await cacheUtils.delPattern('categories_*');
     
     return successResponse(res, 200, 
-      category.isActive ? "Category activated successfully" : "Category deactivated successfully", 
+      !category.isBlocked ? "Category unblocked successfully" : "Category blocked successfully", 
       { category }
     );
   } catch (error) {
@@ -330,10 +307,8 @@ const deleteCategoryById = async (req, res) => {
       return errorResponse(res, 400, `Cannot delete category. ${productsCount} products are associated with this category`);
     }
     
-    // Soft delete instead of hard delete
-    category.isDeleted = true;
-    category.deletedAt = new Date();
-    await category.save();
+    // Hard delete the category
+    await Category.findByIdAndDelete(id);
     
     // Clear related cache
     await cacheUtils.del(`category_${id}`);
