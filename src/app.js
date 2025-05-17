@@ -43,7 +43,7 @@ const swaggerOptions = {
             description: "local server"
       },
         {
-    url: "http://139.59.41.169:5000/",
+    url: "http://139.59.41.169:5000/api/v1",
     description: "Live production server"
   }
     ],
