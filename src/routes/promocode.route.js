@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const promoCodeController = require('../controllers/promoCode.controller');
+const promoCodeController = require('../controllers/promocode.controller');
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
