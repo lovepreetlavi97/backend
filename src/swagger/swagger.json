@@ -5,11 +5,17 @@
     "version": "1.0.0",
     "description": "API for managing various entities, including subcategories."
   },
-  "servers": [
-    {
-      "url": "http://localhost:5000/"
-    }
-  ],
+"servers": [
+  {
+    "url": "http://localhost:5000/",
+    "description": "Local development server"
+  },
+  {
+    "url": "http://139.59.41.169:5000/",
+    "description": "Live production server"
+  }
+]
+,
   "paths": {
     "/": {
       "get": {
