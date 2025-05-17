@@ -10,22 +10,22 @@ const cluster = require("cluster");
 const os = require("os");
 
 // Check if this is the master process
-if (cluster.isPrimary) {
-    const numCPUs = os.cpus().length; // Get the number of CPU cores
-    console.log(`Master process ${process.pid} is running with ${numCPUs} CPUs available`);
+// if (cluster.isPrimary) {
+//     const numCPUs = os.cpus().length; // Get the number of CPU cores
+//     console.log(`Master process ${process.pid} is running with ${numCPUs} CPUs available`);
 
-    // Fork workers (one per CPU core)
-    for (let i = 0; i < numCPUs; i++) {
-        cluster.fork();
-    }
+//     // Fork workers (one per CPU core)
+//     for (let i = 0; i < numCPUs; i++) {
+//         cluster.fork();
+//     }
 
-    // Handle worker failures and restart them
-    cluster.on("exit", (worker, code, signal) => {
-        console.log(`Worker ${worker.process.pid} died with code ${code} and signal ${signal}`);
-        console.log('Starting a new worker');
-        cluster.fork();
-    });
-} else {
+//     // Handle worker failures and restart them
+//     cluster.on("exit", (worker, code, signal) => {
+//         console.log(`Worker ${worker.process.pid} died with code ${code} and signal ${signal}`);
+//         console.log('Starting a new worker');
+//         cluster.fork();
+//     });
+// } else {
     // Worker process - run the Express app
     const app = require("./app");
     const port = process.env.PORT || 5000;
@@ -33,4 +33,4 @@ if (cluster.isPrimary) {
     app.listen(port, () => {
         console.log(`Worker ${process.pid} started, running on http://localhost:${port}`);
     });
-}
+// }
