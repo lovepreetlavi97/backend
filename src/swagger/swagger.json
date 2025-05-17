@@ -9,11 +9,8 @@
   {
     "url": "http://localhost:5000/",
     "description": "Local development server"
-  },
-  {
-    "url": "http://139.59.41.169:5000/",
-    "description": "Live production server"
   }
+
 ]
 ,
   "paths": {

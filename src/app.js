@@ -40,7 +40,12 @@ const swaggerOptions = {
     servers: [
       {
         url: 'http://localhost:5000/api/v1',
+            description: "local server"
       },
+        {
+    url: "http://139.59.41.169:5000/",
+    description: "Live production server"
+  }
     ],
     components: {
       securitySchemes: {
