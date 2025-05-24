@@ -7,6 +7,10 @@ const categoryController = require('./category.controller');
 const promoCodeController = require('./promoCode.controller');
 const cartController = require('./cart.controller');
 const wishlistController = require('./wishlist.controller');
+const socialIntegrationController = require('./socialIntegration.controller');
+const priceRuleController = require('./priceRule.controller');
+const grievanceController = require('./grievance.controller');
+
 module.exports = {
   adminController,
   userController,
@@ -16,5 +20,8 @@ module.exports = {
   categoryController,
   promoCodeController,
   cartController,
-  wishlistController
+  wishlistController,
+  socialIntegrationController,
+  priceRuleController,
+  grievanceController
 };

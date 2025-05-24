@@ -186,6 +186,27 @@ const messages = {
   CACHE_CLEARED: "Cache cleared successfully",
   CACHE_UPDATED: "Cache updated successfully",
   CACHE_ERROR: "Error accessing cache",
+  
+  success: {
+    createPromocode: "Promo code created successfully",
+    updatePromocode: "Promo code updated successfully",
+    deletePromocode: "Promo code deleted successfully",
+    getPromocodes: "Promo codes retrieved successfully",
+    getPromocode: "Promo code retrieved successfully",
+    validatePromocode: "Promo code validated successfully",
+    togglePromocode: "Promo code status updated successfully",
+    defaultMessage: "Operation completed successfully"
+  },
+  error: {
+    noPromoCodeFound: "Promo code not found",
+    invalidPromoCode: "Invalid promo code",
+    promoCodeExpired: "Promo code has expired",
+    promoCodeInactive: "Promo code is inactive",
+    promoCodeLimitExceeded: "Promo code usage limit exceeded",
+    minPurchaseNotMet: "Minimum purchase amount not met",
+    promoCodeExists: "Promo code already exists",
+    defaultError: "Something went wrong"
+  }
 };
 
 module.exports = messages;

@@ -5,54 +5,93 @@ const promoCodeSchema = new mongoose.Schema(
     // ✅ Required
     code: {
       type: String,
-      required: [true, "Promo code is required"],
+      required: true,
       unique: true,
+      uppercase: true,
       trim: true,
     },
 
-    discountType: {
+    type: {
       type: String,
       enum: ["percentage", "fixed"],
-      required: [true, "Discount type is required"],
+      required: true,
     },
 
-    discountValue: {
+    value: {
       type: Number,
-      required: [true, "Discount value is required"],
-      min: [0, "Discount value must be non-negative"],
+      required: true,
+      min: 0,
     },
 
-    expiryDate: {
+    minPurchase: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+
+    maxDiscount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    startDate: {
       type: Date,
-      required: [true, "Expiry date is required"],
+      required: true,
+      default: Date.now,
     },
 
-    isActive: {
+    endDate: {
+      type: Date,
+      required: true,
+    },
+
+    usageLimit: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    usageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    description: {
+      type: String,
+      required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive", "expired"],
+      default: "active",
+    },
+
+    isDeleted: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    updatedAt: {
+      type: Date,
+      default: Date.now,
     },
 
     // 🔁 Optional
-    maxDiscount: {
-      type: Number,
-      default: null,
-    },
-
     minOrderValue: {
       type: Number,
       default: 0,
     },
 
-    startDate: {
-      type: Date,
-      default: Date.now,
-    },
-
     // ✅ New fields for global usage tracking
-    usageLimit: {
-      type: Number,
-      default: null, // Null = unlimited usage
-    },
     usedCount: {
       type: Number,
       default: 0,
@@ -78,7 +117,14 @@ const promoCodeSchema = new mongoose.Schema(
 
 // 🔍 Virtual to check expiry status
 promoCodeSchema.virtual("isExpired").get(function () {
-  return Date.now() > this.expiryDate;
+  return Date.now() > this.endDate;
 });
 
-module.exports = mongoose.model("PromoCode", promoCodeSchema);
+// Add index for faster queries
+promoCodeSchema.index({ code: 1 });
+promoCodeSchema.index({ status: 1 });
+promoCodeSchema.index({ startDate: 1, endDate: 1 });
+
+const PromoCode = mongoose.model("PromoCode", promoCodeSchema);
+
+module.exports = PromoCode;

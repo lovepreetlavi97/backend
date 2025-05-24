@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const relationController = require('../controllers/relation.controller');
-const { uploadMultipleImages } = require("../middlewares/multerUploads");
+const { uploadSingleImage } = require("../middlewares/multerUploads");
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
@@ -30,19 +30,25 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *                 type: string
  *                 description: The name of the relation.
  *                 example: "Friend"
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Optional array of image files. If not provided, a default image will be used.
+ *               description:
+ *                 type: string
+ *                 description: Description of the relation.
+ *                 example: "Friend relation description"
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional icon image file. If not provided, a default icon will be used.
+ *               isActive:
+ *                 type: boolean
+ *                 description: Whether the relation is active or not.
+ *                 default: true
  *     responses:
  *       201:
  *         description: Relation created successfully
  *       400:
  *         description: Bad request
  */
-router.post('/', adminAuth, uploadMultipleImages, relationController.createRelation);
+router.post('/', adminAuth, uploadSingleImage, relationController.createRelation);
 /**
  * @swagger
  * /relations:
@@ -104,19 +110,24 @@ router.get('/:id',adminAuth, relationController.getRelationById);
  *                 type: string
  *                 description: The updated name of the relation.
  *                 example: "Colleague"
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Optional array of image files. If not provided, the current images will be retained.
+ *               description:
+ *                 type: string
+ *                 description: Updated description of the relation.
+ *                 example: "Colleague relation description"
+ *               icon:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional icon image file. If not provided, the current icon will be retained.
+ *               isActive:
+ *                 type: boolean
+ *                 description: Whether the relation is active or not.
  *     responses:
  *       200:
  *         description: Relation updated successfully
  *       404:
  *         description: Relation not found
  */
-router.put('/:id', adminAuth, uploadMultipleImages, relationController.updateRelationById);
+router.put('/:id', adminAuth, uploadSingleImage, relationController.updateRelationById);
 
 /**
  * @swagger
@@ -137,6 +148,29 @@ router.put('/:id', adminAuth, uploadMultipleImages, relationController.updateRel
  *       404:
  *         description: Relation not found
  */
-router.delete('/:id', adminAuth,relationController.deleteRelationById);
+router.delete('/:id', adminAuth, relationController.deleteRelationById);
+
+/**
+ * @swagger
+ * /relations/{id}/toggle-status:
+ *   patch:
+ *     summary: Toggle the active status of a relation
+ *     tags: [Relation]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: The ID of the relation
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Relation status toggled successfully
+ *       404:
+ *         description: Relation not found
+ */
+router.patch('/:id/toggle-status', adminAuth, relationController.toggleRelationStatus);
 
 module.exports = router;

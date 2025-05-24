@@ -5,111 +5,272 @@ const {
   findAndUpdate,
   deleteOne
 } = require('../services/mongodb/mongoService');
-const { Festival } = require('../models/index'); // Adjust the import based on your project structure
+const { Festival } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
+const { cacheUtils } = require("../config/redis");
+const path = require('path');
+const fs = require('fs');
 
 // Create a new festival
 const createFestival = async (req, res) => {
   try {
-    const imageUrls = req.files.map((file) => file.location);
-    const festivalData = req.body;
-    if (imageUrls.length === 0) {
-      return errorResponse(res, 400, "One image is required");
+    const {
+      name,
+      description,
+      startDate,
+      endDate,
+      isActive = true
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !description || !startDate || !endDate) {
+      return errorResponse(res, 400, "Missing required fields");
     }
-    
-    festivalData.images = imageUrls;
 
+    // Create festival data object
+    const festivalData = {
+      name,
+      description,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      isActive: isActive === 'true' || isActive === true
+    };
+
+    // Handle image upload if present
+    if (req.file) {
+      // For S3 uploads, use the location property
+      if (req.file.location) {
+        festivalData.image = req.file.location;
+      } 
+      // For local uploads, format the path
+      else if (req.file.path) {
+        festivalData.image = req.file.path.replace(/\\/g, '/').split('public/')[1];
+      }
+    }
+
+    // Create the festival
     const festival = await create(Festival, festivalData);
-    return successResponse(res, 201, messages.FESTIVAL_CREATED, { festival });
 
+    // Clear cache
+    await cacheUtils.delPattern('festivals_*');
+
+    return successResponse(res, 201, "Festival created successfully", { festival });
   } catch (error) {
-    return errorResponse(res, 400, error.message);
+    console.error("Create festival error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
 
-// Get all festivals
+// Get all festivals with pagination and filters
 const getAllFestivals = async (req, res) => {
   try {
-    const festivals = await findMany(Festival);
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      isActive,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-    if (festivals.length === 0) {
-      return successResponse(res, 200, messages.FESTIVALS_NOT_FOUND, { festivals });
+    // Create cache key
+    const cacheKey = `festivals_${page}_${limit}_${search || ''}_${isActive || ''}`;
+
+    // Try to get from cache
+    const cachedData = await cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return successResponse(res, 200, "Festivals retrieved successfully", cachedData);
     }
 
-    return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, { festivals });
+    // Build query
+    const query = { isDeleted: false };
 
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Sort configuration
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query
+    const festivals = await Festival.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Festival.countDocuments(query);
+
+    const result = {
+      festivals,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    };
+
+    // Cache the result
+    await cacheUtils.set(cacheKey, result, 300); // Cache for 5 minutes
+
+    return successResponse(res, 200, "Festivals retrieved successfully", result);
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("Get all festivals error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
 
 // Get a festival by ID
 const getFestivalById = async (req, res) => {
   try {
-    const festival = await findOne(Festival, { _id: req.params.id });
+    const { id } = req.params;
+
+    const festival = await findOne(Festival, { 
+      _id: id,
+      isDeleted: false
+    });
 
     if (!festival) {
-      return errorResponse(res, 404, messages.FESTIVAL_NOT_FOUND);
+      return errorResponse(res, 404, "Festival not found");
     }
 
-    return successResponse(res, 200, messages.FESTIVAL_RETRIEVED, { festival });
-
+    return successResponse(res, 200, "Festival retrieved successfully", { festival });
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("Get festival error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
+// Update a festival by ID
 const updateFestivalById = async (req, res) => {
   try {
-    // Ensure req.files is handled safely
-    const imageUrls = req.files?.map((file) => file.location) || [];
+    const { id } = req.params;
+    const updateData = { ...req.body };
 
-    // Extract festival data from the request body
-    const festivalData = req.body;
+    // Check if festival exists
+    const existingFestival = await Festival.findOne({ 
+      _id: id,
+      isDeleted: false
+    });
 
-    console.log(imageUrls.length, "imageUrls.length");
-
-    // Only update images if imageUrls is empty
-    if (imageUrls.length === 0) {
-      console.log("No new images provided, images will not be updated.");
-      delete festivalData.images; // Ensure images field is not updated
-    } else {
-      console.log(imageUrls, "imageUrls");
-      festivalData.images = imageUrls; // Update images if new images exist
+    if (!existingFestival) {
+      return errorResponse(res, 404, "Festival not found");
     }
 
-    // Find and update the festival by ID
-    const festival = await findAndUpdate(Festival, { _id: req.params.id }, festivalData);
-
-    // If festival is not found, return a 404 response
-    if (!festival) {
-      return errorResponse(res, 404, messages.FESTIVAL_NOT_FOUND);
+    // Process dates if they exist
+    if (updateData.startDate) {
+      updateData.startDate = new Date(updateData.startDate);
+    }
+    
+    if (updateData.endDate) {
+      updateData.endDate = new Date(updateData.endDate);
     }
 
-    // Return success response with updated festival data
-    return successResponse(res, 200, messages.FESTIVAL_UPDATED, { festival });
+    // Handle isActive conversion if it's a string
+    if (updateData.isActive !== undefined) {
+      updateData.isActive = updateData.isActive === 'true' || updateData.isActive === true;
+    }
 
+    // Handle image upload if present
+    if (req.file) {
+      // For S3 uploads, use the location property
+      if (req.file.location) {
+        updateData.image = req.file.location;
+      } 
+      // For local uploads, format the path
+      else if (req.file.path) {
+        updateData.image = req.file.path.replace(/\\/g, '/').split('public/')[1];
+      }
+    }
+
+    // Update festival
+    const festival = await findAndUpdate(
+      Festival,
+      { _id: id },
+      updateData
+    );
+
+    // Clear cache
+    await cacheUtils.delPattern('festivals_*');
+
+    return successResponse(res, 200, "Festival updated successfully", { festival });
   } catch (error) {
-    // Return error response if something goes wrong
-    return errorResponse(res, 400, error.message);
+    console.error("Update festival error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
 
 
 
-// Delete a festival by ID
+// Delete a festival by ID (soft delete)
 const deleteFestivalById = async (req, res) => {
   try {
-    const result = await deleteOne(Festival, { _id: req.params.id });
+    const { id } = req.params;
 
-    if (result.deletedCount === 0) {
-      return errorResponse(res, 404, messages.FESTIVAL_NOT_FOUND);
+    // Check if festival exists
+    const existingFestival = await Festival.findOne({ 
+      _id: id,
+      isDeleted: false
+    });
+
+    if (!existingFestival) {
+      return errorResponse(res, 404, "Festival not found");
     }
 
-    return successResponse(res, 200, messages.FESTIVAL_DELETED);
+    // Soft delete by setting isDeleted to true
+    await findAndUpdate(Festival, { _id: id }, { isDeleted: true });
 
+    // Clear cache
+    await cacheUtils.delPattern('festivals_*');
+
+    return successResponse(res, 200, "Festival deleted successfully");
   } catch (error) {
-    return errorResponse(res, 500, error.message);
+    console.error("Delete festival error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
+  }
+};
+
+// Toggle festival status
+const toggleFestivalStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if festival exists
+    const existingFestival = await Festival.findOne({ 
+      _id: id,
+      isDeleted: false
+    });
+
+    if (!existingFestival) {
+      return errorResponse(res, 404, "Festival not found");
+    }
+
+    // Toggle isActive status
+    const updatedFestival = await findAndUpdate(
+      Festival,
+      { _id: id },
+      { isActive: !existingFestival.isActive }
+    );
+
+    // Clear cache
+    await cacheUtils.delPattern('festivals_*');
+
+    return successResponse(res, 200, "Festival status toggled successfully", { festival: updatedFestival });
+  } catch (error) {
+    console.error("Toggle festival status error:", error);
+    return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
 
@@ -120,4 +281,5 @@ module.exports = {
   getFestivalById,
   updateFestivalById,
   deleteFestivalById,
+  toggleFestivalStatus
 };
