@@ -110,6 +110,11 @@ const productSchema = new mongoose.Schema({
     default: false,
     select: false,
   },
+    isPriceFixed: {
+    type: Boolean,
+    default: false,
+   
+  },
   isBlocked: {
     type: Boolean,
     default: false,
