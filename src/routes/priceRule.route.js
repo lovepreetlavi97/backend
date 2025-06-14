@@ -1,72 +1,80 @@
 const express = require('express');
 const router = express.Router();
-const { festivalController } = require('../controllers');
+const { priceRuleController } = require('../controllers');
 const { adminAuth } = require('../middlewares/auth/auth.middleware');
-const { uploadSingleImage } = require("../middlewares/multerUploads");
 const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
-
 
 /**
  * @swagger
- * /festivals:
+ * tags:
+ *   name: PriceRules
+ *   description: Price rule management
+ */
+
+/**
+ * @swagger
+ * /prices:
  *   post:
- *     summary: Create a new festival
- *     tags: [Festivals]
+ *     summary: Create a new price rule
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required:
  *               - name
  *               - description
- *               - startDate
- *               - endDate
+ *               - type
+ *               - value
  *             properties:
  *               name:
  *                 type: string
- *                 description: The name of the festival
  *               description:
  *                 type: string
- *                 description: Description of the festival
+ *               type:
+ *                 type: string
+ *                 enum: [fixed, percentage]
+ *               value:
+ *                 type: number
+ *               categoryId:
+ *                 type: string
+ *               subcategoryId:
+ *                 type: string
+ *               productId:
+ *                 type: string
+ *               minOrderValue:
+ *                 type: number
  *               startDate:
  *                 type: string
- *                 format: date
- *                 description: Start date of the festival
+ *                 format: date-time
  *               endDate:
  *                 type: string
- *                 format: date
- *                 description: End date of the festival
+ *                 format: date-time
  *               isActive:
  *                 type: boolean
- *                 description: Whether the festival is active
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: Festival image
  *     responses:
  *       201:
- *         description: Festival created successfully
+ *         description: Price rule created successfully
  *       400:
  *         description: Bad request
  */
 router.post(
   '/',
   adminAuth,
-  uploadSingleImage,
-  clearRouteCache('festivals_*'),
-  festivalController.createFestival
+  clearRouteCache('price_rules_*'),
+  priceRuleController.createPriceRule
 );
 
 /**
  * @swagger
- * /festivals:
+ * /prices:
  *   get:
- *     summary: Get all festivals with pagination and filters
- *     tags: [Festivals]
+ *     summary: Get all price rules
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -88,6 +96,12 @@ router.post(
  *           type: string
  *         description: Search term for name or description
  *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [fixed, percentage]
+ *         description: Filter by type
+ *       - in: query
  *         name: isActive
  *         schema:
  *           type: boolean
@@ -107,21 +121,21 @@ router.post(
  *         description: Sort order
  *     responses:
  *       200:
- *         description: List of festivals
+ *         description: List of price rules
  */
 router.get(
   '/',
   adminAuth,
-  cacheRoute('festivals_', 300),
-  festivalController.getAllFestivals
+  cacheRoute('price_rules_', 300),
+  priceRuleController.getAllPriceRules
 );
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /prices/{id}:
  *   get:
- *     summary: Get a festival by ID
- *     tags: [Festivals]
+ *     summary: Get a price rule by ID
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -130,27 +144,25 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         description: Festival ID
+ *         description: Price rule ID
  *     responses:
  *       200:
- *         description: Festival details
+ *         description: Price rule details
  *       404:
- *         description: Festival not found
+ *         description: Price rule not found
  */
 router.get(
   '/:id',
   adminAuth,
-  festivalController.getFestivalById
+  priceRuleController.getPriceRuleById
 );
-
-
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /prices/{id}:
  *   put:
- *     summary: Update a festival
- *     tags: [Festivals]
+ *     summary: Update a price rule
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -159,11 +171,11 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         description: Festival ID
+ *         description: Price rule ID
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
@@ -171,38 +183,46 @@ router.get(
  *                 type: string
  *               description:
  *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: [fixed, percentage]
+ *               value:
+ *                 type: number
+ *               categoryId:
+ *                 type: string
+ *               subcategoryId:
+ *                 type: string
+ *               productId:
+ *                 type: string
+ *               minOrderValue:
+ *                 type: number
  *               startDate:
  *                 type: string
- *                 format: date
+ *                 format: date-time
  *               endDate:
  *                 type: string
- *                 format: date
+ *                 format: date-time
  *               isActive:
  *                 type: boolean
- *               image:
- *                 type: string
- *                 format: binary
  *     responses:
  *       200:
- *         description: Festival updated successfully
+ *         description: Price rule updated successfully
  *       404:
- *         description: Festival not found
+ *         description: Price rule not found
  */
 router.put(
   '/:id',
   adminAuth,
-  uploadSingleImage,
-  clearRouteCache('festivals_*'),
-  festivalController.updateFestivalById
+  clearRouteCache('price_rules_*'),
+  priceRuleController.updatePriceRuleById
 );
-
 
 /**
  * @swagger
- * /festivals/{id}:
+ * /prices/{id}:
  *   delete:
- *     summary: Delete a festival
- *     tags: [Festivals]
+ *     summary: Delete a price rule
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -211,25 +231,26 @@ router.put(
  *         required: true
  *         schema:
  *           type: string
- *         description: Festival ID
+ *         description: Price rule ID
  *     responses:
  *       200:
- *         description: Festival deleted successfully
+ *         description: Price rule deleted successfully
  *       404:
- *         description: Festival not found
+ *         description: Price rule not found
  */
 router.delete(
   '/:id',
   adminAuth,
-  clearRouteCache('festivals_*'),
-  festivalController.deleteFestivalById
+  clearRouteCache('price_rules_*'),
+  priceRuleController.deletePriceRuleById
 );
+
 /**
  * @swagger
- * /festivals/{id}/toggle-status:
+ * /prices/{id}/toggle-status:
  *   patch:
- *     summary: Toggle festival active status
- *     tags: [Festivals]
+ *     summary: Toggle price rule active status
+ *     tags: [PriceRules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -238,18 +259,18 @@ router.delete(
  *         required: true
  *         schema:
  *           type: string
- *         description: Festival ID
+ *         description: Price rule ID
  *     responses:
  *       200:
- *         description: Festival status toggled successfully
+ *         description: Price rule status toggled successfully
  *       404:
- *         description: Festival not found
+ *         description: Price rule not found
  */
 router.patch(
   '/:id/toggle-status',
   adminAuth,
-  clearRouteCache('festivals_*'),
-  festivalController.toggleFestivalStatus
+  clearRouteCache('price_rules_*'),
+  priceRuleController.togglePriceRuleStatus
 );
 
 module.exports = router;

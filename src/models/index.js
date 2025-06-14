@@ -16,6 +16,10 @@ const Transaction = require('./transaction.model');
 const Shipping = require('./shipping.model');
 const Blog = require('./blog.model');
 const Contact = require('./contact.model');
+const SocialIntegration = require('./socialIntegration.model');
+const PriceRule = require('./priceRule.model');
+const Grievance = require('./grievance.model');
+
 module.exports = {
   Cart,
   Wishlist,
@@ -33,5 +37,7 @@ module.exports = {
   Shipping,
   Blog,
   Contact,
-
+  SocialIntegration,
+  PriceRule,
+  Grievance
 };
