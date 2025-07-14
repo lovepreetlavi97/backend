@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const subcategoryController = require("../controllers/subcategory.controller");
-const { uploadSingleImage } = require("../middlewares/multerUploads");
+const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 
 /**

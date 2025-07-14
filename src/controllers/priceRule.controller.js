@@ -2,66 +2,30 @@ const {
   create, 
   findOne, 
   findMany, 
-  findAndUpdate, 
-  deleteOne 
+  findAndUpdate 
 } = require('../services/mongodb/mongoService');
 
-const { PriceRule } = require('../models/index');
+const PriceRule = require('../models/priceRule.model');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
-const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
 
-// Create a new price rule
+// Create Price Rule
 const createPriceRule = async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      type,
-      value,
-      categoryId,
-      subcategoryId,
-      productId,
-      minOrderValue,
-      startDate,
-      endDate,
-      isActive = true
-    } = req.body;
+    const { name, price, isActive = true } = req.body;
 
-    // Validate required fields
-    if (!name || !description || !type || !value) {
-      return errorResponse(res, 400, "Missing required fields");
+    if (!name || price === undefined) {
+      return errorResponse(res, 400, "Name and price are required");
     }
 
-    // Create new price rule
-    const priceRuleData = {
-      name,
-      description,
-      type,
-      value,
-      minOrderValue: minOrderValue || 0,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      isActive
-    };
-    
-    // Only add IDs if they're not empty strings
-    if (categoryId && categoryId.trim() !== '') {
-      priceRuleData.categoryId = categoryId;
-    }
-    
-    if (subcategoryId && subcategoryId.trim() !== '') {
-      priceRuleData.subcategoryId = subcategoryId;
-    }
-    
-    if (productId && productId.trim() !== '') {
-      priceRuleData.productId = productId;
+    const existing = await PriceRule.findOne({ name: name.trim(), isDeleted: false });
+    if (existing) {
+      return errorResponse(res, 409, "Price rule with this name already exists");
     }
 
-    const priceRule = await create(PriceRule, priceRuleData);
+    const priceRule = await create(PriceRule, { name: name.trim(), price, isActive });
 
-    // Clear cache
-    await cacheUtils.delPattern('price_rules_*');
+    await cacheUtils.delPattern('price-rules_*');
 
     return successResponse(res, 201, "Price rule created successfully", { priceRule });
   } catch (error) {
@@ -70,58 +34,41 @@ const createPriceRule = async (req, res) => {
   }
 };
 
-// Get all price rules with pagination and filters
+// Get All Price Rules
 const getAllPriceRules = async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
-      search,
-      type,
+      search = '',
       isActive,
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
 
-    // Create cache key
-    const cacheKey = `price_rules_${page}_${limit}_${search || ''}_${type || ''}_${isActive || ''}`;
-
-    // Try to get from cache
+    const cacheKey = `price-rules_${page}_${limit}_${search}_${isActive || ''}`;
     const cachedData = await cacheUtils.get(cacheKey);
     if (cachedData) {
       return successResponse(res, 200, "Price rules retrieved successfully", cachedData);
     }
 
-    // Build query
     const query = { isDeleted: false };
-
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    if (type) {
-      query.type = type;
+      query.name = { $regex: search, $options: 'i' };
     }
 
     if (isActive !== undefined) {
       query.isActive = isActive === 'true';
     }
 
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // Sort configuration
+    const skip = (page - 1) * limit;
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    // Execute query
     const priceRules = await PriceRule.find(query)
       .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
+      .skip(Number(skip))
+      .limit(Number(limit))
       .lean();
 
     const total = await PriceRule.countDocuments(query);
@@ -130,14 +77,13 @@ const getAllPriceRules = async (req, res) => {
       priceRules,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / Number(limit)),
+      },
     };
 
-    // Cache the result
-    await cacheUtils.set(cacheKey, result, 300); // Cache for 5 minutes
+    await cacheUtils.set(cacheKey, result, 300); // 5 min cache
 
     return successResponse(res, 200, "Price rules retrieved successfully", result);
   } catch (error) {
@@ -146,15 +92,12 @@ const getAllPriceRules = async (req, res) => {
   }
 };
 
-// Get a price rule by ID
+// Get by ID
 const getPriceRuleById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const priceRule = await findOne(PriceRule, { 
-      _id: id,
-      isDeleted: false
-    });
+    const priceRule = await findOne(PriceRule, { _id: id, isDeleted: false });
 
     if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
@@ -167,53 +110,25 @@ const getPriceRuleById = async (req, res) => {
   }
 };
 
-// Update a price rule
+// Update by ID
 const updatePriceRuleById = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body };
+    const { name, price, isActive } = req.body;
 
-    // Check if price rule exists
-    const existingPriceRule = await PriceRule.findOne({ 
-      _id: id,
-      isDeleted: false
-    });
-
-    if (!existingPriceRule) {
+    const existing = await PriceRule.findOne({ _id: id, isDeleted: false });
+    if (!existing) {
       return errorResponse(res, 404, "Price rule not found");
     }
 
-    // Process dates if they exist
-    if (updateData.startDate) {
-      updateData.startDate = new Date(updateData.startDate);
-    }
-    
-    if (updateData.endDate) {
-      updateData.endDate = new Date(updateData.endDate);
-    }
-    
-    // Handle empty string IDs
-    if (updateData.categoryId === '') {
-      delete updateData.categoryId;
-    }
-    
-    if (updateData.subcategoryId === '') {
-      delete updateData.subcategoryId;
-    }
-    
-    if (updateData.productId === '') {
-      delete updateData.productId;
-    }
+    const updateData = {};
+    if (name !== undefined) updateData.name = name.trim();
+    if (price !== undefined) updateData.price = price;
+    if (isActive !== undefined) updateData.isActive = isActive;
 
-    // Update price rule
-    const priceRule = await findAndUpdate(
-      PriceRule,
-      { _id: id },
-      updateData
-    );
+    const priceRule = await findAndUpdate(PriceRule, { _id: id }, updateData);
 
-    // Clear cache
-    await cacheUtils.delPattern('price_rules_*');
+    await cacheUtils.delPattern('price-rules_*');
 
     return successResponse(res, 200, "Price rule updated successfully", { priceRule });
   } catch (error) {
@@ -222,26 +137,19 @@ const updatePriceRuleById = async (req, res) => {
   }
 };
 
-// Delete a price rule (soft delete)
+// Soft Delete by ID
 const deletePriceRuleById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if price rule exists
-    const existingPriceRule = await PriceRule.findOne({ 
-      _id: id,
-      isDeleted: false
-    });
-
-    if (!existingPriceRule) {
+    const priceRule = await PriceRule.findOne({ _id: id, isDeleted: false });
+    if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
     }
 
-    // Soft delete by setting isDeleted to true
     await findAndUpdate(PriceRule, { _id: id }, { isDeleted: true });
 
-    // Clear cache
-    await cacheUtils.delPattern('price_rules_*');
+    await cacheUtils.delPattern('price-rules_*');
 
     return successResponse(res, 200, "Price rule deleted successfully");
   } catch (error) {
@@ -250,34 +158,27 @@ const deletePriceRuleById = async (req, res) => {
   }
 };
 
-// Toggle price rule status
+// Toggle isActive
 const togglePriceRuleStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if price rule exists
-    const existingPriceRule = await PriceRule.findOne({ 
-      _id: id,
-      isDeleted: false
-    });
-
-    if (!existingPriceRule) {
+    const priceRule = await PriceRule.findOne({ _id: id, isDeleted: false });
+    if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
     }
 
-    // Toggle isActive status
-    const updatedPriceRule = await findAndUpdate(
+    const updated = await findAndUpdate(
       PriceRule,
       { _id: id },
-      { isActive: !existingPriceRule.isActive }
+      { isActive: !priceRule.isActive }
     );
 
-    // Clear cache
-    await cacheUtils.delPattern('price_rules_*');
+    await cacheUtils.delPattern('price-rules_*');
 
-    return successResponse(res, 200, "Price rule status toggled successfully", { priceRule: updatedPriceRule });
+    return successResponse(res, 200, "Price rule status toggled successfully", { priceRule: updated });
   } catch (error) {
-    console.error("Toggle price rule status error:", error);
+    console.error("Toggle status error:", error);
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -288,5 +189,5 @@ module.exports = {
   getPriceRuleById,
   updatePriceRuleById,
   deletePriceRuleById,
-  togglePriceRuleStatus
+  togglePriceRuleStatus,
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/category.controller');
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
-const { uploadSingleImage } = require("../middlewares/multerUploads");
+const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 
 /**
  * @swagger
@@ -61,7 +61,7 @@ const { uploadSingleImage } = require("../middlewares/multerUploads");
  *       500:
  *         description: Internal server error
  */
-router.post('/', adminAuth, uploadSingleImage, categoryController.createCategory);
+router.post('/', uploadSingleImage, categoryController.createCategory);
 
 /**
  * @swagger

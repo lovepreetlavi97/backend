@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
-const { uploadImagesToBucket } = require('../middlewares/multerUploads');
+// const { uploadImagesToBucket } = require('../middlewares/multerUploads');
 const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
 /**
  * @swagger
@@ -327,7 +327,7 @@ router.post('/logout', userAuth, userController.logoutUser);
  *       200:
  *         description: Images uploaded successfully
  */
-router.post('/upload', userAuth, uploadImagesToBucket, userController.uploadImages);
+router.post('/upload', userAuth,  userController.uploadImages);
 
 /**
  * @swagger

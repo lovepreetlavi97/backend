@@ -14,9 +14,9 @@ const subcategorySchema = new mongoose.Schema({
     ref: 'Category', // Reference to the Category model
     required: false, // Ensure every subcategory is tied to a category
   },
-  images: {
+  image: {
     type: String,
-    default: DEFAULT_IMAGE_URL
+    default: ""
   },
   isFeatured: {
     type: Boolean,

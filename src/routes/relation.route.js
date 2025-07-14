@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const relationController = require('../controllers/relation.controller');
-const { uploadSingleImage } = require("../middlewares/multerUploads");
+const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
@@ -114,7 +114,7 @@ router.get('/:id',adminAuth, relationController.getRelationById);
  *                 type: string
  *                 description: Updated description of the relation.
  *                 example: "Colleague relation description"
- *               icon:
+ *               image:
  *                 type: string
  *                 format: binary
  *                 description: Optional icon image file. If not provided, the current icon will be retained.

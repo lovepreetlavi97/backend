@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const upload = multer();
 const productController = require('../controllers/product.controller');
-const { uploadProductImages } = require("../middlewares/multerUploads");
+const { uploadFields} = require("../middlewares/uploadMiddleware");
 const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
 /**
  * @swagger
@@ -77,14 +79,19 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *                 example: [{name: "Material", value: "Gold"}, {name: "Purity", value: "24K"}]
  *               image:
  *                 type: string
- *                 format: binary
- *                 description: Main product image
+ *                 format: uri
+ *                 description: URL of the main product image.
+ *                 example: "https://cdn.example.com/products/image1.jpg"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                   format: binary
- *                 description: Additional product images (multiple files allowed)
+ *                   format: uri
+ *                 description: Array of additional product image URLs (max 10).
+ *                 example: [
+ *                   "https://cdn.example.com/products/image2.jpg",
+ *                   "https://cdn.example.com/products/image3.jpg"
+ *                 ]
  *     responses:
  *       201:
  *         description: Product created successfully
@@ -93,7 +100,7 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *       500:
  *         description: Internal server error
  */
-router.post("/", adminAuth, uploadProductImages, productController.createProduct);
+router.post("/", adminAuth,upload.none(), productController.createProduct);
 /**
  * @swagger
  * /products:
@@ -125,6 +132,7 @@ router.get('/', adminAuth, productController.getAllProducts);
  *         description: Product not found
  */
 router.get('/:id', adminAuth, productController.getProductById);
+
 /**
  * @swagger
  * /products/{id}:
@@ -201,14 +209,19 @@ router.get('/:id', adminAuth, productController.getProductById);
  *                 example: [{name: "Material", value: "Gold"}, {name: "Purity", value: "24K"}]
  *               image:
  *                 type: string
- *                 format: binary
- *                 description: Main product image
+ *                 format: uri
+ *                 description: URL of the main product image.
+ *                 example: "https://cdn.example.com/products/image1.jpg"
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
- *                   format: binary
- *                 description: Additional product images (multiple files allowed)
+ *                   format: uri
+ *                 description: Array of additional product image URLs (max 10).
+ *                 example: [
+ *                   "https://cdn.example.com/products/image2.jpg",
+ *                   "https://cdn.example.com/products/image3.jpg"
+ *                 ]
  *     responses:
  *       200:
  *         description: Product updated successfully
@@ -219,7 +232,7 @@ router.get('/:id', adminAuth, productController.getProductById);
  *       500:
  *         description: Internal server error
  */
-router.put('/:id', adminAuth, uploadProductImages, productController.updateProductById);
+router.put('/:id', adminAuth,upload.none(),  productController.updateProductById);
 /**
  * @swagger
  * /products/{id}:

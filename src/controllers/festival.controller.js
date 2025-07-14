@@ -11,7 +11,7 @@ const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
 const path = require('path');
 const fs = require('fs');
-
+const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); 
 // Create a new festival
 const createFestival = async (req, res) => {
   try {
@@ -37,18 +37,17 @@ const createFestival = async (req, res) => {
       isActive: isActive === 'true' || isActive === true
     };
 
-    // Handle image upload if present
-    if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        festivalData.image = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        festivalData.image = req.file.path.replace(/\\/g, '/').split('public/')[1];
-      }
+
+    // Handle image
+    if (!req.file) {
+      return errorResponse(res, 400, "Image is required");
     }
 
+    const { buffer, originalname, mimetype } = req.file;
+    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+if (imageKey){
+  festivalData.image = imageKey
+}
     // Create the festival
     const festival = await create(Festival, festivalData);
 
@@ -183,16 +182,10 @@ const updateFestivalById = async (req, res) => {
       updateData.isActive = updateData.isActive === 'true' || updateData.isActive === true;
     }
 
-    // Handle image upload if present
     if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        updateData.image = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        updateData.image = req.file.path.replace(/\\/g, '/').split('public/')[1];
-      }
+      const { buffer, originalname, mimetype } = req.file;
+      const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+      updateData.image = imageKey;
     }
 
     // Update festival

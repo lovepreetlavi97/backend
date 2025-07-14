@@ -10,12 +10,12 @@ const { SubCategory, Category } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const mongoose = require('mongoose');
-
+const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add this at top if not already
 // Create a new subcategory
 const createSubcategory = async (req, res) => {
   try {
     const { name, category, isFeatured } = req.body;
-    
+    console.log(name, category, isFeatured ,"name, category, isFeatured ")
     // Basic validation
     if (!name) {
       return errorResponse(res, 400, "Subcategory name is required");
@@ -33,17 +33,18 @@ const createSubcategory = async (req, res) => {
         return errorResponse(res, 404, "Category not found");
       }
     }
-
-    // Handle image
-    const imageUrl = req.file?.originalname;
-    if (!imageUrl) {
+   // Handle image
+    if (!req.file) {
       return errorResponse(res, 400, "Image is required");
     }
+
+    const { buffer, originalname, mimetype } = req.file;
+    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
 
     const subcategoryData = {
       name,
       category,
-      images: imageUrl,
+      image: imageKey,
       isFeatured: isFeatured,
       isBlocked: false
     };
@@ -164,12 +165,11 @@ const updateSubcategoryById = async (req, res) => {
     if (category) updateData.category = category;
     if (isBlocked !== undefined) updateData.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) updateData.isFeatured = isFeatured === 'true' || isFeatured === true;
-
-    // Handle image update if provided
     if (req.file) {
-      updateData.images = req.file.originalname;
+      const { buffer, originalname, mimetype } = req.file;
+      const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+      updateData.image = imageKey;
     }
-
     const subcategory = await SubCategory.findByIdAndUpdate(
       id,
       updateData,

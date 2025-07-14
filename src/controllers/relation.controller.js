@@ -12,7 +12,7 @@ const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
 const path = require('path');
 const fs = require('fs');
-
+const { uploadToSpaces } = require("../middlewares/uploadMiddleware");
 // Create a new relation
 const createRelation = async (req, res) => {
   try {
@@ -34,17 +34,12 @@ const createRelation = async (req, res) => {
       isActive: isActive === 'true' || isActive === true
     };
 
-    // Handle icon upload if present
-    if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        relationData.icon = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        relationData.icon = req.file.path.replace(/\\/g, '/').split('public/')[1];
-      }
-    }
+
+    const { buffer, originalname, mimetype } = req.file;
+    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+if (imageKey){
+  relationData.image = imageKey
+}
 
     // Create the relation
     const relation = await create(Relation, relationData);
@@ -171,16 +166,10 @@ const updateRelationById = async (req, res) => {
       updateData.isActive = updateData.isActive === 'true' || updateData.isActive === true;
     }
 
-    // Handle icon upload if present
     if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        updateData.icon = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        updateData.icon = req.file.path.replace(/\\/g, '/').split('public/')[1];
-      }
+      const { buffer, originalname, mimetype } = req.file;
+      const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+      updateData.image = imageKey;
     }
 
     // Update relation

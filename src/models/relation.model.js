@@ -11,9 +11,9 @@ const relationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  icon: {
+  image : {
     type: String,
-    default: DEFAULT_ICON_URL
+    default: ""
   },
   isActive: {
     type: Boolean,

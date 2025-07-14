@@ -17,6 +17,8 @@ const socialIntegrationRoutes = require('./socialIntegration.route');
 const priceRuleRoute = require('./priceRule.route');
 const bannerRoute = require('./banner.route');
 const grievanceRoute = require('./grievance.route');
+const uploadRoute = require('./uploadRoutes');
+const userRoute = require('./user.route');
 const router = express.Router();
 
 // Register your routes
@@ -38,6 +40,6 @@ router.use('/social', socialIntegrationRoutes);
 router.use('/prices', priceRuleRoute);
 router.use('/banners', bannerRoute);
 router.use('/grievances', grievanceRoute);
-
-
+router.use('/upload', uploadRoute);
+router.use('/user', userRoute);
 module.exports = router;

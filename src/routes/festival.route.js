@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { festivalController } = require('../controllers');
 const { adminAuth } = require('../middlewares/auth/auth.middleware');
-const { uploadSingleImage } = require("../middlewares/multerUploads");
-const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
 
+const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
+const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 
 /**
  * @swagger

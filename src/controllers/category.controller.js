@@ -11,51 +11,54 @@ const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
 const mongoose = require('mongoose');
 const slugify = require('slugify');
+const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add this at top if not already
 
 // Create a new category
 const createCategory = async (req, res) => {
   try {
     const { name, description, isFeatured } = req.body;
-    
+
     // Basic validation
     if (!name) {
       return errorResponse(res, 400, "Category name is required");
     }
-    
+
     // Check for duplicate category name
-    const existingCategory = await Category.findOne({ 
+    const existingCategory = await Category.findOne({
       name: { $regex: new RegExp(`^${name}$`, 'i') }
     });
-    
+
     if (existingCategory) {
       return errorResponse(res, 409, "Category with this name already exists");
     }
-    
+
     // Handle image
-    const imageUrl = req.file.originalname;
-    if (!imageUrl) {
+    if (!req.file) {
       return errorResponse(res, 400, "Image is required");
     }
-    
+
+    const { buffer, originalname, mimetype } = req.file;
+    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+
     // Create slug
     const slug = slugify(name, { lower: true, strict: true });
-    
+
     // Prepare category data
     const categoryData = {
       name,
       slug,
       description,
-      images: imageUrl,
+      image: imageKey, // save only the image key
       isFeatured: isFeatured,
       isBlocked: false,
       productCount: 0
     };
-    
+
     const category = await create(Category, categoryData);
-    
+
     // Clear cache after creating new category
     await cacheUtils.delPattern('categories_*');
-    
+
     return successResponse(res, 201, messages.CATEGORY_CREATED, { category });
 
   } catch (error) {
@@ -63,6 +66,7 @@ const createCategory = async (req, res) => {
     return errorResponse(res, 500, error.message || "Failed to create category");
   }
 };
+
 
 // Get all categories
 const getAllCategories = async (req, res) => {
@@ -199,8 +203,9 @@ const getCategoryById = async (req, res) => {
 const updateCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, isBlocked, isFeatured } = req.body;
-    
+    const { name, description, isBlocked, isFeatured,image } = req.body;
+        const { buffer, originalname, mimetype } = req.file;
+    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, "Invalid category ID format");
@@ -233,9 +238,11 @@ const updateCategoryById = async (req, res) => {
     if (isBlocked !== undefined) category.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) category.isFeatured = isFeatured === 'true' || isFeatured === true;
     // Handle image update
-    const newImage = req.files?.[0]?.location;
-    if (newImage) {
-      category.images = newImage;
+    
+    if (imageKey) {
+      category.image =imageKey;
+    }else {
+       category.image = image
     }
     
     // Save the updated category

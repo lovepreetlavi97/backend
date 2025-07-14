@@ -17,8 +17,9 @@ const app = express();
 // Middleware for parsing JSON and handling CORS
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cors());
-
+app.use(cors({
+  origin: '*',
+}));
 // Import versioned routes
 const v1Routes = require('./routes'); // Import the index.js in routes
 

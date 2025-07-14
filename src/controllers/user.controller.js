@@ -636,7 +636,7 @@ const getAllProducts = async (req, res) => {
       order = 'desc',
       categoryId,
       subcategoryId,
-      festivalId,
+      festivalIds,
       minPrice,
       maxPrice,
       search
@@ -651,7 +651,8 @@ const getAllProducts = async (req, res) => {
     // Add filters if provided
     if (categoryId) query.categoryId = categoryId;
     if (subcategoryId) query.subcategoryId = subcategoryId;
-    if (festivalId) query.festivalId = festivalId;
+    if (festivalIds) query.festivalIds = festivalIds;
+
     
     // Add price range filter if provided
     if (minPrice || maxPrice) {
@@ -693,7 +694,7 @@ const getAllProducts = async (req, res) => {
       .limit(parseInt(limit))
       .populate('categoryId', 'name')
       .populate('subcategoryId', 'name')
-      .populate('festivalId', 'name');
+      .populate('festivalIds', 'name');
     
     // Get total count for pagination
     const totalProducts = await Product.countDocuments(query);
@@ -745,46 +746,43 @@ const uploadImages = async (req, res) => {
   }
 };
 
-// Get product by slug
 const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    
-    if (!slug) {
-      return errorResponse(res, 400, messages.SLUG_REQUIRED);
+
+    if (!slug || typeof slug !== 'string') {
+      return errorResponse(res, 400, 'Invalid product slug');
     }
-    
-    // Try to get from cache first
-    const cacheKey = `product_${slug}`;
+
+    const cacheKey = `product_slug_${slug}`;
     const cachedProduct = await cacheUtils.get(cacheKey);
+
     if (cachedProduct) {
-      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
-        product: cachedProduct
-      });
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { product: cachedProduct });
     }
-    
-    const product = await Product.findOne({ 
-      slug,
-      isDeleted: false,
-      isBlocked: false
-    })
-    .populate('categoryId', 'name slug')
-    .populate('subcategoryId', 'name slug')
-    .populate('festivalId', 'name slug');
-    
+
+    const product = await Product.findOne({ slug })
+      .populate({ path: 'categoryId', select: 'name' })
+      .populate({ path: 'subcategoryId', select: 'name' })
+      .populate({ path: 'festivalIds', select: 'name' })
+      .populate({ path: 'relationIds', select: 'name' })
+      .lean();
+
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
-    
-    // Cache the result
-    await cacheUtils.set(cacheKey, product, 1800); // Cache for 30 minutes
-    
+
+    // Add discountPercentage manually if needed
+    if (product.actualPrice && product.discountedPrice) {
+      product.discountPercentage = Math.round(((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100);
+    }
+
+    await cacheUtils.set(cacheKey, product, 600); // 10-minute cache
+
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { product });
   } catch (error) {
-    console.error("Get product by slug error:", error);
-    return errorResponse(res, 500, messages.PRODUCT_RETRIEVAL_FAILED, {
-      error: error.message,
-    });
+    console.error('Get product by slug error:', error);
+    return errorResponse(res, 500, error.message || 'Error retrieving product by slug');
   }
 };
 

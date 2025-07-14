@@ -27,33 +27,12 @@ const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.midd
  *             type: object
  *             required:
  *               - name
- *               - description
- *               - type
- *               - value
+ *               - price
  *             properties:
  *               name:
  *                 type: string
- *               description:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: [fixed, percentage]
- *               value:
+ *               price:
  *                 type: number
- *               categoryId:
- *                 type: string
- *               subcategoryId:
- *                 type: string
- *               productId:
- *                 type: string
- *               minOrderValue:
- *                 type: number
- *               startDate:
- *                 type: string
- *                 format: date-time
- *               endDate:
- *                 type: string
- *                 format: date-time
  *               isActive:
  *                 type: boolean
  *     responses:
@@ -94,13 +73,7 @@ router.post(
  *         name: search
  *         schema:
  *           type: string
- *         description: Search term for name or description
- *       - in: query
- *         name: type
- *         schema:
- *           type: string
- *           enum: [fixed, percentage]
- *         description: Filter by type
+ *         description: Search by name
  *       - in: query
  *         name: isActive
  *         schema:
@@ -181,27 +154,8 @@ router.get(
  *             properties:
  *               name:
  *                 type: string
- *               description:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: [fixed, percentage]
- *               value:
+ *               price:
  *                 type: number
- *               categoryId:
- *                 type: string
- *               subcategoryId:
- *                 type: string
- *               productId:
- *                 type: string
- *               minOrderValue:
- *                 type: number
- *               startDate:
- *                 type: string
- *                 format: date-time
- *               endDate:
- *                 type: string
- *                 format: date-time
  *               isActive:
  *                 type: boolean
  *     responses:
