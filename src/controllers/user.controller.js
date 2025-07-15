@@ -549,7 +549,7 @@ const getAllFestivals = async (req, res) => {
     
     const festivals = await Festival.find({
       isDeleted: false,
-      isBlocked: false,
+   
     });
 
     // Cache the result
