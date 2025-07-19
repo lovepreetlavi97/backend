@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const bannerController = require('../controllers/banner.controller');
-const { uploadSingleImage } = require("../middlewares/multerUploads");
+
 const { adminAuth } = require('../middlewares/auth/auth.middleware');
+const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 
 /**
  * @swagger

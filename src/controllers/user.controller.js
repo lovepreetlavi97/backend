@@ -18,7 +18,8 @@ const {
   Product,
   Wishlist,
   Cart,
-  PromoCode
+  PromoCode,
+  Banner
 } = require("../models/index");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -919,6 +920,71 @@ const checkPromoCode = async (req, res) => {
     });
   }
 };
+// Get all relations for user
+const getAllRelations = async (req, res) => {
+  try {
+    // Check cache first
+    const cachedRelations = await cacheUtils.get('relations_user');
+    if (cachedRelations) {
+      return successResponse(res, 200, messages.RELATIONS_RETRIEVED, {
+        relations: cachedRelations
+      });
+    }
+
+    // Fetch from DB
+    const relations = await Relation.find({
+      isDeleted: false,
+    });
+
+    // Cache it
+    await cacheUtils.set('relations_user', relations || []);
+
+    return successResponse(res, 200, messages.RELATIONS_RETRIEVED, {
+      relations: relations || [],
+    });
+  } catch (error) {
+    console.error("Get relations error:", error);
+    return errorResponse(res, 500, messages.RELATIONS_RETRIEVAL_FAILED, {
+      error: error.message,
+    });
+  }
+};
+const getAllBanners = async (req, res) => {
+  try {
+    const cacheKey = 'banners_user';
+    const cachedBanners = await cacheUtils.get(cacheKey);
+    if (cachedBanners) {
+      return successResponse(res, 200, 'Banners retrieved from cache', {
+        banners: cachedBanners
+      });
+    }
+
+    const today = new Date();
+
+    const banners = await Banner.find({
+      isDeleted: false,
+      status: 'active',
+      startDate: { $lte: today },
+      endDate: { $gte: today },
+    }).sort({ position: 1 });
+
+    await cacheUtils.set(cacheKey, banners || []);
+
+    return successResponse(res, 200, 'Banners retrieved successfully', {
+      banners: banners || [],
+    });
+  } catch (error) {
+    console.error("Get banners error:", error);
+    return errorResponse(res, 500, 'Failed to retrieve banners', {
+      error: error.message,
+    });
+  }
+};
+
+module.exports = {
+  getAllBanners,
+  // other exports...
+};
 
 // Add other function exports in your module.exports
 module.exports = {
@@ -938,5 +1004,7 @@ module.exports = {
   uploadImages,
   getProductBySlug,
   checkPromoCode,
-  getCountsOfNavbar
+  getCountsOfNavbar,
+  getAllRelations,
+  getAllBanners
 };

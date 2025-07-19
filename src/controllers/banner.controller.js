@@ -11,7 +11,7 @@ const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { cacheUtils } = require("../config/redis");
 const path = require('path');
 const fs = require('fs');
-
+const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); 
 /**
  * Create a new banner
  * @param {Object} req - Express request object
@@ -58,17 +58,16 @@ const createBanner = async (req, res) => {
       bannerData.position = highestPositionBanner ? highestPositionBanner.position + 1 : 1;
     }
 
-    // Handle image upload if present
-    if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        bannerData.imageUrl = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        bannerData.imageUrl = req.file.path.replace(/\\\\/g, '/').split('public/')[1];
-      }
-    }
+// Handle image upload
+if (!req.file) {
+  return errorResponse(res, 400, "Image is required");
+}
+
+const { buffer, originalname, mimetype } = req.file;
+const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+if (imageKey) {
+  bannerData.imageUrl = imageKey;
+}
 
     // Create the banner
     const banner = await create(Banner, bannerData);
@@ -222,17 +221,11 @@ const updateBannerById = async (req, res) => {
       updateData.position = parseInt(updateData.position);
     }
 
-    // Handle image upload if present
-    if (req.file) {
-      // For S3 uploads, use the location property
-      if (req.file.location) {
-        updateData.imageUrl = req.file.location;
-      } 
-      // For local uploads, format the path
-      else if (req.file.path) {
-        updateData.imageUrl = req.file.path.replace(/\\\\/g, '/').split('public/')[1];
-      }
-    }
+if (req.file) {
+  const { buffer, originalname, mimetype } = req.file;
+  const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+  updateData.imageUrl = imageKey;
+}
 
     // Update banner
     const banner = await findAndUpdate(

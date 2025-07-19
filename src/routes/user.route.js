@@ -21,6 +21,17 @@ const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.midd
  *         description: A list of festivals
  */
 router.get('/festivals', cacheRoute(1800), userController.getAllFestivals);
+/**
+ * @swagger
+ * /user/relations:
+ *   get:
+ *     summary: Get all relations (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of relations
+ */
+router.get('/relations', cacheRoute(1800), userController.getAllRelations);
 
 /**
  * @swagger
@@ -400,5 +411,52 @@ router.put('/:id', userAuth, clearRouteCache('user_*'), userController.updateUse
  *         description: User not found
  */
 router.delete('/:id', userAuth, clearRouteCache('user_*'), userController.deleteUserById);
+/**
+ * @swagger
+ * /user/banners:
+ *   get:
+ *     summary: Get all active banners for users
+ *     tags:
+ *       - User
+ *     security: [] 
+ *     responses:
+ *       200:
+ *         description: A list of active banners
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Banners fetched successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     banners:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           title:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           imageUrl:
+ *                             type: string
+ *                           link:
+ *                             type: string
+ *                           type:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                           startDate:
+ *                             type: string
+ *                           endDate:
+ *                             type: string
+ */
+router.get('/banners', cacheRoute(1800), userController.getAllBanners);
 
 module.exports = router;
