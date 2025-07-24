@@ -981,10 +981,7 @@ const getAllBanners = async (req, res) => {
   }
 };
 
-module.exports = {
-  getAllBanners,
-  // other exports...
-};
+
 
 // Add other function exports in your module.exports
 module.exports = {
