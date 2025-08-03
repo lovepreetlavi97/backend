@@ -17,8 +17,8 @@ const getProductBySlug = async (req, res) => {
 
     if (cached) {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
-        product: cached,
-      });
+      products: cached,
+    });
     }
 
     // Match category/subcategory/festival by name (slug)
@@ -30,19 +30,23 @@ const getProductBySlug = async (req, res) => {
 
     const festivalIds = festivals.map((f) => f._id);
 
+    const slugConditions = [
+      category ? { categoryId: category._id } : null,
+      subcategory ? { subcategoryId: subcategory._id } : null,
+      festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
+    ].filter(Boolean);
+    
     const query = {
-      $and: [
-        {
-          $or: [
-            category ? { categoryId: category._id } : null,
-            subcategory ? { subcategoryId: subcategory._id } : null,
-            festivalIds.length > 0
-              ? { festivalIds: { $in: festivalIds } }
-              : null,
-          ].filter(Boolean),
-        },
-      ],
+      isDeleted: false,
+      isBlocked: false,
+      $and: []
     };
+    
+    if (slugConditions.length > 0) {
+      query.$and.push({ $or: slugConditions });
+    } else {
+      console.log('No matching category, subcategory, or festival found for slug:', slug);
+    }
 
     // Add filters dynamically
     if (filters.price) {
@@ -52,16 +56,20 @@ const getProductBySlug = async (req, res) => {
 
       const priceRanges = priceConditions
         .map((range) => {
-          const [min, max] = range.split("-").map(Number);
-          if (!isNaN(min) && !isNaN(max)) {
-            return {
-              discountedPrice: {
-                $gte: min,
-                $lt: max === Infinity ? Number.MAX_SAFE_INTEGER : max,
-              },
-            };
+          if (range === "under-1500") {
+            return { discountedPrice: { $lt: 1500 } };
           } else if (range === "above-5000") {
             return { discountedPrice: { $gt: 5000 } };
+          } else {
+            const [min, max] = range.split("-").map(Number);
+            if (!isNaN(min) && !isNaN(max)) {
+              return {
+                discountedPrice: {
+                  $gte: min,
+                  $lt: max === Infinity ? Number.MAX_SAFE_INTEGER : max,
+                },
+              };
+            }
           }
           return null;
         })
@@ -81,7 +89,7 @@ const getProductBySlug = async (req, res) => {
         query.$and.push({ [key]: { $in: values } });
       }
     });
-
+  
     const products = await Product.find(query)
       .populate({ path: "categoryId", select: "name" })
       .populate({ path: "subcategoryId", select: "name" })
@@ -92,7 +100,7 @@ const getProductBySlug = async (req, res) => {
     if (!products || products.length === 0) {
       return errorResponse(res, 400, messages.PRODUCT_NOT_FOUND);
     }
-
+    
     const enhancedProducts = products.map((product) => {
       if (product.actualPrice && product.discountedPrice) {
         product.discountPercentage = Math.round(
