@@ -1,9 +1,12 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const userController = require('../controllers/user.controller');
-const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
+const userController = require("../controllers/user.controller");
+const { adminAuth, userAuth } = require("../middlewares/auth/auth.middleware");
 // const { uploadImagesToBucket } = require('../middlewares/multerUploads');
-const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
+const {
+  cacheRoute,
+  clearRouteCache,
+} = require("../middlewares/cache/cache.middleware");
 /**
  * @swagger
  * tags:
@@ -20,7 +23,7 @@ const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.midd
  *       200:
  *         description: A list of festivals
  */
-router.get('/festivals', cacheRoute(1800), userController.getAllFestivals);
+router.get("/festivals", cacheRoute(1800), userController.getAllFestivals);
 /**
  * @swagger
  * /user/relations:
@@ -31,7 +34,7 @@ router.get('/festivals', cacheRoute(1800), userController.getAllFestivals);
  *       200:
  *         description: A list of relations
  */
-router.get('/relations', cacheRoute(1800), userController.getAllRelations);
+router.get("/relations", cacheRoute(1800), userController.getAllRelations);
 /**
  * @swagger
  * /user/banners:
@@ -76,7 +79,7 @@ router.get('/relations', cacheRoute(1800), userController.getAllRelations);
  *                           endDate:
  *                             type: string
  */
-router.get('/banners', cacheRoute(1800), userController.getAllBanners);
+router.get("/banners", cacheRoute(1800), userController.getAllBanners);
 /**
  * @swagger
  * /user/subcategories:
@@ -87,7 +90,11 @@ router.get('/banners', cacheRoute(1800), userController.getAllBanners);
  *       200:
  *         description: A list of subcategories
  */
-router.get('/subcategories', cacheRoute(1800), userController.getAllSubCategories);
+router.get(
+  "/subcategories",
+  cacheRoute(1800),
+  userController.getAllSubCategories
+);
 /**
  * @swagger
  * /user/categories:
@@ -98,7 +105,7 @@ router.get('/subcategories', cacheRoute(1800), userController.getAllSubCategorie
  *       200:
  *         description: A list of categories
  */
-router.get('/categories', cacheRoute(1800), userController.getAllCategories);
+router.get("/categories", cacheRoute(1800), userController.getAllCategories);
 /**
  * @swagger
  * /user/products:
@@ -165,26 +172,7 @@ router.get('/categories', cacheRoute(1800), userController.getAllCategories);
  *       200:
  *         description: A list of products with pagination
  */
-router.get('/products', cacheRoute(600), userController.getAllProducts);
-/**
- * @swagger
- * /user/products/{slug}:
- *   get:
- *     summary: Get product by slug
- *     tags: [User]
- *     parameters:
- *       - in: path
- *         name: slug
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Product details
- *       404:
- *         description: Product not found
- */
-router.get('/products/:slug', cacheRoute(1800), userController.getProductBySlug);
+router.get("/products", cacheRoute(600), userController.getAllProducts);
 
 /**
  * @swagger
@@ -198,7 +186,7 @@ router.get('/products/:slug', cacheRoute(1800), userController.getProductBySlug)
  *       200:
  *         description: Counts retrieved successfully
  */
-router.get('/counts', userAuth, userController.getCountsOfNavbar);
+router.get("/counts", userAuth, userController.getCountsOfNavbar);
 
 /**
  * @swagger
@@ -218,7 +206,7 @@ router.get('/counts', userAuth, userController.getCountsOfNavbar);
  *       404:
  *         description: Promo code not found
  */
-router.get('/promo/:code', userController.checkPromoCode);
+router.get("/promo/:code", userController.checkPromoCode);
 
 /**
  * @swagger
@@ -251,7 +239,7 @@ router.get('/promo/:code', userController.checkPromoCode);
  *       400:
  *         description: Bad request
  */
-router.post('/', userController.createUser);
+router.post("/", userController.createUser);
 
 /**
  * @swagger
@@ -280,7 +268,7 @@ router.post('/', userController.createUser);
  *       500:
  *         description: Internal Server Error
  */
-router.post('/login/phone', userController.loginUser);
+router.post("/login/phone", userController.loginUser);
 
 /**
  * @swagger
@@ -311,7 +299,59 @@ router.post('/login/phone', userController.loginUser);
  *       404:
  *         description: User not found
  */
-router.post('/login/email', userController.loginWithEmail);
+router.post("/login/email", userController.loginWithEmail);
+
+/**
+ * @swagger
+ * /user/login/google:
+ *   post:
+ *     summary: Login or register with Google OAuth2
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Google OAuth2 authorization code from frontend
+ *     responses:
+ *       200:
+ *         description: Login or registration successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     profilePicture:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     isEmailVerified:
+ *                       type: boolean
+ *                     loginProvider:
+ *                       type: string
+ *                 isNewUser:
+ *                   type: boolean
+ *       400:
+ *         description: Google auth code is required
+ *       500:
+ *         description: Google login failed
+ */
+router.post("/login/google", userController.googleLogin);
 
 /**
  * @swagger
@@ -343,7 +383,7 @@ router.post('/login/email', userController.loginWithEmail);
  *       404:
  *         description: User not found
  */
-router.post('/verify-otp', userController.verifyOTP);
+router.post("/verify-otp", userController.verifyOTP);
 
 /**
  * @swagger
@@ -357,7 +397,7 @@ router.post('/verify-otp', userController.verifyOTP);
  *       200:
  *         description: Logout successful
  */
-router.post('/logout', userAuth, userController.logoutUser);
+router.post("/logout", userAuth, userController.logoutUser);
 
 /**
  * @swagger
@@ -382,7 +422,7 @@ router.post('/logout', userAuth, userController.logoutUser);
  *       200:
  *         description: Images uploaded successfully
  */
-router.post('/upload', userAuth,  userController.uploadImages);
+router.post("/upload", userAuth, userController.uploadImages);
 
 /**
  * @swagger
@@ -404,7 +444,7 @@ router.post('/upload', userAuth,  userController.uploadImages);
  *       404:
  *         description: User not found
  */
-router.get('/:id', userAuth, userController.getUserById);
+router.get("/:id", userAuth, userController.getUserById);
 
 /**
  * @swagger
@@ -432,7 +472,12 @@ router.get('/:id', userAuth, userController.getUserById);
  *       404:
  *         description: User not found
  */
-router.put('/:id', userAuth, clearRouteCache('user_*'), userController.updateUserById);
+router.put(
+  "/:id",
+  userAuth,
+  clearRouteCache("user_*"),
+  userController.updateUserById
+);
 
 /**
  * @swagger
@@ -454,7 +499,11 @@ router.put('/:id', userAuth, clearRouteCache('user_*'), userController.updateUse
  *       404:
  *         description: User not found
  */
-router.delete('/:id', userAuth, clearRouteCache('user_*'), userController.deleteUserById);
-
+router.delete(
+  "/:slug",
+  userAuth,
+  clearRouteCache("user_*"),
+  userController.deleteUserById
+);
 
 module.exports = router;
