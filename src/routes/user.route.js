@@ -176,6 +176,26 @@ router.get("/products", cacheRoute(600), userController.getAllProducts);
 
 /**
  * @swagger
+ * /user/products/{slug}:
+ *   get:
+ *     summary: Get product by slug
+ *     tags: [User]
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product details
+ *       404:
+ *         description: Product not found
+ */
+router.get("/product/:slug", cacheRoute(1800), userController.getProductBySlug);
+
+/**
+ * @swagger
  * /user/counts:
  *   get:
  *     summary: Get counts for navbar (cart and wishlist)
