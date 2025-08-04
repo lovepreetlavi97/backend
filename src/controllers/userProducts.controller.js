@@ -17,15 +17,15 @@ const getProductBySlug = async (req, res) => {
 
     if (cached) {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
-      products: cached,
-    });
+        products: cached,
+      });
     }
 
     // Match category/subcategory/festival by name (slug)
     const [category, subcategory, festivals] = await Promise.all([
       Category.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
       SubCategory.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
-      Festival.find({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
+      Festival.find({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
     ]);
 
     const festivalIds = festivals.map((f) => f._id);
@@ -35,17 +35,20 @@ const getProductBySlug = async (req, res) => {
       subcategory ? { subcategoryId: subcategory._id } : null,
       festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
     ].filter(Boolean);
-    
+
     const query = {
       isDeleted: false,
       isBlocked: false,
-      $and: []
+      $and: [],
     };
-    
+
     if (slugConditions.length > 0) {
       query.$and.push({ $or: slugConditions });
     } else {
-      console.log('No matching category, subcategory, or festival found for slug:', slug);
+      console.log(
+        "No matching category, subcategory, or festival found for slug:",
+        slug
+      );
     }
 
     // Add filters dynamically
@@ -89,7 +92,7 @@ const getProductBySlug = async (req, res) => {
         query.$and.push({ [key]: { $in: values } });
       }
     });
-  
+
     const products = await Product.find(query)
       .populate({ path: "categoryId", select: "name" })
       .populate({ path: "subcategoryId", select: "name" })
@@ -100,7 +103,7 @@ const getProductBySlug = async (req, res) => {
     if (!products || products.length === 0) {
       return errorResponse(res, 400, messages.PRODUCT_NOT_FOUND);
     }
-    
+
     const enhancedProducts = products.map((product) => {
       if (product.actualPrice && product.discountedPrice) {
         product.discountPercentage = Math.round(
