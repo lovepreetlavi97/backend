@@ -6,19 +6,21 @@ const { cacheUtils } = require("../config/redis");
 const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const filters = req.query;
+    let { page = 1, limit = 20, ...filters } = req.query;
+    page = parseInt(page, 10) > 0 ? parseInt(page, 10) : 1;
+    limit = parseInt(limit, 10) > 0 ? parseInt(limit, 10) : 20;
+    const skip = (page - 1) * limit;
 
     if (!slug || typeof slug !== "string") {
       return errorResponse(res, 400, "Invalid product slug");
     }
 
-    const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}`;
+    // Exclude page and limit from cache filters
+    const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}_${page}_${limit}`;
     const cached = await cacheUtils.get(cacheKey);
 
     if (cached) {
-      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
-        products: cached,
-      });
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
     }
 
     // Match category/subcategory/festival by name (slug)
@@ -93,11 +95,16 @@ const getProductBySlug = async (req, res) => {
       }
     });
 
+    // Get total count for pagination
+    const total = await Product.countDocuments(query);
+
     const products = await Product.find(query)
       .populate({ path: "categoryId", select: "name" })
       .populate({ path: "subcategoryId", select: "name" })
       .populate({ path: "festivalIds", select: "name" })
       .populate({ path: "relationIds", select: "name" })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     if (!products || products.length === 0) {
@@ -115,11 +122,19 @@ const getProductBySlug = async (req, res) => {
       return product;
     });
 
-    await cacheUtils.set(cacheKey, enhancedProducts, 600); // Cache with filters
-
-    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
+    const responseData = {
       products: enhancedProducts,
-    });
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+
+    await cacheUtils.set(cacheKey, responseData, 600); 
+
+    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {
     console.error("Get product by slug error:", error);
     return errorResponse(
