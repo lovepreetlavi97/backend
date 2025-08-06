@@ -12,7 +12,6 @@ const productSchema = new mongoose.Schema({
   slug: {
     type: String,
     unique: true,
-    index: true,
   },
   description: {
     type: String,
@@ -75,12 +74,10 @@ const productSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: [true, 'Category is required'],
-    index: true,
   },
   subcategoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subcategory',
-    index: true,
   },
   festivalIds: [{
     type: mongoose.Schema.Types.ObjectId,

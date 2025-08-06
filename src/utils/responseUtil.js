@@ -9,9 +9,9 @@ const successResponse = (res, status, message, data = {}) => {
 
 const errorResponse = (res, status, message, error = {}) => {
   return res.status(status).json({
-      status,
-      message,
-      error,
+    status,
+    message,
+    error,
   });
 };
 

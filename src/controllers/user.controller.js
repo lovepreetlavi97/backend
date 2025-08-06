@@ -534,7 +534,7 @@ const verifyOTP = async (req, res) => {
     //   return errorResponse(res, 401, messages.OTP_INVALID);
     // }
 
-    if (otp !== "1111") {
+    if (otp !== "111111") {
       {
         return errorResponse(res, 401, messages.OTP_INVALID);
       }
@@ -1169,6 +1169,73 @@ const googleLogin = async (req, res) => {
   }
 };
 
+const resendOTP = async (req, res) => {
+  try {
+    const { phoneNumber, countryCode } = req.body;
+
+    if (!phoneNumber || !countryCode) {
+      return errorResponse(res, 400, "Phone number and country code are required");
+    }
+
+    if (!phoneNumber.match(/^[0-9]{10}$/)) {
+      return errorResponse(res, 400, "Please provide a valid 10-digit phone number");
+    }
+
+    if (!countryCode.match(/^\+[0-9]{1,4}$/)) {
+      return errorResponse(res, 400, "Please provide a valid country code");
+    }
+
+    // Rate limiting: max 5 per hour
+    const rateLimitKey = `otp_resend_limit_${countryCode}_${phoneNumber}`;
+    let rateLimit = await cacheUtils.get(rateLimitKey);
+
+    if (rateLimit && rateLimit.count >= 5) {
+      return errorResponse(
+        res,
+        429,
+        "You have reached the maximum OTP resend limit. Please try again after 1 hour."
+      );
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+
+    // Find user
+    let user = await findByPhone(User, phoneNumber);
+    if (!user) {
+      return errorResponse(res, 404, "User not found");
+    }
+
+    // Save OTP to user
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+
+    // Update rate limit
+    if (rateLimit) {
+      rateLimit.count += 1;
+      await cacheUtils.set(rateLimitKey, rateLimit, 3600); // 1 hour TTL
+    } else {
+      await cacheUtils.set(rateLimitKey, { count: 1 }, 3600);
+    }
+
+    // In production, send OTP via SMS here
+
+    return successResponse(res, 200, "OTP resent successfully", {
+      phoneNumber,
+      countryCode,
+      ...(process.env.NODE_ENV !== "production" && { otp }),
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    return errorResponse(res, 500, "Failed to resend OTP", {
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createUser,
   getUserById,
@@ -1190,4 +1257,5 @@ module.exports = {
   getAllRelations,
   getAllBanners,
   googleLogin,
+  resendOTP,
 };

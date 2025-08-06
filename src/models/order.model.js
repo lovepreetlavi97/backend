@@ -5,13 +5,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     unique: true,
     required: true,
-    index: true,
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   },
   products: [
     {
@@ -98,7 +96,6 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Refunded'],
     default: 'Pending',
-    index: true,
   },
   shippingAddress: {
     addressLine1: {
@@ -152,7 +149,6 @@ const orderSchema = new mongoose.Schema({
     type: String, 
     enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'], 
     default: 'Pending',
-    index: true,
   },
   paymentDetails: {
     transactionId: String,

@@ -526,4 +526,57 @@ router.delete(
   userController.deleteUserById
 );
 
+/**
+ * @swagger
+ * /user/resend-otp:
+ *   post:
+ *     summary: Resend OTP to the user's phone number (max 5 times per hour)
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: User's phone number
+ *                 example: "6398459134"
+ *               countryCode:
+ *                 type: string
+ *                 description: Country code (e.g., "+91")
+ *                 example: "+91"
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: OTP resent successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     phoneNumber:
+ *                       type: string
+ *                     countryCode:
+ *                       type: string
+ *                     otp:
+ *                       type: string
+ *                       description: OTP (only in non-production)
+ *       400:
+ *         description: Bad request, phone number or country code missing/invalid
+ *       404:
+ *         description: User not found
+ *       429:
+ *         description: OTP resend limit reached
+ *       500:
+ *         description: Failed to resend OTP
+ */
+router.post('/resend-otp', userController.resendOTP);
+
 module.exports = router;
