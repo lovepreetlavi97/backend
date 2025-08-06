@@ -22,6 +22,51 @@ const createFestival = async (req, res) => {
       return errorResponse(res, 400, "Missing required fields");
     }
 
+    let mainImage;
+    if (req.files && req.files.mainImage && req.files.mainImage[0]) {
+      const { buffer, originalname, mimetype } = req.files.mainImage[0];
+      mainImage = await uploadToSpaces(buffer, originalname, mimetype);
+    } else {
+      return errorResponse(res, 400, "Main image is required");
+    }
+
+    let cards = [];
+    if (req.body.cards) {
+      let cardData = [];
+      try {
+        cardData =
+          typeof req.body.cards === "string"
+            ? JSON.parse(req.body.cards)
+            : req.body.cards;
+      } catch (e) {
+        return errorResponse(res, 400, "Invalid cards format");
+      }
+
+      if (Array.isArray(cardData) && cardData.length > 0) {
+        const cardImages = req.files.cardImages || [];
+        cards = cardData.map((card, idx) => {
+          let image = card.image;
+          if (cardImages[idx]) {
+            const { buffer, originalname, mimetype } = cardImages[idx];
+            image = uploadToSpaces(buffer, originalname, mimetype);
+          }
+          return {
+            slug: card.slug,
+            image,
+          };
+        });
+
+        cards = await Promise.all(
+          cards.map(async (card, idx) => {
+            if (card.image instanceof Promise) {
+              card.image = await card.image;
+            }
+            return card;
+          })
+        );
+      }
+    }
+
     // Create festival data object
     const festivalData = {
       name,
@@ -29,18 +74,10 @@ const createFestival = async (req, res) => {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       isActive: isActive === "true" || isActive === true,
+      mainImage,
+      cards,
     };
 
-    // Handle image
-    if (!req.file) {
-      return errorResponse(res, 400, "Image is required");
-    }
-
-    const { buffer, originalname, mimetype } = req.file;
-    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
-    if (imageKey) {
-      festivalData.image = imageKey;
-    }
     // Create the festival
     const festival = await create(Festival, festivalData);
 
@@ -181,21 +218,65 @@ const updateFestivalById = async (req, res) => {
     if (updateData.startDate) {
       updateData.startDate = new Date(updateData.startDate);
     }
-
     if (updateData.endDate) {
       updateData.endDate = new Date(updateData.endDate);
     }
-
-    // Handle isActive conversion if it's a string
     if (updateData.isActive !== undefined) {
       updateData.isActive =
         updateData.isActive === "true" || updateData.isActive === true;
     }
 
-    if (req.file) {
-      const { buffer, originalname, mimetype } = req.file;
-      const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
-      updateData.image = imageKey;
+    if (req.files && req.files.mainImage && req.files.mainImage[0]) {
+      const { buffer, originalname, mimetype } = req.files.mainImage[0];
+      updateData.mainImage = await uploadToSpaces(buffer, originalname, mimetype);
+    }
+
+    if (updateData.cards) {
+      console.log({cards: updateData.cards});
+      let cardData = [];
+      try {
+        cardData = typeof updateData.cards === "string" ? JSON.parse(updateData.cards) : updateData.cards;
+      } catch (e) {
+        console.error("Invalid cards format:", e);
+        return errorResponse(res, 400, "Invalid cards format");
+      }
+
+      if (Array.isArray(cardData) && cardData.length > 0) {
+        const cardImages = req.files?.cardImages || [];
+        
+        let uploadedCardIndices = [];
+        cardData.forEach((card, idx) => {
+          if (!card.image || card.image === "") {
+            uploadedCardIndices.push(idx);
+          }
+        });
+        
+        let cards = cardData.map((card, idx) => {
+          let image = card.image;
+          
+          if ((!image || image === "") && uploadedCardIndices.includes(idx) && cardImages.length > 0) {
+            const fileIndex = uploadedCardIndices.indexOf(idx);
+            if (fileIndex < cardImages.length) {
+              const { buffer, originalname, mimetype } = cardImages[fileIndex];
+              image = uploadToSpaces(buffer, originalname, mimetype);
+            }
+          }
+          
+          return {
+            slug: card.slug,
+            image,
+          };
+        });
+
+        cards = await Promise.all(cards.map(async (card) => {
+          if (card.image instanceof Promise) {
+            card.image = await card.image;
+          }
+          return card;
+        }));
+
+        updateData.cards = cards;
+      }
     }
 
     // Update festival

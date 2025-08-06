@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 
 // Multer memory storage (no disk writing)
 const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Accept images & videos only
 const fileFilter = (req, file, cb) => {
@@ -17,11 +18,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Middleware: upload single image under field name `image`
-const uploadSingleImage = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
-  fileFilter,
-}).single("image");
+const uploadSingleImage = upload.single("image");
 
 // Middleware: upload multiple images under field name `images`
 const uploadMultipleImagesMulter = multer({
@@ -109,6 +106,7 @@ const deleteMultipleImagesFromSpaces = async (keys) => {
 };
 
 module.exports = {
+  upload,
   uploadSingleImage,
   uploadMultipleImagesMulter,
   uploadToSpaces,

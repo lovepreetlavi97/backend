@@ -603,35 +603,52 @@ const logoutUser = async (req, res) => {
 // Get all festivals for user
 const getAllFestivals = async (req, res) => {
   try {
-    const cachedFestivals = await cacheUtils.get("festivals_user");
-    if (cachedFestivals) {
+    const { date } = req.query;
+    
+    let targetDate;
+    if (date) {
+      targetDate = new Date(date);
+      if (isNaN(targetDate.getTime())) {
+        return errorResponse(res, 400, "Invalid date format. Use YYYY-MM-DD");
+      }
+    } else {
+      targetDate = new Date();
+    }
+    
+    const dateStr = targetDate.toISOString().split('T')[0];
+    const cacheKey = `festival_${dateStr}`;
+    
+    const cachedFestival = await cacheUtils.get(cacheKey);
+    if (cachedFestival) {
       return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, {
-        festivals: cachedFestivals,
+        festival: cachedFestival
       });
     }
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const selectedDate = `${year}-${month}-${day}`;
-    const startOfDayUTC = new Date(`${selectedDate}T00:00:00.000Z`);
-    const endOfDayUTC = new Date(`${selectedDate}T23:59:59.999Z`);
+    // Set up date range for precise matching
+    const startOfDayUTC = new Date(targetDate);
+    startOfDayUTC.setUTCHours(0, 0, 0, 0);
+    
+    const endOfDayUTC = new Date(targetDate);
+    endOfDayUTC.setUTCHours(23, 59, 59, 999);
 
-    const festivals = await Festival.find({
+    // Find most relevant festival for this date
+    const festival = await Festival.findOne({
       isDeleted: false,
       isActive: true,
-      startDate: { $lte: endOfDayUTC }, // ✅ started before or on end of today
-      endDate: { $gte: startOfDayUTC }, // ✅ ends after or on start of today
+      startDate: { $lte: endOfDayUTC },  // Started before or on end of target day
+      endDate: { $gte: startOfDayUTC },  // Ends after or on start of target day
+    }).sort({ 
+      startDate: -1 
     });
 
-    await cacheUtils.set("festivals_user", festivals || []);
+    await cacheUtils.set(cacheKey, festival || null, 3600); // Cache for 1 hour
 
     return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, {
-      festivals: festivals || [],
+      festival: festival || null
     });
   } catch (error) {
-    console.error("Get festivals error:", error);
+    console.error("Get festival error:", error);
     return errorResponse(res, 500, messages.FESTIVALS_RETRIEVAL_FAILED, {
       error: error.message,
     });

@@ -7,7 +7,7 @@ const {
   cacheRoute,
   clearRouteCache,
 } = require("../middlewares/cache/cache.middleware");
-const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
+const { upload } = require("../middlewares/uploadMiddleware");
 
 /**
  * @swagger
@@ -59,7 +59,10 @@ const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 router.post(
   "/",
   adminAuth,
-  uploadSingleImage,
+  upload.fields([
+    { name: "mainImage", maxCount: 1 },
+    { name: "cardImages", maxCount: 4 },
+  ]),
   clearRouteCache("festivals_*"),
   festivalController.createFestival
 );
@@ -188,7 +191,10 @@ router.get("/:id", adminAuth, festivalController.getFestivalById);
 router.put(
   "/:id",
   adminAuth,
-  uploadSingleImage,
+  upload.fields([
+    { name: "mainImage", maxCount: 1 },
+    { name: "cardImages", maxCount: 4 },
+  ]),
   clearRouteCache("festivals_*"),
   festivalController.updateFestivalById
 );

@@ -15,7 +15,6 @@ const getProductBySlug = async (req, res) => {
       return errorResponse(res, 400, "Invalid product slug");
     }
 
-    // Exclude page and limit from cache filters
     const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}_${page}_${limit}`;
     const cached = await cacheUtils.get(cacheKey);
 
@@ -23,7 +22,6 @@ const getProductBySlug = async (req, res) => {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
     }
 
-    // Match category/subcategory/festival by name (slug)
     const [category, subcategory, festivals] = await Promise.all([
       Category.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
       SubCategory.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
@@ -38,22 +36,27 @@ const getProductBySlug = async (req, res) => {
       festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
     ].filter(Boolean);
 
+    if (slugConditions.length === 0) {
+      const responseData = {
+        products: [],
+        pagination: {
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        },
+      };
+
+      await cacheUtils.set(cacheKey, responseData, 600);
+      return successResponse(res, 200, messages.PRODUCT_NOT_FOUND, responseData);
+    }
+
     const query = {
       isDeleted: false,
       isBlocked: false,
-      $and: [],
+      $and: [{ $or: slugConditions }],
     };
 
-    if (slugConditions.length > 0) {
-      query.$and.push({ $or: slugConditions });
-    } else {
-      console.log(
-        "No matching category, subcategory, or festival found for slug:",
-        slug
-      );
-    }
-
-    // Add filters dynamically
     if (filters.price) {
       const priceConditions = Array.isArray(filters.price)
         ? filters.price
@@ -85,7 +88,6 @@ const getProductBySlug = async (req, res) => {
       }
     }
 
-    // Handle other filters like metal/style/occasion
     ["metal", "style", "occasion"].forEach((key) => {
       if (filters[key]) {
         const values = Array.isArray(filters[key])
@@ -95,7 +97,6 @@ const getProductBySlug = async (req, res) => {
       }
     });
 
-    // Get total count for pagination
     const total = await Product.countDocuments(query);
     const products = await Product.find(query)
       .populate({ path: "categoryId", select: "name" })
@@ -105,7 +106,7 @@ const getProductBySlug = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .lean();
-    
+
     if (!products || products.length === 0) {
       return successResponse(res, 200, messages.PRODUCT_NOT_FOUND);
     }
@@ -131,7 +132,7 @@ const getProductBySlug = async (req, res) => {
       },
     };
 
-    await cacheUtils.set(cacheKey, responseData, 600); 
+    await cacheUtils.set(cacheKey, responseData, 600);
 
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {

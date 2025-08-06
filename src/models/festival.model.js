@@ -40,8 +40,13 @@ const festivalSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  cards: [
+    {
+      image: { type: String, required: true },
+      slug: { type: String, required: true },
+    }
+  ],
   mainImage: { type: String, required: true },
-  cards: { type: [FestivalCardSchema], default: [] } 
 }, { timestamps: true });
 
 // Pre-save middleware to generate slug
