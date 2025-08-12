@@ -1253,6 +1253,108 @@ const resendOTP = async (req, res) => {
   }
 };
 
+// Get trending products
+const getTrendingProducts = async (req, res) => {
+  try {
+    const { limit = 4 } = req.query;
+    const parsedLimit = parseInt(limit) > 0 ? parseInt(limit) : 4;
+    console.log("Parsed limit for trending products:", parsedLimit);
+    
+    const cacheKey = `trending_products_${parsedLimit}`;
+    const cached = await cacheUtils.get(cacheKey);
+    
+    if (cached) {
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
+    }
+    
+    const products = await Product.find({
+      isDeleted: false, 
+      isBlocked: false
+    })
+      .sort({ 
+        viewCount: -1, 
+        purchaseCount: -1, 
+        createdAt: -1 
+      })
+      .limit(parsedLimit)
+      .lean();
+      
+    const enhancedProducts = products.map((product) => {
+      if (product.actualPrice && product.discountedPrice) {
+        product.discountPercentage = Math.round(
+          ((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100
+        );
+      }
+      return product;
+    });
+    
+    const responseData = { products: enhancedProducts };
+    
+    await cacheUtils.set(cacheKey, responseData, 3600);
+    
+    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
+  } catch (error) {
+    console.error("Get trending products error:", error);
+    return errorResponse(
+      res, 
+      500, 
+      error.message || "Error retrieving trending products"
+    );
+  }
+};
+
+// Get shop essentials
+const getShopEssentials = async (req, res) => {
+  try {
+    const { limit = 8 } = req.query;
+    const parsedLimit = parseInt(limit) > 0 ? parseInt(limit) : 8;
+    
+    const cacheKey = `shop_essentials_${parsedLimit}`;
+    const cached = await cacheUtils.get(cacheKey);
+    
+    if (cached) {
+      return successResponse(res, 200, "Shop essentials retrieved successfully", cached);
+    }
+    
+    const products = await Product.find({
+      isDeleted: false,
+      isBlocked: false
+    })
+      .sort({ 
+        purchaseCount: -1,
+        discountPercentage: -1
+      })
+      .limit(parsedLimit)
+      .lean();
+      
+    const enhancedProducts = products.map((product) => {
+      if (product.actualPrice && product.discountedPrice) {
+        product.discountPercentage = Math.round(
+          ((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100
+        );
+      }
+      return product;
+    });
+    
+    const responseData = { 
+      products: enhancedProducts,
+      title: "Shop Essentials",
+      description: "Must-have items for every occasion"
+    };
+    
+    await cacheUtils.set(cacheKey, responseData, 3600);
+    
+    return successResponse(res, 200, "Shop essentials retrieved successfully", responseData);
+  } catch (error) {
+    console.error("Get shop essentials error:", error);
+    return errorResponse(
+      res, 
+      500, 
+      error.message || "Error retrieving shop essentials"
+    );
+  }
+};
+
 module.exports = {
   createUser,
   getUserById,
@@ -1275,4 +1377,6 @@ module.exports = {
   getAllBanners,
   googleLogin,
   resendOTP,
+  getTrendingProducts,
+  getShopEssentials,
 };

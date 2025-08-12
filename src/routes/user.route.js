@@ -196,6 +196,80 @@ router.get("/product/:slug", cacheRoute(1800), userController.getProductBySlug);
 
 /**
  * @swagger
+ * /user/products/trending:
+ *   get:
+ *     summary: Get trending products
+ *     tags: [User]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of trending products to return
+ *     responses:
+ *       200:
+ *         description: List of trending products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     products:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Product'
+ *       500:
+ *         description: Server error
+ */
+router.get("/trending-products", cacheRoute(1800), userController.getTrendingProducts);
+/**
+ * @swagger
+ * /user/products/essentials:
+ *   get:
+ *     summary: Get shop essential products
+ *     tags: [User]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of essential products to return
+ *     responses:
+ *       200:
+ *         description: List of shop essential products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     products:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Product'
+ *                     title:
+ *                       type: string
+ *                       example: "Shop Essentials"
+ *                     description:
+ *                       type: string
+ *                       example: "Must-have items for every occasion"
+ *       500:
+ *         description: Server error
+ */
+router.get("/products/essentials", cacheRoute(1800), userController.getShopEssentials);
+/**
+ * @swagger
  * /user/counts:
  *   get:
  *     summary: Get counts for navbar (cart and wishlist)

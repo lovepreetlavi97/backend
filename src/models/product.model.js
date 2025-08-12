@@ -184,6 +184,14 @@ const productSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
   },
+  viewCount: {
+    type: Number,
+    default: 0,
+  },
+  purchaseCount: {
+    type: Number,
+    default: 0,
+  },
 }, { 
   timestamps: true,
   toJSON: { getters: true, virtuals: true },
