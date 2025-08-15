@@ -1,10 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { festivalController } = require('../controllers');
-const { adminAuth } = require('../middlewares/auth/auth.middleware');
+const { festivalController } = require("../controllers");
+const { adminAuth } = require("../middlewares/auth/auth.middleware");
 
-const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
-const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
+const {
+  cacheRoute,
+  clearRouteCache,
+} = require("../middlewares/cache/cache.middleware");
+const { upload } = require("../middlewares/uploadMiddleware");
 
 /**
  * @swagger
@@ -54,10 +57,13 @@ const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
  *         description: Bad request
  */
 router.post(
-  '/',
+  "/",
   adminAuth,
-  uploadSingleImage,
-  clearRouteCache('festivals_*'),
+  upload.fields([
+    { name: "mainImage", maxCount: 1 },
+    { name: "cardImages", maxCount: 4 },
+  ]),
+  clearRouteCache("festivals_*"),
   festivalController.createFestival
 );
 
@@ -110,9 +116,9 @@ router.post(
  *         description: List of festivals
  */
 router.get(
-  '/',
+  "/",
   adminAuth,
-  cacheRoute('festivals_', 300),
+  cacheRoute("festivals_", 300),
   festivalController.getAllFestivals
 );
 
@@ -137,13 +143,7 @@ router.get(
  *       404:
  *         description: Festival not found
  */
-router.get(
-  '/:id',
-  adminAuth,
-  festivalController.getFestivalById
-);
-
-
+router.get("/:id", adminAuth, festivalController.getFestivalById);
 
 /**
  * @swagger
@@ -189,13 +189,15 @@ router.get(
  *         description: Festival not found
  */
 router.put(
-  '/:id',
+  "/:id",
   adminAuth,
-  uploadSingleImage,
-  clearRouteCache('festivals_*'),
+  upload.fields([
+    { name: "mainImage", maxCount: 1 },
+    { name: "cardImages", maxCount: 4 },
+  ]),
+  clearRouteCache("festivals_*"),
   festivalController.updateFestivalById
 );
-
 
 /**
  * @swagger
@@ -219,9 +221,9 @@ router.put(
  *         description: Festival not found
  */
 router.delete(
-  '/:id',
+  "/:id",
   adminAuth,
-  clearRouteCache('festivals_*'),
+  clearRouteCache("festivals_*"),
   festivalController.deleteFestivalById
 );
 /**
@@ -246,10 +248,75 @@ router.delete(
  *         description: Festival not found
  */
 router.patch(
-  '/:id/toggle-status',
+  "/:id/toggle-status",
   adminAuth,
-  clearRouteCache('festivals_*'),
+  clearRouteCache("festivals_*"),
   festivalController.toggleFestivalStatus
 );
 
+/**
+ * @swagger
+ * /festivals/{id}/products:
+ *   get:
+ *     summary: Get products list for a festival
+ *     tags: [Festivals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Festival ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: inStock
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: isFeatured
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: Products retrieved successfully
+ */
+router.get(
+  "/:id/products",
+  adminAuth,
+  festivalController.getProductsByFestival
+);
 module.exports = router;
