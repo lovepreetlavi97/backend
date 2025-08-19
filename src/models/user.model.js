@@ -101,7 +101,7 @@ const userSchema = new mongoose.Schema({
     },
     label: {
       type: String,
-      enum: ['Home', 'Work', 'Other'],
+      enum: ['Home', 'Office', 'Other'],
       default: 'Home',
     },
   }],
