@@ -11,10 +11,12 @@ const createOrder = async (req, res) => {
         const { 
             products, 
             shippingAddress, 
+            billingAddress,
             paymentMethod, 
             promoCode,
             deliveryNotes,
-            giftWrap = false
+            giftWrap = false,
+            giftMessage
         } = req.body;
 
         // Basic validation
@@ -22,33 +24,32 @@ const createOrder = async (req, res) => {
             return errorResponse(res, 400, "Products array is required and cannot be empty");
         }
         
-        if (!shippingAddress || !shippingAddress.address || !shippingAddress.city || !shippingAddress.postalCode) {
-            return errorResponse(res, 400, "Complete shipping address is required");
-        }
-        
         if (!paymentMethod) {
             return errorResponse(res, 400, "Payment method is required");
         }
         
         // Check valid payment methods
-        const validPaymentMethods = ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'WALLET', 'NET_BANKING'];
+        const validPaymentMethods = ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
         if (!validPaymentMethods.includes(paymentMethod)) {
             return errorResponse(res, 400, `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`);
         }
 
-        // Validate user exists
-        if (!req.user || !req.user.id) {
-            return errorResponse(res, 401, "User authentication required");
+        // Validate shipping address
+        if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city || 
+            !shippingAddress.state || !shippingAddress.postalCode || 
+            !shippingAddress.contactName || !shippingAddress.contactPhone) {
+            return errorResponse(res, 400, "Complete shipping address with contact information is required");
         }
-        
-        const userExists = await User.exists({ _id: req.user.id, isBlocked: false, isDeleted: false });
-        if (!userExists) {
-            return errorResponse(res, 403, "User account is inactive or deleted");
+
+        // Validate user exists
+        if (!req.user || !req.user._id) {
+            return errorResponse(res, 401, "User authentication required");
         }
 
         // Fetch and validate product details from DB
         let productDetails = [];
         let outOfStockProducts = [];
+        let unavailableProducts = [];
         
         for (const p of products) {
             if (!p.productId || !p.quantity || p.quantity <= 0) {
@@ -61,54 +62,65 @@ const createOrder = async (req, res) => {
             
             const product = await Product.findOne({ 
                 _id: p.productId, 
-                isDeleted: false, 
-                isBlocked: false 
+                isDeleted: { $ne: true }, 
+                isBlocked: { $ne: true } 
             });
             
             if (!product) {
-                return errorResponse(res, 404, `Product ${p.productId} not found or unavailable`);
+                unavailableProducts.push(p.productId);
+                continue;
             }
             
             // Check if product is in stock
-            if (!product.isInStock || (product.stock !== undefined && product.stock < p.quantity)) {
-                outOfStockProducts.push(product.name);
+            if ((product.isInStock === false) || (product.stock !== undefined && product.stock < p.quantity)) {
+                outOfStockProducts.push({
+                    id: product._id,
+                    name: product.name,
+                    available: product.stock || 0,
+                    requested: p.quantity
+                });
                 continue;
             }
             
             const price = product.discountedPrice || product.actualPrice;
             
             productDetails.push({
-                productId: new mongoose.Types.ObjectId(p.productId),
+                productId: product._id,
                 name: product.name,
+                slug: product.slug,
                 price: price,
                 actualPrice: product.actualPrice,
                 discountedPrice: product.discountedPrice,
                 quantity: p.quantity,
-                subtotal: price * p.quantity,
+                subtotal: parseFloat((price * p.quantity).toFixed(2)),
                 image: product.images && product.images.length > 0 ? product.images[0] : null,
                 sku: product.sku,
-                weight: product.weight,
+                weight: product.weight || 0,
                 unit: product.unit || 'kg'
             });
         }
         
+        // Report any issues with products
+        if (unavailableProducts.length > 0) {
+            return errorResponse(res, 404, "Some products are unavailable or have been removed", { unavailableProducts });
+        }
+        
         if (outOfStockProducts.length > 0) {
-            return errorResponse(res, 400, "Some products are out of stock", { outOfStockProducts });
+            return errorResponse(res, 400, "Some products are out of stock or have insufficient quantity", { outOfStockProducts });
         }
         
         if (productDetails.length === 0) {
             return errorResponse(res, 400, "No valid products in order");
         }
 
-        // Calculate total amounts
-        const subtotal = productDetails.reduce((sum, p) => sum + p.subtotal, 0);
+        const subtotal = parseFloat(productDetails.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2));
         
-        // Calculate shipping charge based on subtotal or product weight
         const totalWeight = productDetails.reduce((sum, p) => sum + (p.weight || 0) * p.quantity, 0);
         const shippingCharge = calculateShippingCharge(subtotal, totalWeight);
         
-        const taxRate = 0.1; // 10% tax (should be configurable)
+        const taxRate = 0.18; // 18% GST (should be configurable)
         const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
+        
         let discountAmount = 0;
         let promoCodeDetails = null;
 
@@ -124,16 +136,14 @@ const createOrder = async (req, res) => {
             if (promo) {
                 if (promo.discountType === 'PERCENTAGE') {
                     discountAmount = parseFloat(((subtotal * promo.discountValue) / 100).toFixed(2));
-                    // Cap the discount if there's a maximum
                     if (promo.maxDiscountAmount && discountAmount > promo.maxDiscountAmount) {
-                        discountAmount = promo.maxDiscountAmount;
+                        discountAmount = parseFloat(promo.maxDiscountAmount.toFixed(2));
                     }
                 } else {
-                    discountAmount = promo.discountValue;
+                    discountAmount = parseFloat(promo.discountValue.toFixed(2));
                 }
                 
                 promoCodeDetails = {
-                    id: promo._id,
                     code: promo.code,
                     discountType: promo.discountType,
                     discountValue: promo.discountValue
@@ -143,62 +153,94 @@ const createOrder = async (req, res) => {
             }
         }
 
-        const finalAmount = parseFloat((subtotal - discountAmount + taxAmount + shippingCharge).toFixed(2));
+        const totalAmount = parseFloat((subtotal + taxAmount + shippingCharge).toFixed(2));
+        const finalAmount = parseFloat((totalAmount - discountAmount).toFixed(2));
         
-        // Generate unique order number
+        const finalBillingAddress = billingAddress || shippingAddress;
+        
         const orderNumber = await generateOrderNumber();
 
         const orderData = {
             orderNumber,
-            userId: new mongoose.Types.ObjectId(req.user.id),
+            userId: req.user._id,
             products: productDetails,
             subtotal,
+            totalAmount,
             shippingCharge,
             tax: taxRate * 100, // Storing tax rate as percentage
             taxAmount,
             discountAmount,
             finalAmount,
-            promoCode: promoCodeDetails ? promoCodeDetails.id : null,
+            promoCode: promoCode || null,
             promoCodeDetails,
             status: "Pending",
             shippingAddress,
+            billingAddress: finalBillingAddress,
             paymentMethod,
             paymentStatus: "Pending",
             deliveryNotes,
             giftWrap,
+            giftMessage,
             estimatedDelivery: calculateEstimatedDelivery(),
             paymentDetails: {
                 method: paymentMethod,
                 status: "Pending",
-                transactionId: null
-            }
+            },
+            statusHistory: [{
+                status: "Pending",
+                timestamp: new Date(),
+                notes: "Order created"
+            }]
         };
 
         const order = await create(Order, orderData);
         
-        // Update product stock
-        for (const item of productDetails) {
-            await Product.findByIdAndUpdate(
+        // Update product stock with proper error handling
+        const stockUpdatePromises = productDetails.map(item => 
+            Product.findByIdAndUpdate(
                 item.productId,
-                { 
-                    $inc: { stock: -item.quantity },
-                    $set: { isInStock: { $cond: [{ $gt: [{ $subtract: ["$stock", item.quantity] }, 0] }, true, false] } }
+                { $inc: { stock: -item.quantity } },
+                { new: true }
+            ).then(updatedProduct => {
+                // Update isInStock based on new stock value
+                if (updatedProduct && updatedProduct.stock <= 0) {
+                    return Product.findByIdAndUpdate(
+                        item.productId,
+                        { isInStock: false }
+                    );
                 }
-            );
+                return updatedProduct;
+            })
+        );
+        
+        try {
+            await Promise.all(stockUpdatePromises);
+        } catch (stockError) {
+            console.error("Error updating product stock:", stockError);
         }
         
-        // Clear any related caches
-        await cacheUtils.del(`user_orders_${req.user.id}`);
-        await cacheUtils.delPattern('admin_orders_*');
+        try {
+            await cacheUtils.del(`user_orders_${req.user._id}`);
+            await cacheUtils.delPattern('admin_orders_*');
+        } catch (cacheError) {
+            console.error("Error clearing cache:", cacheError);
+        }
         
+        // Return a simplified order response
         return successResponse(res, 201, "Order created successfully", { 
             order: {
                 _id: order._id,
                 orderNumber: order.orderNumber,
+                subtotal: order.subtotal,
+                shippingCharge: order.shippingCharge,
+                taxAmount: order.taxAmount,
+                discountAmount: order.discountAmount,
                 finalAmount: order.finalAmount,
                 status: order.status,
                 paymentStatus: order.paymentStatus,
-                estimatedDelivery: order.estimatedDelivery
+                estimatedDelivery: order.estimatedDelivery,
+                paymentMethod: order.paymentMethod,
+                createdAt: order.createdAt
             } 
         });
 

@@ -30,6 +30,14 @@ const orderSchema = new mongoose.Schema({
         required: true,
         min: 0
       },
+      actualPrice: {
+        type: Number,
+        min: 0
+      },
+      discountedPrice: {
+        type: Number,
+        min: 0
+      },
       quantity: { 
         type: Number, 
         required: true,
@@ -38,6 +46,13 @@ const orderSchema = new mongoose.Schema({
       weight: {
         type: Number,
         min: 0
+      },
+      unit: {
+        type: String,
+        default: 'kg'
+      },
+      sku: {
+        type: String
       },
       image: {
         type: String
@@ -49,6 +64,11 @@ const orderSchema = new mongoose.Schema({
       }
     }
   ],
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   shippingCharge: { 
     type: Number, 
     default: 0,
@@ -84,11 +104,11 @@ const orderSchema = new mongoose.Schema({
     ref: 'PromoCode', 
     default: null 
   },
-  promoDetails: {
+  promoCodeDetails: {
     code: String,
     discountType: { 
       type: String,
-      enum: ['percentage', 'fixed']
+      enum: ['PERCENTAGE', 'FIXED']
     },
     discountValue: Number
   },
@@ -120,6 +140,7 @@ const orderSchema = new mongoose.Schema({
     country: {
       type: String,
       required: true,
+      default: 'India'
     },
     contactPhone: {
       type: String,
@@ -129,6 +150,11 @@ const orderSchema = new mongoose.Schema({
       type: String,
       required: true,
     },
+    label: {
+      type: String,
+      enum: ['Home', 'Work', 'Other'],
+      default: 'Home'
+    }
   },
   billingAddress: {
     addressLine1: String,
@@ -139,10 +165,11 @@ const orderSchema = new mongoose.Schema({
     country: String,
     contactPhone: String,
     contactName: String,
+    label: String,
   },
   paymentMethod: {
     type: String,
-    enum: ['Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'COD', 'Wallet', 'PayPal'],
+    enum: ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'],
     required: true,
   },
   paymentStatus: { 
@@ -153,9 +180,10 @@ const orderSchema = new mongoose.Schema({
   paymentDetails: {
     transactionId: String,
     paymentGateway: String,
-    paymentMethod: String,
+    method: String,
     cardLastFour: String,
     cardBrand: String,
+    status: String
   },
   estimatedDelivery: { 
     type: Date 
@@ -163,24 +191,46 @@ const orderSchema = new mongoose.Schema({
   deliveredAt: { 
     type: Date 
   },
-  cancelledAt: { 
-    type: Date 
+  cancelDetails: {
+    cancelledAt: { 
+      type: Date 
+    },
+    reason: {
+      type: String
+    },
+    cancelledBy: {
+      type: String,
+      enum: ['User', 'Admin', 'System'],
+    }
   },
-  returnedAt: { 
-    type: Date 
+  returnDetails: {
+    returnedAt: { 
+      type: Date 
+    },
+    reason: {
+      type: String
+    },
+    returnInitiatedBy: {
+      type: String,
+      enum: ['User', 'Admin'],
+    }
   },
-  refundedAt: { 
-    type: Date 
-  },
-  cancellationReason: {
-    type: String
-  },
-  returnReason: {
-    type: String
-  },
-  refundAmount: {
-    type: Number,
-    min: 0
+  refundDetails: {
+    refundedAt: { 
+      type: Date 
+    },
+    refundAmount: {
+      type: Number,
+      min: 0
+    },
+    refundTransactionId: {
+      type: String
+    },
+    refundStatus: {
+      type: String,
+      enum: ['Pending', 'Processed', 'Failed', 'Completed'],
+      default: 'Pending'
+    }
   },
   notes: {
     type: String
@@ -188,7 +238,7 @@ const orderSchema = new mongoose.Schema({
   adminNotes: {
     type: String
   },
-  deliveryInstructions: {
+  deliveryNotes: {
     type: String
   },
   giftWrap: {
@@ -201,10 +251,11 @@ const orderSchema = new mongoose.Schema({
   invoiceUrl: {
     type: String
   },
-  tracking: {
-    carrier: String,
-    trackingNumber: String,
-    trackingUrl: String,
+  trackingInfo: {
+    trackingId: String,
+    trackingURL: String,
+    deliveryPartner: String,
+    shippedAt: Date
   },
   statusHistory: [{
     status: {
@@ -215,7 +266,7 @@ const orderSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
-    comment: String,
+    notes: String,
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin'
@@ -226,6 +277,9 @@ const orderSchema = new mongoose.Schema({
     default: false,
     select: false,
   },
+  deletedAt: {
+    type: Date
+  }
 }, { 
   timestamps: true,
   toJSON: { virtuals: true },
