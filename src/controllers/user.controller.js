@@ -689,7 +689,7 @@ const homeSearch = async (req, res) => {
     }
 
     const products = await Product.find(productFilter)
-      .select("_id  name description title slug price discountedPrice images categoryId")
+      .select("_id  name description title slug price actualPrice discountedPrice images categoryId")
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
