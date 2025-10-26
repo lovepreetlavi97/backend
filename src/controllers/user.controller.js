@@ -654,6 +654,62 @@ const getAllFestivals = async (req, res) => {
     });
   }
 };
+// Get all festivals for user
+const homeSearch = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const trimmedQuery = query?.trim();
+    const cacheKey = `home_${trimmedQuery || "default"}`;
+
+    // 🧠 Try from cache first
+    const cached = await cacheUtils.get(cacheKey);
+    if (cached) {
+      return successResponse(res, 200, messages.HOME_DATA_RETRIEVED, cached);
+    }
+
+    // 🧭 Build subcategory filter
+    let subCategoryFilter = { isDeleted: false, isBlocked: false };
+    if (trimmedQuery) {
+      const regex = new RegExp(trimmedQuery, "i");
+      subCategoryFilter.$or = [{ name: regex }, { slug: regex }];
+    }
+
+    // 📂 Efficiently fetch matching subcategories
+    const subcategories = await SubCategory.find(subCategoryFilter)
+      .select("_id name slug image categoryId")
+      .sort({ name: 1 }) // sorting for better UX
+      .limit(20)
+      .lean();
+
+    // 💎 Build product filter
+    let productFilter = { isDeleted: false, isBlocked: false };
+    if (trimmedQuery) {
+      const regex = new RegExp(trimmedQuery, "i");
+      productFilter.$or = [{ name: regex }, { description: regex }];
+    }
+
+    const products = await Product.find(productFilter)
+      .select("_id  name description title slug price discountedPrice images categoryId")
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const responseData = {
+      subcategories,
+      products,
+    };
+
+    // ⚡ Cache results for 1 hour
+    await cacheUtils.set(cacheKey, responseData, 3600);
+
+    return successResponse(res, 200, messages.HOME_DATA_RETRIEVED, responseData);
+  } catch (error) {
+    console.error("Home search error:", error);
+    return errorResponse(res, 500, messages.HOME_DATA_RETRIEVAL_FAILED, {
+      error: error.message,
+    });
+  }
+};
 
 // Get all subcategories for user
 const getAllSubCategories = async (req, res) => {
@@ -1379,4 +1435,5 @@ module.exports = {
   resendOTP,
   getTrendingProducts,
   getShopEssentials,
+  homeSearch
 };

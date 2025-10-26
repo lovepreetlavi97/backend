@@ -26,6 +26,65 @@ const {
 router.get("/festivals", cacheRoute(1800), userController.getAllFestivals);
 /**
  * @swagger
+ * /user/home-search:
+ *   get:
+ *     summary: Get homepage data (subcategories + products)
+ *     description: Returns subcategories and products, optionally filtered by search query.
+ *     tags: [User]
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         schema:
+ *           type: string
+ *         description: Search term to filter products
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved homepage data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 subcategories:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       slug:
+ *                         type: string
+ *                       image:
+ *                         type: string
+ *                 products:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       slug:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ *                       discountedPrice:
+ *                         type: number
+ *                       images:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *       500:
+ *         description: Internal server error
+ */
+
+router.get("/home-search", userController.homeSearch);
+
+/**
+ * @swagger
  * /user/relations:
  *   get:
  *     summary: Get all relations (user-facing)
