@@ -21,6 +21,7 @@ const uploadRoute = require("./uploadRoutes");
 const userRoute = require("./user.route");
 const userProductRoute = require("./userProduct.route");
 const addressRoute = require("./address.route");
+const paymentRoute = require("./payment.route");
 const router = express.Router();
 
 // Register your routes
@@ -46,4 +47,5 @@ router.use("/upload", uploadRoute);
 router.use("/user", userRoute);
 router.use("/user/products", userProductRoute);
 router.use("/addresses", addressRoute);
+router.use("/payment", paymentRoute);
 module.exports = router;
