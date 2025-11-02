@@ -7,12 +7,17 @@ const { generateOrderNumber } = require("../utils/orderUtils");
 
 // Create a new order
 const createOrder = async (req, res) => {
+    const expectedDeliveryDate = new Date();
+    expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + 7);
+
+
+
     try {
-        const { 
-            products, 
-            shippingAddress, 
+        const {
+            products,
+            shippingAddress,
             billingAddress,
-            paymentMethod, 
+            paymentMethod,
             promoCode,
             deliveryNotes,
             giftWrap = false,
@@ -23,20 +28,20 @@ const createOrder = async (req, res) => {
         if (!products || !Array.isArray(products) || products.length === 0) {
             return errorResponse(res, 400, "Products array is required and cannot be empty");
         }
-        
+
         if (!paymentMethod) {
             return errorResponse(res, 400, "Payment method is required");
         }
-        
+
         // Check valid payment methods
-        const validPaymentMethods = ['COD',"ONLINE", 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
+        const validPaymentMethods = ['COD', "ONLINE", 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
         if (!validPaymentMethods.includes(paymentMethod)) {
             return errorResponse(res, 400, `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`);
         }
 
         // Validate shipping address
-        if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city || 
-            !shippingAddress.state || !shippingAddress.postalCode || 
+        if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city ||
+            !shippingAddress.state || !shippingAddress.postalCode ||
             !shippingAddress.contactName || !shippingAddress.contactPhone) {
             return errorResponse(res, 400, "Complete shipping address with contact information is required");
         }
@@ -50,27 +55,27 @@ const createOrder = async (req, res) => {
         let productDetails = [];
         let outOfStockProducts = [];
         let unavailableProducts = [];
-        
+
         for (const p of products) {
             if (!p.productId || !p.quantity || p.quantity <= 0) {
                 return errorResponse(res, 400, "Each product must have a valid productId and positive quantity");
             }
-            
+
             if (!mongoose.Types.ObjectId.isValid(p.productId)) {
                 return errorResponse(res, 400, `Invalid product ID format: ${p.productId}`);
             }
-            
-            const product = await Product.findOne({ 
-                _id: p.productId, 
-                isDeleted: { $ne: true }, 
-                isBlocked: { $ne: true } 
+
+            const product = await Product.findOne({
+                _id: p.productId,
+                isDeleted: { $ne: true },
+                isBlocked: { $ne: true }
             });
-            
+
             if (!product) {
                 unavailableProducts.push(p.productId);
                 continue;
             }
-            
+
             // Check if product is in stock
             if ((product.isInStock === false) || (product.stock !== undefined && product.stock < p.quantity)) {
                 outOfStockProducts.push({
@@ -81,9 +86,9 @@ const createOrder = async (req, res) => {
                 });
                 continue;
             }
-            
+
             const price = product.discountedPrice || product.actualPrice;
-            
+
             productDetails.push({
                 productId: product._id,
                 name: product.name,
@@ -96,31 +101,32 @@ const createOrder = async (req, res) => {
                 image: product.images && product.images.length > 0 ? product.images[0] : null,
                 sku: product.sku,
                 weight: product.weight || 0,
-                unit: product.unit || 'kg'
+                unit: product.unit || 'kg',
+                expectedDeliveryDate: expectedDeliveryDate
             });
         }
-        
+
         // Report any issues with products
         if (unavailableProducts.length > 0) {
             return errorResponse(res, 404, "Some products are unavailable or have been removed", { unavailableProducts });
         }
-        
+
         if (outOfStockProducts.length > 0) {
             return errorResponse(res, 400, "Some products are out of stock or have insufficient quantity", { outOfStockProducts });
         }
-        
+
         if (productDetails.length === 0) {
             return errorResponse(res, 400, "No valid products in order");
         }
 
         const subtotal = parseFloat(productDetails.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2));
-        
+
         const totalWeight = productDetails.reduce((sum, p) => sum + (p.weight || 0) * p.quantity, 0);
         const shippingCharge = calculateShippingCharge(subtotal, totalWeight);
-        
+
         const taxRate = 0.18; // 18% GST (should be configurable)
         const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
-        
+
         let discountAmount = 0;
         let promoCodeDetails = null;
 
@@ -132,7 +138,7 @@ const createOrder = async (req, res) => {
                 expiryDate: { $gt: new Date() },
                 minPurchaseAmount: { $lte: subtotal }
             });
-            
+
             if (promo) {
                 if (promo.discountType === 'PERCENTAGE') {
                     discountAmount = parseFloat(((subtotal * promo.discountValue) / 100).toFixed(2));
@@ -142,7 +148,7 @@ const createOrder = async (req, res) => {
                 } else {
                     discountAmount = parseFloat(promo.discountValue.toFixed(2));
                 }
-                
+
                 promoCodeDetails = {
                     code: promo.code,
                     discountType: promo.discountType,
@@ -155,9 +161,9 @@ const createOrder = async (req, res) => {
 
         const totalAmount = parseFloat((subtotal + taxAmount + shippingCharge).toFixed(2));
         const finalAmount = parseFloat((totalAmount - discountAmount).toFixed(2));
-        
+
         const finalBillingAddress = billingAddress || shippingAddress;
-        
+
         const orderNumber = await generateOrderNumber();
 
         const orderData = {
@@ -194,9 +200,9 @@ const createOrder = async (req, res) => {
         };
 
         const order = await create(Order, orderData);
-        
+
         // Update product stock with proper error handling
-        const stockUpdatePromises = productDetails.map(item => 
+        const stockUpdatePromises = productDetails.map(item =>
             Product.findByIdAndUpdate(
                 item.productId,
                 { $inc: { stock: -item.quantity } },
@@ -212,22 +218,22 @@ const createOrder = async (req, res) => {
                 return updatedProduct;
             })
         );
-        
+
         try {
             await Promise.all(stockUpdatePromises);
         } catch (stockError) {
             console.error("Error updating product stock:", stockError);
         }
-        
+
         try {
             await cacheUtils.del(`user_orders_${req.user._id}`);
             await cacheUtils.delPattern('admin_orders_*');
         } catch (cacheError) {
             console.error("Error clearing cache:", cacheError);
         }
-        
+
         // Return a simplified order response
-        return successResponse(res, 201, "Order created successfully", { 
+        return successResponse(res, 201, "Order created successfully", {
             order: {
                 _id: order._id,
                 orderNumber: order.orderNumber,
@@ -241,7 +247,7 @@ const createOrder = async (req, res) => {
                 estimatedDelivery: order.estimatedDelivery,
                 paymentMethod: order.paymentMethod,
                 createdAt: order.createdAt
-            } 
+            }
         });
 
     } catch (error) {
@@ -264,35 +270,35 @@ const getAllOrders = async (req, res) => {
             endDate,
             search
         } = req.query;
-        
+
         // Create cache key
         const cacheKey = `admin_orders_${page}_${limit}_${sortBy}_${sortOrder}_${status || ''}_${paymentStatus || ''}_${startDate || ''}_${endDate || ''}_${search || ''}`;
-        
+
         // Try to get from cache
         const cachedData = await cacheUtils.get(cacheKey);
         if (cachedData) {
             return successResponse(res, 200, "Orders retrieved successfully", cachedData);
         }
-        
+
         // Build query
         const query = {};
-        
+
         if (status) {
             query.status = status;
         }
-        
+
         if (paymentStatus) {
             query.paymentStatus = paymentStatus;
         }
-        
+
         // Date filter
         if (startDate || endDate) {
             query.createdAt = {};
-            
+
             if (startDate) {
                 query.createdAt.$gte = new Date(startDate);
             }
-            
+
             if (endDate) {
                 // Set the end date to the end of the day
                 const endDateTime = new Date(endDate);
@@ -300,23 +306,23 @@ const getAllOrders = async (req, res) => {
                 query.createdAt.$lte = endDateTime;
             }
         }
-        
+
         // Search by order number or user information
         if (search) {
             query.$or = [
                 { orderNumber: { $regex: search, $options: 'i' } }
             ];
-            
+
             // If it's a valid ObjectId, also search by userId
             if (mongoose.Types.ObjectId.isValid(search)) {
                 query.$or.push({ userId: new mongoose.Types.ObjectId(search) });
             }
         }
-        
+
         // Calculate pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const sortOptions = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-        
+
         // Execute query with pagination
         const orders = await Order.find(query)
             .populate({ path: 'userId', select: 'name email phone' })
@@ -324,9 +330,9 @@ const getAllOrders = async (req, res) => {
             .limit(parseInt(limit))
             .sort(sortOptions)
             .lean();
-        
+
         const total = await Order.countDocuments(query);
-        
+
         const result = {
             orders,
             pagination: {
@@ -336,10 +342,10 @@ const getAllOrders = async (req, res) => {
                 pages: Math.ceil(total / parseInt(limit))
             }
         };
-        
+
         // Cache the result for 2 minutes
         await cacheUtils.set(cacheKey, result, 120);
-        
+
         return successResponse(res, 200, "Orders retrieved successfully", result);
     } catch (error) {
         console.error("Get All Orders Error:", error);
@@ -358,36 +364,36 @@ const getUserOrders = async (req, res) => {
             sortBy = 'createdAt',
             sortOrder = 'desc'
         } = req.query;
-        
+
         // Create cache key
         const cacheKey = `user_orders_${userId}_${page}_${limit}_${status || ''}_${sortBy}_${sortOrder}`;
-        
+
         // Try to get from cache
         const cachedData = await cacheUtils.get(cacheKey);
         if (cachedData) {
             return successResponse(res, 200, "Orders retrieved successfully", cachedData);
         }
-        
+
         // Build query
         const query = { userId: new mongoose.Types.ObjectId(userId) };
-        
+
         if (status) {
             query.status = status;
         }
-        
+
         // Calculate pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const sortOptions = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-        
+
         // Execute query with pagination
         const orders = await Order.find(query)
             .skip(skip)
             .limit(parseInt(limit))
             .sort(sortOptions)
             .lean();
-        
+
         const total = await Order.countDocuments(query);
-        
+
         const result = {
             orders,
             pagination: {
@@ -397,10 +403,10 @@ const getUserOrders = async (req, res) => {
                 pages: Math.ceil(total / parseInt(limit))
             }
         };
-        
+
         // Cache the result for 5 minutes
         await cacheUtils.set(cacheKey, result, 300);
-        
+
         return successResponse(res, 200, "Orders retrieved successfully", result);
     } catch (error) {
         console.error("Get User Orders Error:", error);
@@ -410,126 +416,122 @@ const getUserOrders = async (req, res) => {
 
 // Get order by ID
 const getOrderById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // Validate ObjectId
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return errorResponse(res, 400, "Invalid order ID format");
-        }
-        
-        // Check if admin or order owner
-        const isAdmin = req.user.role === 'Admin';
-        const userId = req.user.id;
-        
-        // Create cache key
-        const cacheKey = `order_${id}_${isAdmin ? 'admin' : userId}`;
-        
-        // Try to get from cache
-        const cachedOrder = await cacheUtils.get(cacheKey);
-        if (cachedOrder) {
-            return successResponse(res, 200, "Order retrieved successfully", { order: cachedOrder });
-        }
-        
-        // Build query based on user role
-        const query = { _id: id };
-        if (!isAdmin) {
-            query.userId = new mongoose.Types.ObjectId(userId);
-        }
-        
-        // Get order with populated fields
-        const order = await Order.findOne(query)
-            .populate({ path: 'userId', select: 'name email phone' })
-            .lean();
-        
-        if (!order) {
-            return errorResponse(res, 404, "Order not found");
-        }
-        
-        // Cache for 10 minutes
-        await cacheUtils.set(cacheKey, order, 600);
-        
-        return successResponse(res, 200, "Order retrieved successfully", { order });
-    } catch (error) {
-        console.error("Get Order Error:", error);
-        return errorResponse(res, 500, error.message || "Failed to retrieve order");
+  try {
+    const { id, productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return errorResponse(res, 400, "Invalid order ID format");
     }
+
+    const isAdmin = req.user.role === "Admin";
+    const userId = req.user.id;
+
+    const query = {
+      _id: id,
+      "products.productId": new mongoose.Types.ObjectId(productId)
+    };
+
+    if (!isAdmin) query.userId = userId;
+
+    // fetch only the matched product + minimal order info
+    const order = await Order.findOne(query, {
+      _id: 1,
+      status: 1,
+      orderNumber: 1,
+      createdAt: 1,
+      products: { $elemMatch: { productId: new mongoose.Types.ObjectId(productId) } }
+    }).lean();
+
+    if (!order) {
+      return errorResponse(res, 404, "Order / Product Not Found");
+    }
+
+    return successResponse(res, 200, "Product Retrieved Successfully", {
+      order,
+      product: order.products[0]
+    });
+
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, error.message || "Failed to retrieve product");
+  }
 };
+
 
 // Update order status (Admin only)
 const updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, trackingId, trackingURL, deliveryPartner, notes } = req.body;
-        
+
         // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, 400, "Invalid order ID format");
         }
-        
+
         if (!status) {
             return errorResponse(res, 400, "Status is required");
         }
-        
+
         // Validate status
         const validStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded'];
         if (!validStatuses.includes(status)) {
             return errorResponse(res, 400, `Invalid status. Must be one of: ${validStatuses.join(', ')}`);
         }
-        
+
         // Get the existing order
         const existingOrder = await Order.findById(id);
         if (!existingOrder) {
             return errorResponse(res, 404, "Order not found");
         }
-        
+
         // Build update data
-        const updateData = { 
+        const updateData = {
             status
         };
-        
+
         // Add tracking info if provided
         if (status === 'Shipped') {
             if (!trackingId) {
                 return errorResponse(res, 400, "Tracking ID is required for 'Shipped' status");
             }
-            
+
             updateData.trackingInfo = {
                 trackingId,
                 trackingURL: trackingURL || '',
                 deliveryPartner: deliveryPartner || '',
                 shippedAt: new Date()
             };
-            
+
             // Update estimated delivery based on shipping date
             updateData.estimatedDelivery = calculateEstimatedDelivery(new Date());
         }
-        
+
         if (status === 'Delivered') {
             updateData.deliveredAt = new Date();
         }
-        
+
         const statusHistory = {
             status,
             timestamp: new Date(),
             notes: notes || ''
         };
-        
+
         // Add the new status to history
         const order = await Order.findByIdAndUpdate(
             id,
-            { 
+            {
                 $set: updateData,
                 $push: { statusHistory }
             },
             { new: true }
         );
-        
+
         // Clear order cache
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
-        
+
         return successResponse(res, 200, "Order status updated successfully", { order });
     } catch (error) {
         console.error("Update Order Status Error:", error);
@@ -542,27 +544,27 @@ const cancelOrder = async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
-        
+
         // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, 400, "Invalid order ID format");
         }
-        
+
         // Find the order
-        const order = await Order.findOne({ 
-            _id: id, 
-            userId: new mongoose.Types.ObjectId(req.user.id) 
+        const order = await Order.findOne({
+            _id: id,
+            userId: new mongoose.Types.ObjectId(req.user.id)
         });
-        
+
         if (!order) {
             return errorResponse(res, 404, "Order not found");
         }
-        
+
         // Check if order can be cancelled
         if (['Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(order.status)) {
             return errorResponse(res, 400, `Cannot cancel order in ${order.status} status`);
         }
-        
+
         // Update order status
         order.status = "Cancelled";
         order.cancelDetails = {
@@ -570,37 +572,37 @@ const cancelOrder = async (req, res) => {
             reason: reason || 'Customer cancelled',
             cancelledBy: 'User'
         };
-        
+
         // Add to status history
         order.statusHistory.push({
             status: 'Cancelled',
             timestamp: new Date(),
             notes: reason || 'Customer cancelled'
         });
-        
+
         // If payment was made, mark for refund
         if (order.paymentStatus === 'Paid') {
             order.refundStatus = 'Pending';
         }
-        
+
         await order.save();
-        
+
         // Restore product stock
         for (const item of order.products) {
             await Product.findByIdAndUpdate(
                 item.productId,
-                { 
+                {
                     $inc: { stock: item.quantity },
                     $set: { isInStock: true }
                 }
             );
         }
-        
+
         // Clear order cache
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
-        
+
         return successResponse(res, 200, "Order cancelled successfully", { order });
     } catch (error) {
         console.error("Cancel Order Error:", error);
@@ -613,49 +615,49 @@ const updatePaymentStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { paymentStatus, transactionId, paymentDetails } = req.body;
-        
+
         // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, 400, "Invalid order ID format");
         }
-        
+
         if (!paymentStatus) {
             return errorResponse(res, 400, "Payment status is required");
         }
-        
+
         // Validate status
         const validStatuses = ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'];
         if (!validStatuses.includes(paymentStatus)) {
             return errorResponse(res, 400, `Invalid payment status. Must be one of: ${validStatuses.join(', ')}`);
         }
-        
+
         // Get the existing order
         const order = await Order.findById(id);
         if (!order) {
             return errorResponse(res, 404, "Order not found");
         }
-        
+
         // Update payment status and details
         order.paymentStatus = paymentStatus;
-        
+
         if (!order.paymentDetails) {
             order.paymentDetails = {};
         }
-        
+
         order.paymentDetails.status = paymentStatus;
-        
+
         if (transactionId) {
             order.paymentDetails.transactionId = transactionId;
         }
-        
+
         if (paymentDetails) {
             Object.assign(order.paymentDetails, paymentDetails);
         }
-        
+
         // Update order status based on payment status
         if (paymentStatus === 'Paid' && order.status === 'Pending') {
             order.status = 'Processing';
-            
+
             // Add to status history
             order.statusHistory.push({
                 status: 'Processing',
@@ -664,19 +666,19 @@ const updatePaymentStatus = async (req, res) => {
             });
         } else if (paymentStatus === 'Failed' && order.status === 'Pending') {
             order.status = 'Cancelled';
-            
+
             // Add to status history
             order.statusHistory.push({
                 status: 'Cancelled',
                 timestamp: new Date(),
                 notes: 'Payment failed'
             });
-            
+
             // Restore product stock
             for (const item of order.products) {
                 await Product.findByIdAndUpdate(
                     item.productId,
-                    { 
+                    {
                         $inc: { stock: item.quantity },
                         $set: { isInStock: true }
                     }
@@ -690,14 +692,14 @@ const updatePaymentStatus = async (req, res) => {
                 refundTransactionId: transactionId || null
             };
         }
-        
+
         await order.save();
-        
+
         // Clear order cache
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
-        
+
         return successResponse(res, 200, "Payment status updated successfully", { order });
     } catch (error) {
         console.error("Update Payment Status Error:", error);
@@ -709,27 +711,27 @@ const updatePaymentStatus = async (req, res) => {
 const deleteOrder = async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return errorResponse(res, 400, "Invalid order ID format");
         }
-        
+
         const order = await Order.findByIdAndUpdate(
             id,
             { isDeleted: true, deletedAt: new Date() },
             { new: true }
         );
-        
+
         if (!order) {
             return errorResponse(res, 404, "Order not found");
         }
-        
+
         // Clear order cache
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
-        
+
         return successResponse(res, 200, "Order deleted successfully");
     } catch (error) {
         console.error("Delete Order Error:", error);
@@ -741,16 +743,16 @@ const deleteOrder = async (req, res) => {
 function calculateShippingCharge(subtotal, weight) {
     // Base shipping is free for orders above 1000
     if (subtotal >= 1000) return 0;
-    
+
     // For smaller orders, calculate based on weight
     // Base charge
     let charge = 50;
-    
+
     // Add weight-based charge for items over 5kg
     if (weight > 5) {
         charge += Math.ceil(weight - 5) * 10;
     }
-    
+
     return charge;
 }
 
@@ -758,11 +760,11 @@ function calculateEstimatedDelivery(fromDate = new Date()) {
     // Default delivery estimate is 3-7 days from current date
     const minDays = 3;
     const maxDays = 7;
-    
+
     // Calculate a date between min and max days from now
     const deliveryDate = new Date(fromDate);
     deliveryDate.setDate(deliveryDate.getDate() + maxDays);
-    
+
     return deliveryDate;
 }
 

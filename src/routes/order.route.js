@@ -290,13 +290,19 @@ router.get('/user', userAuth, orderController.getUserOrders);
  *         required: true
  *         schema:
  *           type: string
+ *       - name: productId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Order details retrieved successfully
  *       404:
  *         description: Order not found
  */
-router.get('/:id', userAuth, orderController.getOrderById);
+router.get('/:id/product/:productId', userAuth, orderController.getOrderById);
+
 
 /**
  * @swagger
