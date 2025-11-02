@@ -13,20 +13,25 @@ const orderSchema = new mongoose.Schema({
   },
   products: [
     {
-      productId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Product', 
-        required: true 
+  deliveredAt: Date,
+cancelledAt: Date,
+returnedAt: Date,
+expectedDeliveryDate: Date,
+
+      productId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+        required: true
       },
-      name: { 
-        type: String, 
-        required: true 
+      name: {
+        type: String,
+        required: true
       },
-      slug: { 
+      slug: {
         type: String
       },
-      price: { 
-        type: Number, 
+      price: {
+        type: Number,
         required: true,
         min: 0
       },
@@ -38,8 +43,8 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         min: 0
       },
-      quantity: { 
-        type: Number, 
+      quantity: {
+        type: Number,
         required: true,
         min: 1
       },
@@ -57,56 +62,69 @@ const orderSchema = new mongoose.Schema({
       image: {
         type: String
       },
-      subtotal: { 
-        type: Number, 
+      subtotal: {
+        type: Number,
         required: true,
         min: 0
       }
+      , status: {
+        type: String,
+        enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded'],
+        default: 'Pending'
+      },
+      refundAmount: {
+        type: Number,
+        default: 0
+      },
+      // refundTransactionId: {
+      //   type: String
+      // }
     }
+
   ],
   subtotal: {
     type: Number,
     required: true,
     min: 0
   },
-  shippingCharge: { 
-    type: Number, 
-    default: 0,
-    min: 0
-  }, 
-  tax: { 
-    type: Number, 
-    default: 0,
-    min: 0
-  }, 
-  taxAmount: { 
-    type: Number, 
-    default: 0,
-    min: 0
-  }, 
-  totalAmount: { 
-    type: Number, 
-    required: true,
-    min: 0
-  }, 
-  discountAmount: { 
-    type: Number, 
+  shippingCharge: {
+    type: Number,
     default: 0,
     min: 0
   },
-  finalAmount: { 
-    type: Number, 
+  tax: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  taxAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalAmount: {
+    type: Number,
     required: true,
     min: 0
-  }, 
-  promoCode: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'PromoCode', 
-    default: null 
+  },
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  finalAmount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  promoCode: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PromoCode',
+    default: null
   },
   promoCodeDetails: {
     code: String,
-    discountType: { 
+    discountType: {
       type: String,
       enum: ['PERCENTAGE', 'FIXED']
     },
@@ -169,12 +187,12 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'],
+    enum: ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'ONLINE', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'],
     required: true,
   },
-  paymentStatus: { 
-    type: String, 
-    enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'], 
+  paymentStatus: {
+    type: String,
+    enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'],
     default: 'Pending',
   },
   paymentDetails: {
@@ -185,15 +203,15 @@ const orderSchema = new mongoose.Schema({
     cardBrand: String,
     status: String
   },
-  estimatedDelivery: { 
-    type: Date 
+  estimatedDelivery: {
+    type: Date
   },
-  deliveredAt: { 
-    type: Date 
+  deliveredAt: {
+    type: Date
   },
   cancelDetails: {
-    cancelledAt: { 
-      type: Date 
+    cancelledAt: {
+      type: Date
     },
     reason: {
       type: String
@@ -204,8 +222,8 @@ const orderSchema = new mongoose.Schema({
     }
   },
   returnDetails: {
-    returnedAt: { 
-      type: Date 
+    returnedAt: {
+      type: Date
     },
     reason: {
       type: String
@@ -216,8 +234,8 @@ const orderSchema = new mongoose.Schema({
     }
   },
   refundDetails: {
-    refundedAt: { 
-      type: Date 
+    refundedAt: {
+      type: Date
     },
     refundAmount: {
       type: Number,
@@ -272,15 +290,15 @@ const orderSchema = new mongoose.Schema({
       ref: 'Admin'
     }
   }],
-  isDeleted: { 
-    type: Boolean, 
+  isDeleted: {
+    type: Boolean,
     default: false,
     select: false,
   },
   deletedAt: {
     type: Date
   }
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -294,15 +312,15 @@ orderSchema.index({ createdAt: -1 });
 orderSchema.index({ isDeleted: 1 });
 
 // Generate unique order number
-orderSchema.pre('save', async function(next) {
+orderSchema.pre('save', async function (next) {
   if (this.isNew) {
     // Only generate order number for new orders
-    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     this.orderNumber = `ORD-${dateStr}-${randomPart}`;
-    
+
     // Initialize status history for new orders
-    this.statusHistory = [{ 
+    this.statusHistory = [{
       status: this.status,
       timestamp: new Date(),
       comment: 'Order created'
@@ -313,7 +331,7 @@ orderSchema.pre('save', async function(next) {
       status: this.status,
       timestamp: new Date()
     });
-    
+
     // Update timestamp fields based on status
     if (this.status === 'Delivered') {
       this.deliveredAt = new Date();
@@ -329,13 +347,13 @@ orderSchema.pre('save', async function(next) {
 });
 
 // Don't show deleted orders in queries
-orderSchema.pre(/^find/, function(next) {
+orderSchema.pre(/^find/, function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });
 
 // Virtual for calculating days since order
-orderSchema.virtual('daysSinceOrder').get(function() {
+orderSchema.virtual('daysSinceOrder').get(function () {
   return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
 });
 

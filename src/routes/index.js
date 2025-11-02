@@ -22,6 +22,7 @@ const userRoute = require("./user.route");
 const userProductRoute = require("./userProduct.route");
 const addressRoute = require("./address.route");
 const paymentRoute = require("./payment.route");
+const webhookRoute = require("./webhook.route");
 const router = express.Router();
 
 // Register your routes
@@ -48,4 +49,5 @@ router.use("/user", userRoute);
 router.use("/user/products", userProductRoute);
 router.use("/addresses", addressRoute);
 router.use("/payment", paymentRoute);
+router.use("/webhook", webhookRoute);
 module.exports = router;
