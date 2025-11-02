@@ -29,7 +29,7 @@ const createOrder = async (req, res) => {
         }
         
         // Check valid payment methods
-        const validPaymentMethods = ['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
+        const validPaymentMethods = ['COD',"ONLINE", 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
         if (!validPaymentMethods.includes(paymentMethod)) {
             return errorResponse(res, 400, `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`);
         }
