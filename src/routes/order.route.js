@@ -360,6 +360,44 @@ router.put(
   ],
   orderController.updateOrderStatus
 );
+/**
+ * @swagger
+ * /orders/{orderId}/products/{productId}/status:
+ *   patch:
+ *     summary: Update single product status in an order (Admin only)
+ *     tags: [Order]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: orderId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: productId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+ *     responses:
+ *       200:
+ *         description: Product status updated successfully
+ */
+router.patch(
+  '/:orderId/products/:productId/status',
+  adminAuth,
+  orderController.updateProductStatus
+)
 
 /**
  * @swagger

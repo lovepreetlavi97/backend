@@ -137,6 +137,7 @@ const messages = {
   PROMO_CODE_INVALID: "Invalid promo code",
   PROMO_CODE_EXPIRED: "This promo code has expired",
   PROMO_CODE_VALID: "Promo code is valid",
+    PROMO_CODE_APPLIED: "Promo Applied",
   PROMO_CODE_MAX_USAGE: "This promo code has reached its usage limit",
   PROMO_CODE_ALREADY_USED: "You have already used this promo code",
   PROMO_CODE_NOT_ELIGIBLE: "You are not eligible to use this promo code",

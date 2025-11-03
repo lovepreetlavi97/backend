@@ -538,6 +538,48 @@ const updateOrderStatus = async (req, res) => {
         return errorResponse(res, 500, error.message || "Failed to update order status");
     }
 };
+const updateProductStatus = async (req, res) => {
+  try {
+    const { orderId, productId } = req.params;
+    const { status } = req.body;
+
+    // const validStatuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
+    // if (!validStatuses.includes(status)) {
+    //   return errorResponse(res, 400, "Invalid status");
+    // }
+
+    const order = await Order.findOneAndUpdate(
+      { _id: orderId, "products._id": productId },
+      { 
+        $set: { "products.$.status": status },
+        $push: {
+          statusHistory: {
+            status: `${status} (Product: ${productId})`,
+            timestamp: new Date(),
+          }
+        }
+      },
+      { new: true }
+    ).populate("userId");
+
+    if (!order) return errorResponse(res, 404, "Order or product not found");
+
+    // // After update → Send Email to User
+    // await sendMail(order.userId.email, `Product Status Update`, `
+    //   Hello ${order.userId.name},
+      
+    //   Your product with ID: ${productId} is now marked as "${status}".
+      
+    //   Regards,
+    //   Guru Jewellers Team
+    // `);
+
+    return successResponse(res, 200, "Product status updated successfully", { order });
+  } catch (e) {
+    console.log(e)
+    return errorResponse(res, 500, "Failed to update product status");
+  }
+}
 
 // Cancel order (User only)
 const cancelOrder = async (req, res) => {
@@ -776,5 +818,6 @@ module.exports = {
     updateOrderStatus,
     cancelOrder,
     updatePaymentStatus,
-    deleteOrder
+    deleteOrder,
+    updateProductStatus
 };

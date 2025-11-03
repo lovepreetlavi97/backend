@@ -15,6 +15,27 @@ const {
  */
 /**
  * @swagger
+ * /user/promo/check/{code}:
+ *   get:
+ *     summary: Check promo code validity
+ *     tags: [User]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Promo code is valid
+ *       404:
+ *         description: Promo code not found
+ */
+router.get("/promo/check/:code", userController.checkPromoCode);
+
+
+/**
+ * @swagger
  * /user/festivals:
  *   get:
  *     summary: Get all festivals (user-facing)
@@ -341,25 +362,6 @@ router.get("/products/essentials", cacheRoute(1800), userController.getShopEssen
  */
 router.get("/counts", userAuth, userController.getCountsOfNavbar);
 
-/**
- * @swagger
- * /user/promo/{code}:
- *   get:
- *     summary: Check promo code validity
- *     tags: [User]
- *     parameters:
- *       - in: path
- *         name: code
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Promo code is valid
- *       404:
- *         description: Promo code not found
- */
-router.get("/promo/:code", userController.checkPromoCode);
 
 /**
  * @swagger
