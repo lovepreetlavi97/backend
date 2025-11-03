@@ -142,6 +142,7 @@ const getAllUsers = async (req, res) => {
 // Get a user by ID
 const getUserById = async (req, res) => {
   try {
+    console.log("Fetching user with ID:", req.params.id);
     const { id } = req.params;
 
     // Validate ObjectId
@@ -997,6 +998,7 @@ const getCountsOfNavbar = async (req, res) => {
 // Check promo code validity
 const checkPromoCode = async (req, res) => {
   try {
+    console.log("Checking promo code...");
     const { code } = req.params;
     const userId = req.user?._id;
 
@@ -1017,8 +1019,8 @@ const checkPromoCode = async (req, res) => {
 
     const promoCode = await PromoCode.findOne({
       code: code.toUpperCase(),
-      isActive: true,
-      expiryDate: { $gt: new Date() },
+      status: "active",
+      endDate: { $gt: new Date() },
     });
 
     if (!promoCode) {
@@ -1071,19 +1073,18 @@ const checkPromoCode = async (req, res) => {
       return errorResponse(res, 403, messages.PROMO_CODE_NOT_ELIGIBLE);
     }
 
-    const promoDetails = {
-      code: promoCode.code,
-      discountType: promoCode.discountType,
-      discountValue: promoCode.discountValue,
-      maxDiscount: promoCode.maxDiscount,
-      minOrderValue: promoCode.minOrderValue,
-      expiryDate: promoCode.expiryDate,
-    };
-
+const promoDetails = {
+  code: promoCode.code,
+  discountType: promoCode.type,              // <- changed
+  discountValue: promoCode.value,            // <- changed
+  maxDiscount: promoCode.maxDiscount,
+  minOrderValue: promoCode.minPurchase,      // <- changed
+  expiryDate: promoCode.endDate,             // <- use endDate not expiryDate
+};
     // Cache the result
     await cacheUtils.set(cacheKey, promoDetails, 300); // Cache for 5 minutes
 
-    return successResponse(res, 200, messages.PROMO_CODE_VALID, promoDetails);
+    return successResponse(res, 200, messages.PROMO_CODE_APPLIED, promoDetails);
   } catch (error) {
     console.error("Check promo code error:", error);
     return errorResponse(res, 500, messages.PROMO_CODE_CHECK_FAILED, {

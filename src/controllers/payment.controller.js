@@ -13,10 +13,16 @@ const razorpay = new Razorpay({
 // 🧾 Create Razorpay Order
 export const createRazorpayOrder = async (req, res) => {
   try {
-    const { amount, currency = "INR", receipt } = req.body;
+    let { amount, currency = "INR", receipt } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ success: false, message: "Amount required" });
+    }
+
+    amount = Number(amount);
 
     const options = {
-      amount: amount * 100, // convert to paise
+      amount: Math.round(amount * 100), // Razorpay tradition, paise.
       currency,
       receipt: receipt || `rcpt_${Date.now()}`,
     };
