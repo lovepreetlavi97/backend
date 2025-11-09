@@ -2,7 +2,16 @@ const express = require("express");
 const router = express.Router();
 const wishlistController = require("../controllers/wishlist.controller");
 const {  userAuth } = require('../middlewares/auth/auth.middleware');
-
+/**
+ * @swagger
+ * components:
+ *   securitySchemes:
+ *     BearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *       description: Enter your bearer token in the format **Bearer &lt;token&gt;**
+ */
 /**
  * @swagger
  * tags:
@@ -16,7 +25,7 @@ const {  userAuth } = require('../middlewares/auth/auth.middleware');
  *     summary: Add item to wishlist
  *     tags: [Wishlist]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -40,7 +49,7 @@ router.post("/add", userAuth, wishlistController.addToWishlist);
  *     summary: Remove item from wishlist
  *     tags: [Wishlist]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -64,7 +73,7 @@ router.delete("/remove", userAuth, wishlistController.removeFromWishlist);
  *     summary: Get wishlist items for a user
  *     tags: [Wishlist]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Wishlist retrieved successfully
@@ -78,7 +87,7 @@ router.get("/", userAuth, wishlistController.getWishlist);
  *     summary: Clear all items from wishlist
  *     tags: [Wishlist]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Wishlist cleared successfully
@@ -94,7 +103,7 @@ router.delete("/clear", userAuth, wishlistController.clearWishlist);
  *     summary: Check if a product is in user's wishlist
  *     tags: [Wishlist]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - name: productId
  *         in: path
@@ -114,5 +123,31 @@ router.delete("/clear", userAuth, wishlistController.clearWishlist);
  *                   type: boolean
  */
 router.get("/check/:productId", userAuth, wishlistController.isProductInWishlist);
+/**
+ * @swagger
+ * /wishlist/sync:
+ *   post:
+ *     summary: Sync guest wishlist with logged-in user
+ *     tags: [Wishlist]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               products:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Wishlist synced successfully
+ *       400:
+ *         description: Bad request
+ */
+router.post("/sync", userAuth, wishlistController.syncGuestWishlist);
 
 module.exports = router;

@@ -86,5 +86,37 @@ router.get("/", userAuth,cartController.getCart);
  */
 router.post("/update-quantity", userAuth, cartController.updateCartQuantity);
 
+/**
+ * @swagger
+ * /cart/sync:
+ *   post:
+ *     summary: Sync guest cart with logged-in user
+ *     tags: [Cart]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Cart synced successfully
+ *       400:
+ *         description: Bad request
+ */
+router.post("/sync", userAuth, cartController.syncGuestCart);
+
 
 module.exports = router;

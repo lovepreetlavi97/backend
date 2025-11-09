@@ -127,7 +127,7 @@ const getWishlist = async (req, res) => {
     const wishlist = await Wishlist.findOne({ userId })
       .populate({
         path: "products",
-        select: "name slug actualPrice discountedPrice weight images isInStock stock",
+        select: "name slug actualPrice discountedPrice weight images isInStock stock image",
         match: { isDeleted: false, isBlocked: false }
       })
       .lean();
@@ -209,6 +209,68 @@ const isProductInWishlist = async (req, res) => {
     return errorResponse(res, 500, error.message || "Failed to check wishlist status");
   }
 };
+// Sync guest wishlist with user wishlist
+const syncGuestWishlist = async (req, res) => {
+  try {
+    console.log("syncGuestWishlist called", req.body);
+    const userId = req.user._id;
+    const { products } = req.body; // array of productIds or product objects
+
+    if (!products || !Array.isArray(products)) {
+      return errorResponse(res, 400, "Products array is required");
+    }
+
+    // Extract product IDs in case frontend sends objects instead of strings
+    const productIds = products.map(p => (typeof p === "string" ? p : p._id));
+
+    // Filter out invalid productIds
+    const validProducts = productIds.filter(p => mongoose.Types.ObjectId.isValid(p));
+
+    if (!validProducts.length) {
+      return errorResponse(res, 400, "No valid product IDs found");
+    }
+
+    let wishlist = await findOne(Wishlist, { userId });
+
+    if (!wishlist) {
+      // Create new wishlist
+      wishlist = await create(Wishlist, { userId, products: validProducts });
+    } else {
+      // Add only products that are not already in wishlist
+      validProducts.forEach(p => {
+        if (!wishlist.products.includes(p)) wishlist.products.push(p);
+      });
+      await wishlist.save();
+    }
+
+    // Populate product details
+    const populatedWishlist = await Wishlist.findOne({ userId })
+      .populate({
+        path: "products",
+        select: "name slug actualPrice discountedPrice weight images isInStock stock image",
+        match: { isDeleted: false, isBlocked: false }
+      })
+      .lean();
+
+    // Filter out null products
+    populatedWishlist.products = populatedWishlist.products.filter(product => product !== null);
+
+    // Clear cache
+    await cacheUtils.del(`wishlist_${userId}`);
+    await cacheUtils.del(`navbar_counts_${userId}`);
+
+    // Cache the updated wishlist
+    await cacheUtils.set(`wishlist_${userId}`, populatedWishlist, 600); // 10 minutes
+
+    return successResponse(res, 200, "Guest wishlist synced successfully", {
+      wishlist: populatedWishlist
+    });
+  } catch (error) {
+    console.error("Sync guest wishlist error:", error);
+    return errorResponse(res, 500, error.message || "Failed to sync wishlist");
+  }
+};
+
 
 // Export the functions
 module.exports = {
@@ -216,5 +278,6 @@ module.exports = {
   removeFromWishlist,
   getWishlist,
   clearWishlist,
-  isProductInWishlist
+  isProductInWishlist,
+  syncGuestWishlist
 };
