@@ -33,6 +33,33 @@ const {
  */
 router.get("/promo/check/:code", userController.checkPromoCode);
 
+/**
+ * @swagger
+ * /cart/check-stock:
+ *   post:
+ *     summary: Validate cart items stock
+ *     tags: [Cart]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: List of items with stock status
+ */
+router.post("/cart/check-stock",  userController.checkCartStock);
 
 /**
  * @swagger

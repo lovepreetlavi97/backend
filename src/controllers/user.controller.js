@@ -600,7 +600,42 @@ const logoutUser = async (req, res) => {
     });
   }
 };
+ const checkCartStock = async (req, res) => {
+  try {
+    const { items } = req.body;
 
+    if (!items || !Array.isArray(items)) {
+      return errorResponse(res, 400, "Invalid items array");
+    }
+
+    // Get product IDs
+    const productIds = items.map((item) => item.productId);
+
+    // Fetch products from DB
+    const products = await Product.find({ _id: { $in: productIds }, isDeleted: false });
+
+    // Map stock status
+    const results = items.map((item) => {
+      const product = products.find(p => p._id.toString() === item.productId);
+      console.log("Checking stock for product:", item.productId, product ? product.stock : "Not found");
+      if (!product) {
+        return { ...item, inStock: false, availableQuantity: 0 };
+      }
+
+      const inStock = product.stock >= item.quantity;
+      return {
+        ...item,
+        inStock,
+        availableQuantity: product.stock,
+      };
+    });
+
+    return successResponse(res, 200, "Cart stock validated", { results });
+  } catch (error) {
+    console.error("Cart validation error:", error);
+    return errorResponse(res, 500, "Failed to validate cart stock", { error: error.message });
+  }
+};
 // Get all festivals for user
 const getAllFestivals = async (req, res) => {
   try {
@@ -1413,6 +1448,7 @@ const getShopEssentials = async (req, res) => {
 };
 
 module.exports = {
+  checkCartStock,
   createUser,
   getUserById,
   getAllUsers,

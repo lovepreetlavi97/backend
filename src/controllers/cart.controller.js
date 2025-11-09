@@ -8,7 +8,73 @@ const {
   const { Cart ,Wishlist} = require('../models/index'); // Ensure this matches your project structure
   const { successResponse, errorResponse } = require("../utils/responseUtil");
   const messages = require("../utils/messages");
-  
+  const mongoose = require("mongoose");
+const { cacheUtils } = require("../config/redis");
+
+const syncGuestCart = async (req, res) => {
+  try {
+    console.log("syncGuestCart called", req.body);
+    const userId = req.user._id;
+    const { items } = req.body; // [{ productId, quantity }]
+
+    if (!items || !Array.isArray(items)) {
+      return errorResponse(res, 400, "Items array is required");
+    }
+
+    // Normalize + validate productIds
+    const validItems = items
+      .filter(i => mongoose.Types.ObjectId.isValid(i.productId))
+      .map(i => ({
+        productId: i.productId,
+        quantity: Number(i.quantity) || 1,
+      }));
+
+    if (!validItems.length) {
+      return errorResponse(res, 400, "No valid cart items found");
+    }
+
+    let cart = await Cart.findOne({ userId });
+
+    if (!cart) {
+      cart = await Cart.create({ userId, items: validItems });
+    } else {
+      validItems.forEach(gItem => {
+        const idx = cart.items.findIndex(
+          item => item.productId.toString() === gItem.productId
+        );
+
+        if (idx > -1) {
+          cart.items[idx].quantity += gItem.quantity;
+        } else {
+          cart.items.push(gItem);
+        }
+      });
+
+      await cart.save();
+    }
+
+    const populatedCart = await Cart.findOne({ userId })
+      .populate("items.productId", "name slug actualPrice discountedPrice weight images stock image")
+      .lean();
+
+    // clear cache if you using same caching pattern
+    await cacheUtils.del(`cart_${userId}`);
+    await cacheUtils.del(`navbar_counts_${userId}`);
+
+    await cacheUtils.set(`cart_${userId}`, populatedCart, 600);
+
+    return successResponse(res, 200, "Guest cart synced successfully", {
+      cart: populatedCart
+    });
+
+  } catch (error) {
+    console.error("Sync guest cart error:", error);
+    return errorResponse(res, 500, error.message || "Failed to sync cart");
+  }
+};
+
+module.exports = { syncGuestCart };
+
   // Add to Cart
   const addToCart = async (req, res) => {
       try {
@@ -73,7 +139,7 @@ const {
   const getCart = async (req, res) => {
       try {
           const userId = req.user._id;
-          const cart = await Cart.findOne({ userId }).populate("items.productId",   "name actualPrice discountedPrice weight images");
+          const cart = await Cart.findOne({ userId }).populate("items.productId",   "name image actualPrice discountedPrice weight images");
   
           if (!cart) {
               return errorResponse(res, 404, messages.CART_NOT_FOUND);
@@ -91,18 +157,23 @@ const {
       const { productId, action } = req.body;
   
       // Validate input
+      console.log("Validating input:", { productId, action });
       if (!productId || !["inc", "dec"].includes(action)) {
         return errorResponse(res, 400, "Invalid request body: productId and action are required.");
       }
   
       // Fetch user's cart
-      const cart = await findOne(Cart, { userId });
+     const cart = await Cart.findOne({ userId }).populate("items.productId",   "name image actualPrice discountedPrice weight images");
       if (!cart) return errorResponse(res, 404, "Cart not found");
-  
+  console.log("User's cart:", cart);
       // Find product in cart
-      const productIndex = cart.items.findIndex(
-        (item) => item.productId.toString() === productId
-      );
+  const productIndex = cart.items.findIndex((item) => {
+  const match = item.productId._id.toString() == productId;
+  console.log("checking item =>", item.productId._id.toString(), productId, match);
+  return match;
+});
+
+
       if (productIndex === -1) {
         return errorResponse(res, 404, "Product not found in cart");
       }
@@ -129,5 +200,5 @@ const {
   };
   
   
-  module.exports = { addToCart, removeFromCart, getCart ,updateCartQuantity};
+  module.exports = { addToCart, removeFromCart, getCart ,updateCartQuantity,syncGuestCart};
   
