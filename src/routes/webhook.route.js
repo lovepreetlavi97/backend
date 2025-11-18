@@ -6,7 +6,7 @@ razorpayWebhookHandler
 
 // for webhook — DO NOT use bodyParser.json here
 router.post(
-  "/webhook",
+  "/",
   express.raw({ type: "application/json" }),
   razorpayWebhookHandler
 );
