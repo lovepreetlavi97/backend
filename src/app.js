@@ -13,6 +13,8 @@ dotenv.config();
 
 // Create express app
 const app = express();
+// Import versioned routes
+const v1Routes = require('./routes'); // Import the index.js in routes
 app.use('/api/v1', v1Routes); // Mounting the routes under /api/v1
 // Middleware for parsing JSON and handling CORS
 app.use(express.json());
@@ -20,8 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: '*',
 }));
-// Import versioned routes
-const v1Routes = require('./routes'); // Import the index.js in routes
+
 
 // Import error handling middleware
 const { errorConverter, errorHandler } = require('./middlewares/error.middleware');
