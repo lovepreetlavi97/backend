@@ -1,29 +1,23 @@
-// ✅ Razorpay Webhook Handler
-import crypto from "crypto";
-export const razorpayWebhookHandler = async (req, res) => {
-  try {
-    console.log("oooooooooooooooooooooooooooo");
-    console.log("🔔 Razorpay Webhook Received", req.body.toString());
+const crypto = require("crypto");
 
-    const webhookSecret = process.env.RAZORPAY_KEY_SECRET;
+exports.razorpayWebhookHandler = (req, res) => {
+  console.log("🔔 Razorpay Webhook Received", req.body.toString());
 
-    const shasum = crypto.createHmac("sha256", webhookSecret);
-    shasum.update(req.body.toString());
-    const digest = shasum.digest("hex");
+  const body = req.body; // BUFFER
 
-    const signature = req.headers["x-razorpay-signature"];
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(body)
+    .digest("hex");
 
-    if (digest !== signature) {
-      console.warn("⚠️ Webhook Signature Verification Failed");
-      return res.status(400).json({ success: false });
-    }
+  const receivedSignature = req.headers["x-razorpay-signature"];
 
-    const event = JSON.parse(req.body.toString());
-    console.log("Webhook Event:", event);
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("Webhook Handler Error:", err);
-    return res.status(500).json({ success: false });
+  if (expectedSignature !== receivedSignature) {
+    console.log("⚠️ Webhook Signature Verification Failed");
+    return res.status(400).json({ error: "Invalid signature" });
   }
+
+  console.log("✅ Webhook Verified Successfully");
+
+  res.status(200).json({ status: "ok" });
 };
