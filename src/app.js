@@ -15,8 +15,8 @@ dotenv.config();
 const app = express();
 
 // Middleware for parsing JSON and handling CORS
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: '*',
 }));
