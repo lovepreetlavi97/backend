@@ -5,7 +5,7 @@ razorpayWebhookHandler
 } = require("../controllers/webhook.controller.js");
 
 // for webhook — DO NOT use bodyParser.json here
-router.get(
+router.post(
   "/",
   express.raw({ type: "application/json" }),
   razorpayWebhookHandler
