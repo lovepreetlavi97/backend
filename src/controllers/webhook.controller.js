@@ -4,7 +4,8 @@ export const razorpayWebhookHandler = (req, res) => {
   try {
     console.log("🔔 Razorpay Webhook Received", req.body.toString());
 
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const secret = process.env.RAZORPAY_KEY_SECRET
+;
 
     const expectedSignature = crypto
       .createHmac("sha256", secret)
