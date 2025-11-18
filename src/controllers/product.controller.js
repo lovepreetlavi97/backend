@@ -81,6 +81,7 @@ const createProduct = async (req, res) => {
       subcategoryId,
       festivalIds,
       relationIds,
+      relatedProductIds ,
       specifications,
       tags,
       isFeatured,
@@ -206,6 +207,8 @@ const createProduct = async (req, res) => {
         : undefined,
       festivalIds: parseObjectIdArray(festivalIds),
       relationIds: parseObjectIdArray(relationIds),
+      relatedProductIds : parseObjectIdArray(req.body.relatedProductIds),
+
       specifications: processedSpecs,
       tags: productTag,
       isFeatured: isFeatured === "true" || isFeatured === true,
@@ -385,6 +388,7 @@ const getProductById = async (req, res) => {
       .populate({ path: "subcategoryId", select: "name" })
       .populate({ path: "festivalIds", select: "name" })
       .populate({ path: "relationIds", select: "name" })
+            .populate({ path: "relatedProductIds", select: "name" })
       .lean();
 
     if (!product) {
@@ -471,7 +475,7 @@ const updateProductById = async (req, res) => {
 
     updatedData.festivalIds = parseObjectIdArray(updatedData.festivalIds);
     updatedData.relationIds = parseObjectIdArray(updatedData.relationIds);
-
+    updatedData.relatedProductIds = parseObjectIdArray(updatedData.relatedProductIds);
     // Process specifications
     if (updatedData.specifications) {
       if (typeof updatedData.specifications === "string") {
@@ -612,6 +616,7 @@ const toggleBlockStatus = async (req, res) => {
   }
 };
 
+
 module.exports = {
   createProduct,
   getAllProducts,
@@ -619,4 +624,5 @@ module.exports = {
   updateProductById,
   deleteProductById,
   toggleBlockStatus,
+  
 };
