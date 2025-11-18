@@ -54,6 +54,12 @@ const { adminAuth, userAuth } = require('../middlewares/auth/auth.middleware');
  *                   type: string
  *                 description: Array of festival IDs (optional).
  *                 example: ["64f5e3c5a2e1b6d7889a6789"]
+ *               relatedProductIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of relatedProductIds product IDs.
+ *                 example: ["64f5e3c5a2e1b6d7889a6789","670abcd12345ef678999aaa2"]
  *               relationIds:
  *                 type: array
  *                 items:
@@ -184,6 +190,12 @@ router.get('/:id', adminAuth, productController.getProductById);
  *                   type: string
  *                 description: Array of festival IDs (optional).
  *                 example: ["607d1f77bcf86cd799439033"]
+ *               relatedProductIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of relatedProductIds product IDs.
+ *                 example: ["64f5e3c5a2e1b6d7889a6789","670abcd12345ef678999aaa2"]
  *               relationIds:
  *                 type: array
  *                 items:
@@ -275,4 +287,6 @@ router.delete('/:id', adminAuth, productController.deleteProductById);
  *         description: Internal server error
  */
 router.put('/:id/toggle-block', adminAuth, productController.toggleBlockStatus);
+
+
 module.exports = router;

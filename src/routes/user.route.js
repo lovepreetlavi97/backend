@@ -337,6 +337,48 @@ router.get("/product/:slug", cacheRoute(1800), userController.getProductBySlug);
 router.get("/trending-products", cacheRoute(1800), userController.getTrendingProducts);
 /**
  * @swagger
+ * /user/products/related:
+ *   get:
+ *     summary: Get related products
+ *     tags: [User]
+ *     parameters:
+ *       - in: query
+ *         name: ids
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Comma-separated product IDs (e.g., ?ids=1,2,3)
+ *     responses:
+ *       200:
+ *         description: List of related products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     products:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Product'
+ *       400:
+ *         description: Invalid request
+ *       500:
+ *         description: Server error
+ */
+
+router.get(
+  "/related-products",
+  cacheRoute(1800),
+  userController.getRelatedProducts
+);
+
+/**
+ * @swagger
  * /user/products/essentials:
  *   get:
  *     summary: Get shop essential products

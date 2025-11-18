@@ -192,6 +192,10 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  relatedProductIds: [
+  { type: mongoose.Schema.Types.ObjectId, ref: "Product" }
+],
+
 }, { 
   timestamps: true,
   toJSON: { getters: true, virtuals: true },
