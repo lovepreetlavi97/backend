@@ -1,6 +1,7 @@
 const { create, findOne, findMany, findAndUpdate, deleteOne } = require('../services/mongodb/mongoService');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { Order, PromoCode, Product, User } = require('../models/index');
+const { createAdminOrderNotifications } = require('../services/notifications/notification.service');
 const mongoose = require('mongoose');
 const { cacheUtils } = require("../config/redis");
 const { generateOrderNumber } = require("../utils/orderUtils");
@@ -9,8 +10,6 @@ const { generateOrderNumber } = require("../utils/orderUtils");
 const createOrder = async (req, res) => {
     const expectedDeliveryDate = new Date();
     expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + 7);
-
-
 
     try {
         const {
@@ -232,7 +231,9 @@ const createOrder = async (req, res) => {
             console.error("Error clearing cache:", cacheError);
         }
 
-        // Return a simplified order response
+        // Fire-and-forget admin notification for new order
+        createAdminOrderNotifications('NEW_ORDER',order).catch(e => console.error('NEW_ORDER notification error:', e));
+
         return successResponse(res, 201, "Order created successfully", {
             order: {
                 _id: order._id,
@@ -416,45 +417,45 @@ const getUserOrders = async (req, res) => {
 
 // Get order by ID
 const getOrderById = async (req, res) => {
-  try {
-    const { id, productId } = req.params;
+    try {
+        const { id, productId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return errorResponse(res, 400, "Invalid order ID format");
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return errorResponse(res, 400, "Invalid order ID format");
+        }
+
+        const isAdmin = req.user.role === "Admin";
+        const userId = req.user.id;
+
+        const query = {
+            _id: id,
+            "products.productId": new mongoose.Types.ObjectId(productId)
+        };
+
+        if (!isAdmin) query.userId = userId;
+
+        // fetch only the matched product + minimal order info
+        const order = await Order.findOne(query, {
+            _id: 1,
+            status: 1,
+            orderNumber: 1,
+            createdAt: 1,
+            products: { $elemMatch: { productId: new mongoose.Types.ObjectId(productId) } }
+        }).lean();
+
+        if (!order) {
+            return errorResponse(res, 404, "Order / Product Not Found");
+        }
+
+        return successResponse(res, 200, "Product Retrieved Successfully", {
+            order,
+            product: order.products[0]
+        });
+
+    } catch (error) {
+        console.error(error);
+        return errorResponse(res, 500, error.message || "Failed to retrieve product");
     }
-
-    const isAdmin = req.user.role === "Admin";
-    const userId = req.user.id;
-
-    const query = {
-      _id: id,
-      "products.productId": new mongoose.Types.ObjectId(productId)
-    };
-
-    if (!isAdmin) query.userId = userId;
-
-    // fetch only the matched product + minimal order info
-    const order = await Order.findOne(query, {
-      _id: 1,
-      status: 1,
-      orderNumber: 1,
-      createdAt: 1,
-      products: { $elemMatch: { productId: new mongoose.Types.ObjectId(productId) } }
-    }).lean();
-
-    if (!order) {
-      return errorResponse(res, 404, "Order / Product Not Found");
-    }
-
-    return successResponse(res, 200, "Product Retrieved Successfully", {
-      order,
-      product: order.products[0]
-    });
-
-  } catch (error) {
-    console.error(error);
-    return errorResponse(res, 500, error.message || "Failed to retrieve product");
-  }
 };
 
 
@@ -532,6 +533,12 @@ const updateOrderStatus = async (req, res) => {
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
 
+        // Notifications for specific status changes
+        const typeMap = { Cancelled: 'ORDER_CANCELLED', Returned: 'ORDER_RETURNED', Refunded: 'ORDER_REFUNDED' };
+        if (typeMap[status]) {
+            createAdminOrderNotifications(typeMap[status],order).catch(e => console.error(`${status} notification error:`, e));
+        }
+
         return successResponse(res, 200, "Order status updated successfully", { order });
     } catch (error) {
         console.error("Update Order Status Error:", error);
@@ -539,46 +546,46 @@ const updateOrderStatus = async (req, res) => {
     }
 };
 const updateProductStatus = async (req, res) => {
-  try {
-    const { orderId, productId } = req.params;
-    const { status } = req.body;
+    try {
+        const { orderId, productId } = req.params;
+        const { status } = req.body;
 
-    // const validStatuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
-    // if (!validStatuses.includes(status)) {
-    //   return errorResponse(res, 400, "Invalid status");
-    // }
+        // const validStatuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
+        // if (!validStatuses.includes(status)) {
+        //   return errorResponse(res, 400, "Invalid status");
+        // }
 
-    const order = await Order.findOneAndUpdate(
-      { _id: orderId, "products._id": productId },
-      { 
-        $set: { "products.$.status": status },
-        $push: {
-          statusHistory: {
-            status: `${status} (Product: ${productId})`,
-            timestamp: new Date(),
-          }
-        }
-      },
-      { new: true }
-    ).populate("userId");
+        const order = await Order.findOneAndUpdate(
+            { _id: orderId, "products._id": productId },
+            {
+                $set: { "products.$.status": status },
+                $push: {
+                    statusHistory: {
+                        status: `${status} (Product: ${productId})`,
+                        timestamp: new Date(),
+                    }
+                }
+            },
+            { new: true }
+        ).populate("userId");
 
-    if (!order) return errorResponse(res, 404, "Order or product not found");
+        if (!order) return errorResponse(res, 404, "Order or product not found");
 
-    // // After update → Send Email to User
-    // await sendMail(order.userId.email, `Product Status Update`, `
-    //   Hello ${order.userId.name},
-      
-    //   Your product with ID: ${productId} is now marked as "${status}".
-      
-    //   Regards,
-    //   Guru Jewellers Team
-    // `);
+        // // After update → Send Email to User
+        // await sendMail(order.userId.email, `Product Status Update`, `
+        //   Hello ${order.userId.name},
 
-    return successResponse(res, 200, "Product status updated successfully", { order });
-  } catch (e) {
-    console.log(e)
-    return errorResponse(res, 500, "Failed to update product status");
-  }
+        //   Your product with ID: ${productId} is now marked as "${status}".
+
+        //   Regards,
+        //   Guru Jewellers Team
+        // `);
+
+        return successResponse(res, 200, "Product status updated successfully", { order });
+    } catch (e) {
+        console.log(e)
+        return errorResponse(res, 500, "Failed to update product status");
+    }
 }
 
 // Cancel order (User only)
@@ -644,6 +651,8 @@ const cancelOrder = async (req, res) => {
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
+
+        createAdminOrderNotifications('ORDER_CANCELLED', order).catch(e => console.error('ORDER_CANCELLED notification error:', e));
 
         return successResponse(res, 200, "Order cancelled successfully", { order });
     } catch (error) {
@@ -741,6 +750,16 @@ const updatePaymentStatus = async (req, res) => {
         await cacheUtils.delPattern(`order_${id}_*`);
         await cacheUtils.delPattern('admin_orders_*');
         await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
+
+        if (paymentStatus === 'Refunded') {
+            createAdminOrderNotifications({
+                type: 'ORDER_REFUNDED',
+                orderId: order._id,
+                userId: order.userId,
+                orderNumber: order.orderNumber,
+                amount: order.finalAmount
+            }).catch(e => console.error('ORDER_REFUNDED notification error:', e));
+        }
 
         return successResponse(res, 200, "Payment status updated successfully", { order });
     } catch (error) {

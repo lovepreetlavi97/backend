@@ -127,7 +127,7 @@ const getRelatedProducts = async (req, res) => {
   }
 };
 
-// Get all users
+// Get all users (with search by name/email/phone)
 const getAllUsers = async (req, res) => {
   try {
     const {
@@ -136,14 +136,14 @@ const getAllUsers = async (req, res) => {
       sortBy = "createdAt",
       sortOrder = "desc",
       status,
+      search
     } = req.query;
 
-    // Create cache key based on query parameters
-    const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${
-      status || "all"
-    }`;
+    
+    // Create cache key based on query parameters (include search)
+    const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${status || "all"}_${search || ""}`;
 
-    // Try to get from cache first
+    // Try cache first
     const cachedData = await cacheUtils.get(cacheKey);
     if (cachedData) {
       return successResponse(res, 200, messages.USERS_RETRIEVED, cachedData);
@@ -151,11 +151,18 @@ const getAllUsers = async (req, res) => {
 
     // Build query
     const query = {};
-    if (status) {
-      query.status = status;
+    if (status) query.status = status;
+
+    if (search && typeof search === 'string') {
+      const regex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { name: regex },
+        { email: regex },
+        { phoneNumber: regex }
+      ];
     }
 
-    // Calculate pagination
+    // Pagination & sorting options
     const options = {
       skip: (parseInt(page) - 1) * parseInt(limit),
       limit: parseInt(limit),
@@ -163,7 +170,6 @@ const getAllUsers = async (req, res) => {
       select: "-password -token -otp",
     };
 
-    // Execute query with pagination
     const users = await User.find(query, null, options);
     const total = await User.countDocuments(query);
 
@@ -177,15 +183,12 @@ const getAllUsers = async (req, res) => {
       },
     };
 
-    // Cache the result
-    await cacheUtils.set(cacheKey, result, 300); // Cache for 5 minutes
+    await cacheUtils.set(cacheKey, result, 300); // 5 minutes
 
     return successResponse(res, 200, messages.USERS_RETRIEVED, result);
   } catch (error) {
     console.error("Get all users error:", error);
-    return errorResponse(res, 500, messages.USERS_RETRIEVAL_FAILED, {
-      error: error.message,
-    });
+    return errorResponse(res, 500, messages.USERS_RETRIEVAL_FAILED, { error: error.message });
   }
 };
 

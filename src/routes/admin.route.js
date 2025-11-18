@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const userController = require('../controllers/user.controller');
+const userExportController = require('../controllers/userExport.controller');
+const productExportController = require('../controllers/productExport.controller');
+const orderExportController = require('../controllers/orderExport.controller');
 const { adminAuth, superAdminAuth, adminOrSuperAdminAuth, checkPermission } = require('../middlewares/auth/auth.middleware');
 const { cacheRoute, clearRouteCache } = require('../middlewares/cache/cache.middleware');
 
@@ -51,6 +55,49 @@ router.post('/', adminController.createAdmin);
  *         description: A list of admins
  */
 router.get('/', adminOrSuperAdminAuth, checkPermission('manageAdmins'), cacheRoute(), adminController.getAllAdmins);
+
+
+/**
+* @swagger
+ * /admin/users:
+ *   get:
+ *     summary: Get all users (requires manageUsers permission)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of users with pagination
+ *       403:
+ *         description: Insufficient permissions
+ */
+router.get('/users', adminOrSuperAdminAuth, cacheRoute(), userController.getAllUsers);
 
 /**
  * @swagger
@@ -193,6 +240,159 @@ router.post('/login', adminController.loginAdmin);
  *         description: Logout successful
  */
 router.post('/logout', adminOrSuperAdminAuth, adminController.logoutAdmin);
+
+/**
+* @swagger
+ * /admin/orders/export:
+ *   get:
+ *     summary: Export orders to Excel (requires manageOrders permission)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string }
+ *       - in: query
+ *         name: paymentStatus
+ *         schema: { type: string }
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string, description: 'Order number or userId' }
+ *       - in: query
+ *         name: sortBy
+ *         schema: { type: string, default: createdAt }
+ *       - in: query
+ *         name: sortOrder
+ *         schema: { type: string, enum: [asc, desc], default: desc }
+ *     responses:
+ *       200:
+ *         description: Excel file download
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: No orders found
+ */
+router.get('/orders/export', adminOrSuperAdminAuth, orderExportController.exportOrdersToExcel);
+
+/**
+* @swagger
+ * /admin/products/export:
+ *   get:
+ *     summary: Export products to Excel (requires manageProducts permission)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: categoryId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: subcategoryId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: festivalId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: minPrice
+ *         schema: { type: number }
+ *       - in: query
+ *         name: maxPrice
+ *         schema: { type: number }
+ *       - in: query
+ *         name: inStock
+ *         schema: { type: string, enum: ["true","false"] }
+ *       - in: query
+ *         name: isFeatured
+ *         schema: { type: string, enum: ["true","false"] }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: sortBy
+ *         schema: { type: string, default: createdAt }
+ *       - in: query
+ *         name: sortOrder
+ *         schema: { type: string, enum: [asc, desc], default: desc }
+ *     responses:
+ *       200:
+ *         description: Excel file download
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: No products found
+ */
+router.get('/products/export', adminOrSuperAdminAuth, productExportController.exportProductsToExcel);
+
+/**
+* @swagger
+ * /admin/users/export:
+ *   get:
+ *     summary: Export all users to Excel (requires manageUsers permission)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name, email, or phone
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Excel file download
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: No users found
+ */
+router.get('/users/export', adminOrSuperAdminAuth, userExportController.exportUsersToExcel);
 
 /**
 * @swagger
