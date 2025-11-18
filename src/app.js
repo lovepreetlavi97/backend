@@ -13,7 +13,7 @@ dotenv.config();
 
 // Create express app
 const app = express();
-
+app.use('/api/v1', v1Routes); // Mounting the routes under /api/v1
 // Middleware for parsing JSON and handling CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,7 +27,7 @@ const v1Routes = require('./routes'); // Import the index.js in routes
 const { errorConverter, errorHandler } = require('./middlewares/error.middleware');
 
 // Use the versioned routes
-app.use('/api/v1', v1Routes); // Mounting the routes under /api/v1
+
 
 // Swagger setup
 const swaggerOptions = {
