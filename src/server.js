@@ -28,7 +28,7 @@ const os = require("os");
 // } else {
     // Worker process - run the Express app
     const app = require("./app");
-    const port = process.env.PORT || 5000;
+    const port = process.env.PORT || 4000;
     
     app.listen(port, () => {
         console.log(`Worker ${process.pid} started, running on http://localhost:${port}`);

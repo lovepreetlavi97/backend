@@ -23,10 +23,14 @@ const userProductRoute = require("./userProduct.route");
 const addressRoute = require("./address.route");
 const paymentRoute = require("./payment.route");
 const webhookRoute = require("./webhook.route");
+const dashboardRoute = require("./dashboard.route");
+const notificationRoute = require("./notification.route");
 const router = express.Router();
 
 // Register your routes
 router.use("/", welcomeRoute);
+router.use("/admin/dashboard", dashboardRoute);
+router.use("/admin/notifications", notificationRoute);
 router.use("/admin", adminRoute);
 router.use("/superadmin", superAdminRoute);
 router.use("/categories", categoryRoute);

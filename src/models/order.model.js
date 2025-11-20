@@ -13,10 +13,10 @@ const orderSchema = new mongoose.Schema({
   },
   products: [
     {
-  deliveredAt: Date,
-cancelledAt: Date,
-returnedAt: Date,
-expectedDeliveryDate: Date,
+      deliveredAt: Date,
+      cancelledAt: Date,
+      returnedAt: Date,
+      expectedDeliveryDate: Date,
 
       productId: {
         type: mongoose.Schema.Types.ObjectId,

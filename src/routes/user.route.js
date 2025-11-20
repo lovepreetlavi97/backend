@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user.controller");
-const { adminAuth, userAuth } = require("../middlewares/auth/auth.middleware");
+const { userAuth } = require("../middlewares/auth/auth.middleware");
 // const { uploadImagesToBucket } = require('../middlewares/multerUploads');
 const {
   cacheRoute,

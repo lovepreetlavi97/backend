@@ -20,6 +20,7 @@ const SocialIntegration = require('./socialIntegration.model');
 const PriceRule = require('./priceRule.model');
 const Grievance = require('./grievance.model');
 const Banner = require('./banner.model');
+const Notification = require('./notification.model');
 module.exports = {
   Cart,
   Wishlist,
@@ -40,5 +41,6 @@ module.exports = {
   SocialIntegration,
   PriceRule,
   Grievance,
-  Banner
+  Banner,
+  Notification
 };
