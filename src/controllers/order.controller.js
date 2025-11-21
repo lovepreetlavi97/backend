@@ -5,7 +5,9 @@ const { createAdminOrderNotifications } = require('../services/notifications/not
 const mongoose = require('mongoose');
 const { cacheUtils } = require("../config/redis");
 const { generateOrderNumber } = require("../utils/orderUtils");
-import Razorpay from "razorpay";
+const Razorpay = (await import("razorpay")).default;
+
+
 const razorpayInstance = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
