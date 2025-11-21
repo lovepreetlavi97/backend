@@ -5,8 +5,12 @@ const { createAdminOrderNotifications } = require('../services/notifications/not
 const mongoose = require('mongoose');
 const { cacheUtils } = require("../config/redis");
 const { generateOrderNumber } = require("../utils/orderUtils");
+import Razorpay from "razorpay";
+const razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET
+});
 
-// Create a new order
 const createOrder = async (req, res) => {
     const expectedDeliveryDate = new Date();
     expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + 7);
@@ -200,29 +204,24 @@ const createOrder = async (req, res) => {
 
         const order = await create(Order, orderData);
 
-        // // Update product stock with proper error handling
-        // const stockUpdatePromises = productDetails.map(item =>
-        //     Product.findByIdAndUpdate(
-        //         item.productId,
-        //         { $inc: { stock: -item.quantity } },
-        //         { new: true }
-        //     ).then(updatedProduct => {
-        //         // Update isInStock based on new stock value
-        //         if (updatedProduct && updatedProduct.stock <= 0) {
-        //             return Product.findByIdAndUpdate(
-        //                 item.productId,
-        //                 { isInStock: false }
-        //             );
-        //         }
-        //         return updatedProduct;
-        //     })
-        // );
+        /* --------------------------------------------------
+           🚀 ADDED RAZORPAY ORDER CREATION (ONLY THIS PART)
+        -------------------------------------------------- */
+        if (paymentMethod === "ONLINE" || paymentMethod === "UPI") {
+            const razorpayOrder = await razorpayInstance.orders.create({
+                amount: Math.round(order.finalAmount * 100),
+                currency: "INR",
+                receipt: `order_${order._id}`,
+                notes: {
+                    orderId: order._id.toString(),
+                    userId: req.user._id.toString()
+                }
+            });
 
-        // try {
-        //     await Promise.all(stockUpdatePromises);
-        // } catch (stockError) {
-        //     console.error("Error updating product stock:", stockError);
-        // }
+            order.razorpayOrderId = razorpayOrder.id;
+            await order.save();
+        }
+        /* -------------------------------------------------- */
 
         try {
             await cacheUtils.del(`user_orders_${req.user._id}`);
@@ -232,7 +231,7 @@ const createOrder = async (req, res) => {
         }
 
         // Fire-and-forget admin notification for new order
-        createAdminOrderNotifications('NEW_ORDER',order).catch(e => console.error('NEW_ORDER notification error:', e));
+        createAdminOrderNotifications('NEW_ORDER', order).catch(e => console.error('NEW_ORDER notification error:', e));
 
         return successResponse(res, 201, "Order created successfully", {
             order: {
@@ -247,7 +246,8 @@ const createOrder = async (req, res) => {
                 paymentStatus: order.paymentStatus,
                 estimatedDelivery: order.estimatedDelivery,
                 paymentMethod: order.paymentMethod,
-                createdAt: order.createdAt
+                createdAt: order.createdAt,
+                razorpayOrderId: order.razorpayOrderId || null
             }
         });
 
