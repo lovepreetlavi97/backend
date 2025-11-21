@@ -200,29 +200,29 @@ const createOrder = async (req, res) => {
 
         const order = await create(Order, orderData);
 
-        // Update product stock with proper error handling
-        const stockUpdatePromises = productDetails.map(item =>
-            Product.findByIdAndUpdate(
-                item.productId,
-                { $inc: { stock: -item.quantity } },
-                { new: true }
-            ).then(updatedProduct => {
-                // Update isInStock based on new stock value
-                if (updatedProduct && updatedProduct.stock <= 0) {
-                    return Product.findByIdAndUpdate(
-                        item.productId,
-                        { isInStock: false }
-                    );
-                }
-                return updatedProduct;
-            })
-        );
+        // // Update product stock with proper error handling
+        // const stockUpdatePromises = productDetails.map(item =>
+        //     Product.findByIdAndUpdate(
+        //         item.productId,
+        //         { $inc: { stock: -item.quantity } },
+        //         { new: true }
+        //     ).then(updatedProduct => {
+        //         // Update isInStock based on new stock value
+        //         if (updatedProduct && updatedProduct.stock <= 0) {
+        //             return Product.findByIdAndUpdate(
+        //                 item.productId,
+        //                 { isInStock: false }
+        //             );
+        //         }
+        //         return updatedProduct;
+        //     })
+        // );
 
-        try {
-            await Promise.all(stockUpdatePromises);
-        } catch (stockError) {
-            console.error("Error updating product stock:", stockError);
-        }
+        // try {
+        //     await Promise.all(stockUpdatePromises);
+        // } catch (stockError) {
+        //     console.error("Error updating product stock:", stockError);
+        // }
 
         try {
             await cacheUtils.del(`user_orders_${req.user._id}`);

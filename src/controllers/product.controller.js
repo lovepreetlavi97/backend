@@ -212,7 +212,7 @@ const createProduct = async (req, res) => {
       specifications: processedSpecs,
       tags: productTag,
       isFeatured: isFeatured === "true" || isFeatured === true,
-      isInStock: stock ? parseInt(stock) > 0 : false,
+      // isInStock: stock ? parseInt(stock) > 0 : false,
       dimensions: dimensions
         ? typeof dimensions === "string"
           ? JSON.parse(dimensions)
