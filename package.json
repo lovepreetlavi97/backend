@@ -12,6 +12,7 @@
 		"uno",
 		"suno"
 	],
+	
 	"author": "jeevan42",
 	"license": "ISC",
 	"dependencies": {
