@@ -552,10 +552,18 @@ const updateProductStatus = async (req, res) => {
         const { orderId, productId } = req.params;
         const { status } = req.body;
 
-        // const validStatuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
-        // if (!validStatuses.includes(status)) {
-        //   return errorResponse(res, 400, "Invalid status");
-        // }
+        const validStatuses = [ 'Pending',
+  'Processing',
+  'Confirmed',
+  'Shipped',
+  'Out for Delivery',
+  'Delivered',
+  'Cancelled',
+  'Returned',
+  'Refunded'];
+        if (!validStatuses.includes(status)) {
+          return errorResponse(res, 400, "Invalid status");
+        }
 
         const order = await Order.findOneAndUpdate(
             { _id: orderId, "products._id": productId },
