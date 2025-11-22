@@ -276,7 +276,18 @@ const updateTransactionStatus = async (req, res) => {
     }
     
     // Validate status
-    const validStatuses = ['Pending', 'Completed', 'Failed', 'Refunded'];
+const validStatuses = [
+  'Pending',
+  'Processing',
+  'Confirmed',
+  'Shipped',
+  'Out for Delivery',
+  'Delivered',
+  'Cancelled',
+  'Returned',
+  'Refunded'
+];
+
     if (!validStatuses.includes(status)) {
       return errorResponse(res, 400, `Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
