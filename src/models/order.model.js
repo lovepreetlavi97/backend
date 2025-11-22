@@ -278,7 +278,7 @@ const orderSchema = new mongoose.Schema({
   statusHistory: [{
     status: {
       type: String,
-      enum: ['Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Refunded'],
+      enum: ['Pending', 'Processing',"Confirmed", 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Refunded'],
     },
     timestamp: {
       type: Date,
