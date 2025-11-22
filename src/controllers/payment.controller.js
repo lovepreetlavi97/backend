@@ -13,27 +13,32 @@ const razorpay = new Razorpay({
 // 🧾 Create Razorpay Order
 export const createRazorpayOrder = async (req, res) => {
   try {
-    let { amount, currency = "INR", receipt } = req.body;
+    let { amount, currency = "INR", receipt, orderId } = req.body;
 
-    if (!amount) {
-      return res.status(400).json({ success: false, message: "Amount required" });
+    if (!amount || !orderId) {
+      return res.status(400).json({ success: false, message: "Amount and orderId required" });
     }
 
     amount = Number(amount);
 
     const options = {
-      amount: Math.round(amount * 100), // Razorpay tradition, paise.
+      amount: Math.round(amount * 100),
       currency,
-      receipt: receipt || `rcpt_${Date.now()}`,
+      receipt: receipt || `ORDER-${orderId}-${Date.now()}`,
+      notes: {
+        orderId,  // 🔥 THIS IS THE IMPORTANT MISSING LINE
+      },
     };
 
     const order = await razorpay.orders.create(options);
+
     res.json({ success: true, order });
   } catch (err) {
     console.error("Error creating Razorpay order:", err);
     res.status(500).json({ success: false, message: "Payment order failed" });
   }
 };
+
 
 // ✅ Verify Razorpay Payment Signature
 export const verifyPayment = async (req, res) => {
