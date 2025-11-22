@@ -18,7 +18,7 @@ const exportUsersToExcel = async (req, res) => {
     } = req.query;
 
     // Build query (same as getAllUsers)
-    const query = {};
+    const query = { isDeleted: { $ne: true } };
     if (status) query.status = status;
 
     // Date filter
@@ -32,12 +32,12 @@ const exportUsersToExcel = async (req, res) => {
       }
     }
 
-    // Search filter
-    if (search) {
+    if (search && typeof search === 'string') {
+      const regex = new RegExp(search.trim(), 'i');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phoneNumber: { $regex: search, $options: 'i' } }
+        { name: regex },
+        { email: regex },
+        { phoneNumber: regex }
       ];
     }
 
