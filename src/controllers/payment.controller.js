@@ -21,28 +21,32 @@ export const createRazorpayOrder = async (req, res) => {
 
     amount = Number(amount);
 
+    // 🔥 Fixed receipt (short, unique, < 40 chars)
+    const safeReceipt = receipt || `ORD-${orderId.slice(-6)}-${Date.now().toString().slice(-6)}`;
+
     const options = {
       amount: Math.round(amount * 100),
       currency,
-      receipt: receipt || `ORDER-${orderId}-${Date.now()}`,
+      receipt: safeReceipt, 
       notes: {
-        orderId,  // 🔥 THIS IS THE IMPORTANT MISSING LINE
+        orderId,  
       },
     };
 
     const order = await razorpay.orders.create(options);
 
     res.json({ success: true, order });
-  } catch (err) {
-console.error("🔴 Razorpay Create Error:", err?.error || err);
-return res.status(500).json({
-  success: false,
-  message: err?.error?.description || err.message || "Payment order failed",
-  raw: err
-});
 
+  } catch (err) {
+    console.error("🔴 Razorpay Create Error:", err?.error || err);
+    return res.status(500).json({
+      success: false,
+      message: err?.error?.description || err.message || "Payment order failed",
+      raw: err
+    });
   }
 };
+
 
 
 // ✅ Verify Razorpay Payment Signature
