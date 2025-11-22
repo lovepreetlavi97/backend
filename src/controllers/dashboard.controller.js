@@ -29,10 +29,9 @@ const getDashboardCounts = async (req, res) => {
 
     const festivalsCountPromise = Festival.countDocuments({ isDeleted: { $ne: true } });
 
-    const ordersCountPromise = Order.countDocuments({ isDeleted: { $ne: true } });
+    const ordersCountPromise = Order.countDocuments({});
 
     const refundsCountPromise = Order.countDocuments({
-      isDeleted: { $ne: true },
       $or: [
         { 'refundDetails.refundStatus': 'Completed' },
         { status: 'Refunded' },

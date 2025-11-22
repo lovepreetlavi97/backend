@@ -69,7 +69,7 @@ const authMiddleware = (requiredRoles) => {
       
       // If we get here, no valid user was found
       if (!user) {
-        return res.status(404).json({ status: 'error', statusCode: 404, message: 'User not found' });
+        return res.status(401).json({ status: 'error', statusCode: 401, message: 'User not found' });
       }
       
       // If user exists but role doesn't match
