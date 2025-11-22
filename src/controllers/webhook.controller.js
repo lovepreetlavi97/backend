@@ -89,8 +89,8 @@ export const razorpayWebhookHandler = async (req, res) => {
     if (event === "payment.captured" && payment.status === "captured") {
       console.log("🎉 Payment Captured Successfully!");
 
-      order.status = "CONFIRMED";
-      order.paymentStatus = "PAID";
+      order.status = "Confirmed";
+      order.paymentStatus = "Paid";
       order.razorpayPaymentId = razorpayPaymentId;
 
       await order.save();
