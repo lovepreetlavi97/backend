@@ -355,7 +355,15 @@ router.put(
   adminAuth,
   [
     check('status')
-      .isIn(['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'])
+      .isIn([  'Pending',
+  'Processing',
+  'Confirmed',
+  'Shipped',
+  'Out for Delivery',
+  'Delivered',
+  'Cancelled',
+  'Returned',
+  'Refunded'])
       .withMessage('Invalid order status'),
   ],
   orderController.updateOrderStatus
