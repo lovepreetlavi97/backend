@@ -393,10 +393,21 @@ router.put(
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - status
  *             properties:
  *               status:
  *                 type: string
- *                 enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+ *                 enum:
+ *                   - Pending
+ *                   - Processing
+ *                   - Confirmed
+ *                   - Shipped
+ *                   - Out for Delivery
+ *                   - Delivered
+ *                   - Cancelled
+ *                   - Returned
+ *                   - Refunded
  *     responses:
  *       200:
  *         description: Product status updated successfully
@@ -405,7 +416,8 @@ router.patch(
   '/:orderId/products/:productId/status',
   adminAuth,
   orderController.updateProductStatus
-)
+);
+
 
 /**
  * @swagger
