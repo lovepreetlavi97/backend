@@ -343,7 +343,16 @@ router.get('/', adminAuth, orderController.getAllOrders);
  *             properties:
  *               status:
  *                 type: string
- *                 enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+ *                 enum:
+ *                   - Pending
+ *                   - Processing
+ *                   - Confirmed
+ *                   - Shipped
+ *                   - Out for Delivery
+ *                   - Delivered
+ *                   - Cancelled
+ *                   - Returned
+ *                   - Refunded
  *     responses:
  *       200:
  *         description: Order updated successfully
