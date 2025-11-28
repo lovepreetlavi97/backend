@@ -31,7 +31,7 @@ async function createAdminOrderNotifications(type, order, extra = {}) {
       <h2>${subject}</h2>
       <p>${baseMessage}</p>
       <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-      <p><strong>Amount:</strong> ${order.amount}</p>
+      <p><strong>Amount:</strong> ${order.totalAmount}</p>
       <p><strong>Status:</strong> ${order.status}</p>
       <p style="font-size:12px;color:#666">This is an automated notification.</p>
     `;

@@ -356,6 +356,119 @@ const getAllOrders = async (req, res) => {
     }
 };
 
+const getRefundRequests = async (req, res) => {
+    try {
+        let {
+            page = 1,
+            limit = 10,
+            refundStatus = 'ALL',
+            sort = 'createdAt:desc',
+            search
+        } = req.query;
+
+        const allowedRefundStatuses = ['ALL', 'REFUNDED', 'PROCESSING', 'PENDING'];
+        refundStatus = typeof refundStatus === 'string' ? refundStatus.toUpperCase() : 'ALL';
+        if (!allowedRefundStatuses.includes(refundStatus)) {
+            return errorResponse(res, 400, `Invalid refund status. Must be one of: ${allowedRefundStatuses.join(', ')}`);
+        }
+
+        const allowedSortOptions = {
+            'createdAt:desc': { createdAt: -1 },
+            'createdAt:asc': { createdAt: 1 },
+            'finalAmount:desc': { finalAmount: -1 },
+            'finalAmount:asc': { finalAmount: 1 }
+        };
+
+        if (!allowedSortOptions[sort]) {
+            sort = 'createdAt:desc';
+        }
+
+        page = Math.max(parseInt(page, 10) || 1, 1);
+        limit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+
+        const baseQuery = {
+            isDeleted: { $ne: true },
+            $or: [
+                { status: { $in: ['Cancelled', 'Returned', 'Refunded'] } },
+                { paymentStatus: { $in: ['Refunded', 'Partially Refunded'] } },
+                { 'refundDetails.refundStatus': { $exists: true } }
+            ]
+        };
+
+        const refundStatusConditions = {
+            REFUNDED: {
+                $or: [
+                    { paymentStatus: 'Refunded' },
+                    { status: 'Refunded' },
+                    { 'refundDetails.refundStatus': 'Completed' }
+                ]
+            },
+            PROCESSING: {
+                $or: [
+                    { 'refundDetails.refundStatus': { $in: ['Processed', 'Processing'] } },
+                    { paymentStatus: 'Partially Refunded' }
+                ]
+            },
+            PENDING: {
+                $or: [
+                    { 'refundDetails.refundStatus': { $in: ['Pending'] } },
+                    {
+                        $and: [
+                            { paymentStatus: 'Paid' },
+                            { status: { $in: ['Cancelled', 'Returned'] } },
+                            { 'refundDetails.refundStatus': { $exists: false } }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        if (refundStatus !== 'ALL') {
+            baseQuery.$and = baseQuery.$and || [];
+            baseQuery.$and.push(refundStatusConditions[refundStatus]);
+        }
+
+        if (search) {
+            const searchConditions = [
+                { orderNumber: { $regex: search, $options: 'i' } },
+                { 'refundDetails.refundTransactionId': { $regex: search, $options: 'i' } }
+            ];
+
+            if (mongoose.Types.ObjectId.isValid(search)) {
+                searchConditions.push({ userId: new mongoose.Types.ObjectId(search) });
+            }
+
+            baseQuery.$and = baseQuery.$and || [];
+            baseQuery.$and.push({ $or: searchConditions });
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [orders, total] = await Promise.all([
+            Order.find(baseQuery)
+                .populate({ path: 'userId', select: 'name email phone' })
+                .sort(allowedSortOptions[sort])
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Order.countDocuments(baseQuery)
+        ]);
+
+        return successResponse(res, 200, "Refund requests retrieved successfully", {
+            orders,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error("Get Refund Requests Error:", error);
+        return errorResponse(res, 500, error.message || "Failed to retrieve refund requests");
+    }
+};
+
 // Get user's orders
 const getUserOrders = async (req, res) => {
     try {
@@ -853,6 +966,7 @@ function calculateEstimatedDelivery(fromDate = new Date()) {
 module.exports = {
     createOrder,
     getAllOrders,
+    getRefundRequests,
     getUserOrders,
     getOrderById,
     updateOrderStatus,
