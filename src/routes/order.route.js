@@ -322,6 +322,50 @@ router.get('/', adminAuth, orderController.getAllOrders);
 
 /**
  * @swagger
+ * /orders/refunds:
+ *   get:
+ *     summary: Get refund/cancellation requests (Admin only)
+ *     tags: [Order]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - name: refundStatus
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [ALL, REFUNDED, PROCESSING, PENDING]
+ *           default: ALL
+ *       - name: sort
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [createdAt:desc, createdAt:asc, finalAmount:desc, finalAmount:asc]
+ *           default: createdAt:desc
+ *       - name: search
+ *         in: query
+ *         schema:
+ *           type: string
+ *           description: orderNumber, refundTransactionId, or userId
+ *     responses:
+ *       200:
+ *         description: Refund requests retrieved successfully
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/refunds', adminAuth, orderController.getRefundRequests);
+
+/**
+ * @swagger
  * /orders/{id}:
  *   put:
  *     summary: Update order status (Admin only)
@@ -376,6 +420,52 @@ router.put(
       .withMessage('Invalid order status'),
   ],
   orderController.updateOrderStatus
+);
+
+/**
+ * @swagger
+ * /orders/{id}/payment-status:
+ *   put:
+ *     summary: Update payment status for an order (Admin only)
+ *     tags: [Order]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [paymentStatus]
+ *             properties:
+ *               paymentStatus:
+ *                 type: string
+ *                 enum: [Pending, Paid, Failed, Refunded, Partially Refunded]
+ *               transactionId:
+ *                 type: string
+ *               paymentDetails:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Payment status updated successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.put(
+  '/:id/payment-status',
+  adminAuth,
+  [
+    check('paymentStatus')
+      .isIn(['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'])
+      .withMessage('Invalid payment status'),
+  ],
+  orderController.updatePaymentStatus
 );
 /**
  * @swagger
