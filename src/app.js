@@ -44,16 +44,13 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'API for managing an e-commerce platform with products, categories, orders, etc.',
     },
-    servers: [
-      {
-        url: 'http://localhost:5000/api/v1',
-            description: "local server"
-      },
-        {
-    url: "https://api.gurujewellers.in/api/v1",
-    description: "Live production server"
+servers: [
+  {
+    url: '/api/v1',
+    description: 'proxied server'
   }
-    ],
+],
+
     components: {
       securitySchemes: {
         BearerAuth: {
@@ -73,13 +70,8 @@ const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use(
   '/api-docs',
   swaggerUi.serve,
-  swaggerUi.setup(swaggerDocs, {
-    swaggerOptions: {
-      url: '/api-docs/swagger.json',
-    },
-  })
+  swaggerUi.setup(swaggerDocs)
 );
-
 
 // 404 handler for routes not found
 app.use((req, res, next) => {
