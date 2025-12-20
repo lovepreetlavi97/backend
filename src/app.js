@@ -13,7 +13,6 @@ dotenv.config();
 
 // Create express app
 const app = express();
-app.set('trust proxy', true);
 const WebhookRoutes = require('./routes/webhook.route'); // Import the index.js in routes
 
 
@@ -44,13 +43,16 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'API for managing an e-commerce platform with products, categories, orders, etc.',
     },
-servers: [
-  {
-    url: '/api/v1',
-    description: 'proxied server'
+    servers: [
+      {
+        url: 'http://localhost:5000/api/v1',
+            description: "local server"
+      },
+        {
+    url: "https://api.gurujewellers.in/api/v1",
+    description: "Live production server"
   }
-],
-
+    ],
     components: {
       securitySchemes: {
         BearerAuth: {
@@ -67,11 +69,7 @@ servers: [
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 
-app.use(
-  '/api-docs',
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerDocs)
-);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // 404 handler for routes not found
 app.use((req, res, next) => {
