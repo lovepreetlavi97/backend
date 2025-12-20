@@ -13,6 +13,7 @@ dotenv.config();
 
 // Create express app
 const app = express();
+app.set('trust proxy', true);
 const WebhookRoutes = require('./routes/webhook.route'); // Import the index.js in routes
 
 
@@ -69,7 +70,16 @@ const swaggerOptions = {
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocs, {
+    swaggerOptions: {
+      url: '/api-docs/swagger.json',
+    },
+  })
+);
+
 
 // 404 handler for routes not found
 app.use((req, res, next) => {
