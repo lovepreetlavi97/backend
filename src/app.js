@@ -49,7 +49,7 @@ const swaggerOptions = {
             description: "local server"
       },
         {
-    url: "https://api.gurujewellers.in/api/v1",
+   url: "http://44.202.76.31/api/v1",
     description: "Live production server"
   }
     ],
