@@ -5,25 +5,28 @@ const multerS3 = require("multer-s3");
 const AWS = require("aws-sdk");
 const { v4: uuidv4 } = require("uuid");
 
-// Log for sanity check
-console.log("💬 DO_BUCKET_NAME:", process.env.DO_BUCKET_NAME);
-console.log("💬 DO_REGION:", process.env.DO_REGION);
+// 🔍 Sanity logs (AWS ONLY)
+console.log("💬 AWS_S3_BUCKET:", process.env.AWS_S3_BUCKET);
+console.log("💬 AWS_REGION:", process.env.AWS_REGION);
 
-// Custom DigitalOcean Spaces endpoint
-const spacesEndpoint = new AWS.Endpoint(`${process.env.DO_REGION.trim()}.digitaloceanspaces.com`);
+// ✅ Configure AWS globally (CORRECT)
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
 
-// AWS S3 Client (v2)
+// ✅ AWS S3 Client (NO custom endpoint)
 const s3 = new AWS.S3({
-  endpoint: spacesEndpoint,
-  accessKeyId: process.env.DO_ACCESS_KEY_ID,
-  secretAccessKey: process.env.DO_SECRET_ACCESS_KEY,
-  region: process.env.DO_REGION.trim(),
   signatureVersion: "v4",
 });
 
-// File filter for images and videos
+// File filter for images and videos (UNCHANGED)
 const fileFilter = (req, file, cb) => {
-  const isValid = file.mimetype.match(/(image|video)\/(jpeg|jpg|png|gif|mp4|webp)/);
+  const isValid = file.mimetype.match(
+    /(image|video)\/(jpeg|jpg|png|gif|mp4|webp)/
+  );
+
   if (isValid) {
     cb(null, true);
   } else {
@@ -31,12 +34,12 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Multer upload middleware
+// ✅ Multer upload middleware (AWS S3)
 const imageUpload = multer({
   storage: multerS3({
     s3,
-    bucket: process.env.DO_BUCKET_NAME,
-    acl: "public-read",
+    bucket: process.env.AWS_S3_BUCKET, // 🔥 FIXED (AWS)
+    // acl: "public-read",
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
       const fileExt = file.mimetype.split("/")[1];
@@ -50,5 +53,5 @@ const imageUpload = multer({
 
 module.exports = {
   imageUpload,
-  s3, // in case you need it elsewhere
+  s3,
 };

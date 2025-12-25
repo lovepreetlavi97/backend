@@ -38,14 +38,15 @@ const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') =
   const upload = new Upload({
     client: s3Client,
     params: {
-      Bucket: process.env.DO_BUCKET_NAME,
+      Bucket: process.env.AWS_S3_BUCKET,
       Key: key,
       Body: fileBuffer,
       ContentType: mimeType,
-      ACL: "public-read",
+      // ACL: "public-read",
     },
   });
-
+console.log("Uploading to Spaces with key:", key,upload);
+// return
   await upload.done();
   return key;
 };
@@ -77,7 +78,7 @@ const getPublicUrl = (key) => {
 const deleteImageFromSpaces = async (key) => {
   try {
     const command = new DeleteObjectCommand({
-      Bucket: process.env.DO_BUCKET_NAME,
+      Bucket: process.env.AWS_S3_BUCKET,
       Key: key,
     });
     await s3Client.send(command);
@@ -92,7 +93,7 @@ const deleteImageFromSpaces = async (key) => {
 const deleteMultipleImagesFromSpaces = async (keys) => {
   try {
     const command = new DeleteObjectsCommand({
-      Bucket: process.env.DO_BUCKET_NAME,
+      Bucket: process.env.AWS_S3_BUCKET,
       Delete: {
         Objects: keys.map((key) => ({ Key: key })),
       },
