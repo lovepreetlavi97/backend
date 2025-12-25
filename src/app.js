@@ -7,7 +7,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsDoc = require('swagger-jsdoc');
 const cors = require('cors');
 const messages = require('./utils/messages');
-
+const path = require("path")
 // Load environment variables
 dotenv.config();
 
@@ -64,7 +64,7 @@ const swaggerOptions = {
     },
     security: [{ BearerAuth: [] }], // Apply BearerAuth globally
   },
-  apis: ['./src/routes/**/*.js'], // Adjust path to match your routes
+ apis: [path.join(__dirname, "routes/**/*.js")],
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
