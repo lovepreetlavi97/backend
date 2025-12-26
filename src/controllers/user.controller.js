@@ -20,6 +20,7 @@ const {
   Cart,
   PromoCode,
   Banner,
+  Review
 } = require("../models/index");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
