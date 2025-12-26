@@ -1002,9 +1002,7 @@ const getProductBySlug = async (req, res) => {
     const cachedProduct = await cacheUtils.get(cacheKey);
 
     if (cachedProduct) {
-      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, {
-        product: cachedProduct,
-      });
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cachedProduct);
     }
 
     const product = await Product.findOne({ slug })
@@ -1018,7 +1016,7 @@ const getProductBySlug = async (req, res) => {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
 
-    // Add discountPercentage manually if needed
+    // 🔢 Discount percentage
     if (product.actualPrice && product.discountedPrice) {
       product.discountPercentage = Math.round(
         ((product.actualPrice - product.discountedPrice) /
@@ -1027,9 +1025,45 @@ const getProductBySlug = async (req, res) => {
       );
     }
 
-    await cacheUtils.set(cacheKey, product, 600); // 10-minute cache
+    // ⭐ REVIEWS (summary + latest 3)
+    const reviews = await Review.find({ productId: product._id })
+      .select("rating title reviewText images createdAt")
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
 
-    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { product });
+    const reviewStats = await Review.aggregate([
+      { $match: { productId: product._id } },
+      {
+        $group: {
+          _id: "$productId",
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const reviewSummary = reviewStats.length
+      ? {
+          averageRating: Number(reviewStats[0].averageRating.toFixed(1)),
+          totalReviews: reviewStats[0].totalReviews
+        }
+      : { averageRating: 0, totalReviews: 0 };
+
+    const responseData = {
+      product,
+      reviewSummary,
+      reviews
+    };
+
+    await cacheUtils.set(cacheKey, responseData, 600); // 10 minutes
+
+    return successResponse(
+      res,
+      200,
+      messages.PRODUCT_RETRIEVED,
+      responseData
+    );
   } catch (error) {
     console.error("Get product by slug error:", error);
     return errorResponse(
@@ -1039,6 +1073,7 @@ const getProductBySlug = async (req, res) => {
     );
   }
 };
+
 
 // Get counts for navbar
 const getCountsOfNavbar = async (req, res) => {
