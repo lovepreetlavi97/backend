@@ -1027,11 +1027,16 @@ const getProductBySlug = async (req, res) => {
     }
 
     // ⭐ REVIEWS (summary + latest 3)
-    const reviews = await Review.find({ productId: product._id })
-      .select("rating title reviewText images createdAt")
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .lean();
+const reviews = await Review.find({ productId: product._id })
+  .select("rating title reviewText images createdAt userId")
+  .populate({
+    path: "userId",
+    select: "name"
+  })
+  .sort({ createdAt: -1 })
+  .limit(3)
+  .lean();
+
 
     const reviewStats = await Review.aggregate([
       { $match: { productId: product._id } },
