@@ -25,6 +25,8 @@ const paymentRoute = require("./payment.route");
 const webhookRoute = require("./webhook.route");
 const dashboardRoute = require("./dashboard.route");
 const notificationRoute = require("./notification.route");
+const instagramVideos = require("./instagramVideo.routes");
+
 const router = express.Router();
 
 // Register your routes
@@ -48,6 +50,8 @@ router.use("/social", socialIntegrationRoutes);
 router.use("/prices", priceRuleRoute);
 router.use("/banners", bannerRoute);
 router.use("/grievances", grievanceRoute);
+router.use("/instagram-videos", instagramVideos);
+
 router.use("/upload", uploadRoute);
 router.use("/user", userRoute);
 router.use("/user/products", userProductRoute);
