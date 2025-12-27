@@ -20,7 +20,8 @@ const {
   Cart,
   PromoCode,
   Banner,
-  Review
+  Review,
+  InstagramVideo
 } = require("../models/index");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -1667,7 +1668,18 @@ const getShopEssentials = async (req, res) => {
 };
 
 
+const getAllVideos = async (req, res) => {
+  try {
+    const videos = await InstagramVideo.find({ isActive: true })
+      .sort({ sortOrder: 1, createdAt: -1 });
+
+    return successResponse(res, 200, "Instagram videos fetched", { videos });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
 module.exports = {
+  getAllVideos,
   checkCartStock,
   createUser,
   getUserById,

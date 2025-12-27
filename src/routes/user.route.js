@@ -782,5 +782,17 @@ router.delete(
  *         description: Failed to resend OTP
  */
 router.post('/resend-otp', userController.resendOTP);
-
+/**
+ * @swagger
+ * /instagram-videos:
+ *   get:
+ *     summary: Get all active Instagram videos (Public / Homepage)
+ *     tags: [Instagram Videos]
+ *     responses:
+ *       200:
+ *         description: Instagram videos fetched successfully
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/", userController.getAllVideos);
 module.exports = router;
