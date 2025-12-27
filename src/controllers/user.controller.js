@@ -1490,7 +1490,6 @@ const getTrendingProducts = async (req, res) => {
 };
 
 
-
 const getShopEssentials = async (req, res) => {
   try {
     const { limit = 8 } = req.query;
@@ -1500,7 +1499,12 @@ const getShopEssentials = async (req, res) => {
     const cached = await cacheUtils.get(cacheKey);
 
     if (cached) {
-      return successResponse(res, 200, "Shop essentials retrieved successfully", cached);
+      return successResponse(
+        res,
+        200,
+        "Shop essentials retrieved successfully",
+        cached
+      );
     }
 
     const products = await Product.aggregate([
@@ -1521,10 +1525,11 @@ const getShopEssentials = async (req, res) => {
         },
       },
 
-      // ⭐ Calculate rating & count
+      // ⭐ Reviews + 💸 Discount (ALL IN DB)
       {
         $addFields: {
           totalReviews: { $size: "$reviews" },
+
           averageRating: {
             $cond: [
               { $gt: [{ $size: "$reviews" }, 0] },
@@ -1532,17 +1537,44 @@ const getShopEssentials = async (req, res) => {
               0,
             ],
           },
+
+          discountPercentage: {
+            $cond: [
+              {
+                $and: [
+                  { $gt: ["$actualPrice", 0] },
+                  { $gt: ["$discountedPrice", 0] },
+                ],
+              },
+              {
+                $round: [
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          { $subtract: ["$actualPrice", "$discountedPrice"] },
+                          "$actualPrice",
+                        ],
+                      },
+                      100,
+                    ],
+                  },
+                ],
+              },
+              0,
+            ],
+          },
         },
       },
 
-      // 🧹 Remove heavy reviews array
+      // 🧹 Remove reviews array
       {
         $project: {
           reviews: 0,
         },
       },
 
-      // 🔥 Sorting
+      // 🔥 Shop essentials sort logic
       {
         $sort: {
           purchaseCount: -1,
@@ -1553,28 +1585,27 @@ const getShopEssentials = async (req, res) => {
       { $limit: parsedLimit },
     ]);
 
-    // 💸 Discount calculation
-    const enhancedProducts = products.map((product) => {
-      if (product.actualPrice && product.discountedPrice) {
-        product.discountPercentage = Math.round(
-          ((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100
-        );
-      }
-      return product;
-    });
-
     const responseData = {
-      products: enhancedProducts,
+      products,
       title: "Shop Essentials",
       description: "Must-have items for every occasion",
     };
 
     await cacheUtils.set(cacheKey, responseData, 3600);
 
-    return successResponse(res, 200, "Shop essentials retrieved successfully", responseData);
+    return successResponse(
+      res,
+      200,
+      "Shop essentials retrieved successfully",
+      responseData
+    );
   } catch (error) {
     console.error("Get shop essentials error:", error);
-    return errorResponse(res, 500, error.message || "Error retrieving shop essentials");
+    return errorResponse(
+      res,
+      500,
+      error.message || "Error retrieving shop essentials"
+    );
   }
 };
 
