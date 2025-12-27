@@ -20,12 +20,6 @@ const ReviewSchema = new mongoose.Schema(
       min: 1,
       max: 5
     },
-
-    title: {
-      type: String,
-      trim: true
-    },
-
     reviewText: {
       type: String,
       trim: true

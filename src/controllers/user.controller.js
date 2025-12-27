@@ -1489,30 +1489,71 @@ const getTrendingProducts = async (req, res) => {
   }
 };
 
-// Get shop essentials
+
+
 const getShopEssentials = async (req, res) => {
   try {
     const { limit = 8 } = req.query;
     const parsedLimit = parseInt(limit) > 0 ? parseInt(limit) : 8;
-    
+
     const cacheKey = `shop_essentials_${parsedLimit}`;
     const cached = await cacheUtils.get(cacheKey);
-    
+
     if (cached) {
       return successResponse(res, 200, "Shop essentials retrieved successfully", cached);
     }
-    
-    const products = await Product.find({
-      isDeleted: false,
-      isBlocked: false
-    })
-      .sort({ 
-        purchaseCount: -1,
-        discountPercentage: -1
-      })
-      .limit(parsedLimit)
-      .lean();
-      
+
+    const products = await Product.aggregate([
+      {
+        $match: {
+          isDeleted: false,
+          isBlocked: false,
+        },
+      },
+
+      // 🔗 Join reviews
+      {
+        $lookup: {
+          from: "reviews",
+          localField: "_id",
+          foreignField: "productId",
+          as: "reviews",
+        },
+      },
+
+      // ⭐ Calculate rating & count
+      {
+        $addFields: {
+          totalReviews: { $size: "$reviews" },
+          averageRating: {
+            $cond: [
+              { $gt: [{ $size: "$reviews" }, 0] },
+              { $round: [{ $avg: "$reviews.rating" }, 1] },
+              0,
+            ],
+          },
+        },
+      },
+
+      // 🧹 Remove heavy reviews array
+      {
+        $project: {
+          reviews: 0,
+        },
+      },
+
+      // 🔥 Sorting
+      {
+        $sort: {
+          purchaseCount: -1,
+          averageRating: -1,
+        },
+      },
+
+      { $limit: parsedLimit },
+    ]);
+
+    // 💸 Discount calculation
     const enhancedProducts = products.map((product) => {
       if (product.actualPrice && product.discountedPrice) {
         product.discountPercentage = Math.round(
@@ -1521,25 +1562,22 @@ const getShopEssentials = async (req, res) => {
       }
       return product;
     });
-    
-    const responseData = { 
+
+    const responseData = {
       products: enhancedProducts,
       title: "Shop Essentials",
-      description: "Must-have items for every occasion"
+      description: "Must-have items for every occasion",
     };
-    
+
     await cacheUtils.set(cacheKey, responseData, 3600);
-    
+
     return successResponse(res, 200, "Shop essentials retrieved successfully", responseData);
   } catch (error) {
     console.error("Get shop essentials error:", error);
-    return errorResponse(
-      res, 
-      500, 
-      error.message || "Error retrieving shop essentials"
-    );
+    return errorResponse(res, 500, error.message || "Error retrieving shop essentials");
   }
 };
+
 
 module.exports = {
   checkCartStock,
