@@ -24,18 +24,18 @@ const { userAuth } = require('../middlewares/auth/auth.middleware');
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - productId
+ *               - rating
  *             properties:
  *               productId:
  *                 type: string
- *                 description: The ID of the product being reviewed.
  *                 example: "65c1234567890abcdef12345"
  *               rating:
  *                 type: number
- *                 description: Rating given by the user (1-5).
  *                 example: 4
  *               reviewText:
  *                 type: string
- *                 description: Optional review text.
  *                 example: "Great quality and beautiful design!"
  *     responses:
  *       201:
@@ -49,6 +49,51 @@ router.post('/', userAuth, reviewController.createReview);
 
 /**
  * @swagger
+ * /reviews:
+ *   get:
+ *     summary: Get all reviews with search and rating range filter
+ *     tags: [Reviews]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: number
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: number
+ *           default: 10
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by user name or product name
+ *         example: gold
+ *       - in: query
+ *         name: minRating
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *         example: 1
+ *       - in: query
+ *         name: maxRating
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *         example: 4
+ *     responses:
+ *       200:
+ *         description: All reviews fetched successfully
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/', reviewController.getAllReviews);
+
+/**
+ * @swagger
  * /reviews/{productId}:
  *   get:
  *     summary: Get all reviews for a specific product
@@ -57,7 +102,6 @@ router.post('/', userAuth, reviewController.createReview);
  *       - name: productId
  *         in: path
  *         required: true
- *         description: The ID of the product
  *         schema:
  *           type: string
  *     responses:
@@ -80,7 +124,6 @@ router.get('/:productId', reviewController.getReviewsByProduct);
  *       - name: id
  *         in: path
  *         required: true
- *         description: The ID of the review
  *         schema:
  *           type: string
  *     requestBody:
@@ -92,19 +135,15 @@ router.get('/:productId', reviewController.getReviewsByProduct);
  *             properties:
  *               rating:
  *                 type: number
- *                 description: Updated rating (1-5).
  *                 example: 5
  *               reviewText:
  *                 type: string
- *                 description: Updated review text.
  *                 example: "Absolutely love it!"
  *     responses:
  *       200:
  *         description: Review updated successfully
  *       404:
  *         description: Review not found
- *       400:
- *         description: Bad request
  */
 router.put('/:id', userAuth, reviewController.updateReview);
 
@@ -120,11 +159,10 @@ router.put('/:id', userAuth, reviewController.updateReview);
  *       - name: id
  *         in: path
  *         required: true
- *         description: The ID of the review
  *         schema:
  *           type: string
  *     responses:
- *       204:
+ *       200:
  *         description: Review deleted successfully
  *       404:
  *         description: Review not found

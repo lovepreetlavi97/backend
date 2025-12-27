@@ -43,7 +43,7 @@ router.use("/promocodes", promoRoute);
 router.use("/cart", cartRoute);
 router.use("/wishlist", wishlistRoute);
 router.use("/order", orderRoute);
-router.use("/review", reviewRoute);
+router.use("/reviews", reviewRoute);
 router.use("/social", socialIntegrationRoutes);
 router.use("/prices", priceRuleRoute);
 router.use("/banners", bannerRoute);
