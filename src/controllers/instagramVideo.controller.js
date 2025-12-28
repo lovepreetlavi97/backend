@@ -18,23 +18,42 @@ const createVideo = async (req, res) => {
       return errorResponse(res, 400, "Instagram link is required");
     }
 
-    if (!req.file) {
+    if (!req.files?.video?.[0]) {
       return errorResponse(res, 400, "Video file is required");
     }
 
-    const key = await uploadToSpaces(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype,
+    // ⬆️ Upload VIDEO
+    const videoFile = req.files.video[0];
+    const videoKey = await uploadToSpaces(
+      videoFile.buffer,
+      videoFile.originalname,
+      videoFile.mimetype,
       "instagram-videos"
     );
 
-    const videoUrl = getPublicUrl(key);
+    const videoUrl = getPublicUrl(videoKey);
+
+    // ⬆️ Upload THUMBNAIL (optional but recommended)
+    let thumbnailUrl = null;
+
+    if (req.files?.thumbnail?.[0]) {
+      const thumbFile = req.files.thumbnail[0];
+
+      const thumbKey = await uploadToSpaces(
+        thumbFile.buffer,
+        thumbFile.originalname,
+        thumbFile.mimetype,
+        "instagram-thumbnails"
+      );
+
+      thumbnailUrl = getPublicUrl(thumbKey);
+    }
 
     const video = await InstagramVideo.create({
       caption,
       instagramLink,
       videoUrl,
+      thumbnail: thumbnailUrl,
       sortOrder,
     });
 
@@ -43,6 +62,7 @@ const createVideo = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+
 
 /**
  * ✅ READ (PUBLIC)
@@ -72,6 +92,25 @@ const updateVideo = async (req, res) => {
     if (!video) {
       return errorResponse(res, 404, "Video not found");
     }
+if (req.files?.thumbnail?.[0]) {
+  if (video.thumbnail) {
+    const oldThumbKey = video.thumbnail.replace(
+      `${process.env.DO_PUBLIC_URL}/`,
+      ""
+    );
+    await deleteImageFromSpaces(oldThumbKey);
+  }
+
+  const thumbFile = req.files.thumbnail[0];
+  const thumbKey = await uploadToSpaces(
+    thumbFile.buffer,
+    thumbFile.originalname,
+    thumbFile.mimetype,
+    "instagram-thumbnails"
+  );
+
+  video.thumbnail = getPublicUrl(thumbKey);
+}
 
     // If new video uploaded → delete old video
     if (req.file) {
@@ -117,13 +156,26 @@ const deleteVideo = async (req, res) => {
       return errorResponse(res, 404, "Video not found");
     }
 
-    const key = video.videoUrl.replace(
-      `${process.env.DO_PUBLIC_URL}/`,
-      ""
-    );
+// delete video
+const videoKey = video.videoUrl.replace(
+  `${process.env.DO_PUBLIC_URL}/`,
+  ""
+);
+await deleteImageFromSpaces(videoKey);
 
-    await deleteImageFromSpaces(key);
-    await video.deleteOne();
+// delete thumbnail
+if (video.thumbnail) {
+  const thumbKey = video.thumbnail.replace(
+    `${process.env.DO_PUBLIC_URL}/`,
+    ""
+  );
+  await deleteImageFromSpaces(thumbKey);
+}
+
+await video.deleteOne();
+
+
+
 
     return successResponse(res, 200, "Instagram video deleted");
   } catch (error) {
