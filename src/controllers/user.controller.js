@@ -21,7 +21,8 @@ const {
   PromoCode,
   Banner,
   Review,
-  InstagramVideo
+  InstagramVideo,
+  Relation
 } = require("../models/index");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");

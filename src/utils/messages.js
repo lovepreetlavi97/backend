@@ -108,6 +108,14 @@ const messages = {
   WISHLIST_ITEM_EXISTS: "This product is already in your wishlist",
   WISHLIST_UPDATED: "Wishlist updated successfully",
   
+
+  RELATIONS_RETRIEVED: "Relations retrieved successfully",
+  RELATION_NOT_FOUND: "Relation not found",
+  RELATION_RETRIEVED: "Relation retrieved successfully",
+  RELATION_CREATED: "Relation created successfully",
+  RELATION_UPDATED: "Relation updated successfully",
+  RELATION_DELETED: "Relation deleted successfully",
+  RELATIONS_RETRIEVAL_FAILED: "Failed to retrieve relations",
   // ===== Cart Management =====
   ADDED_PRODUCT_CART: "Product added to cart",
   UPDATED_PRODUCT_CART: "Cart updated successfully",
