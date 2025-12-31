@@ -21,6 +21,8 @@ const PriceRule = require('./priceRule.model');
 const Grievance = require('./grievance.model');
 const Banner = require('./banner.model');
 const Notification = require('./notification.model');
+const CuratedCollection = require('./curatedCollection.model');
+
 module.exports = {
   Cart,
   Wishlist,
@@ -42,5 +44,6 @@ module.exports = {
   PriceRule,
   Grievance,
   Banner,
-  Notification
+  Notification,
+  CuratedCollection
 };
