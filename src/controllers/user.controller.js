@@ -1550,10 +1550,9 @@ const getTrendingProducts = async (req, res) => {
 
 const getShopEssentials = async (req, res) => {
   try {
-    const { limit = 8 } = req.query;
-    const parsedLimit = parseInt(limit) > 0 ? parseInt(limit) : 8;
+    const LIMIT = 4; // 🔒 fixed, permanent
 
-    const cacheKey = `shop_essentials_${parsedLimit}`;
+    const cacheKey = `shop_essentials_${LIMIT}`;
     const cached = await cacheUtils.get(cacheKey);
 
     if (cached) {
@@ -1572,8 +1571,6 @@ const getShopEssentials = async (req, res) => {
           isBlocked: false,
         },
       },
-
-      // 🔗 Join reviews
       {
         $lookup: {
           from: "reviews",
@@ -1582,12 +1579,9 @@ const getShopEssentials = async (req, res) => {
           as: "reviews",
         },
       },
-
-      // ⭐ Reviews + 💸 Discount (ALL IN DB)
       {
         $addFields: {
           totalReviews: { $size: "$reviews" },
-
           averageRating: {
             $cond: [
               { $gt: [{ $size: "$reviews" }, 0] },
@@ -1595,7 +1589,6 @@ const getShopEssentials = async (req, res) => {
               0,
             ],
           },
-
           discountPercentage: {
             $cond: [
               {
@@ -1624,23 +1617,14 @@ const getShopEssentials = async (req, res) => {
           },
         },
       },
-
-      // 🧹 Remove reviews array
-      {
-        $project: {
-          reviews: 0,
-        },
-      },
-
-      // 🔥 Shop essentials sort logic
+      { $project: { reviews: 0 } },
       {
         $sort: {
           purchaseCount: -1,
           averageRating: -1,
         },
       },
-
-      { $limit: parsedLimit },
+      { $limit: LIMIT }, // 🔥 ONLY 4
     ]);
 
     const responseData = {
@@ -1651,21 +1635,13 @@ const getShopEssentials = async (req, res) => {
 
     await cacheUtils.set(cacheKey, responseData, 3600);
 
-    return successResponse(
-      res,
-      200,
-      "Shop essentials retrieved successfully",
-      responseData
-    );
+    return successResponse(res, 200, "Shop essentials retrieved successfully", responseData);
   } catch (error) {
     console.error("Get shop essentials error:", error);
-    return errorResponse(
-      res,
-      500,
-      error.message || "Error retrieving shop essentials"
-    );
+    return errorResponse(res, 500, error.message);
   }
 };
+
 
 
 const getAllVideos = async (req, res) => {

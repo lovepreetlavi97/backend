@@ -70,6 +70,13 @@ const productSchema = new mongoose.Schema({
       }
     ]
   },
+  filters: {
+  type: Map,
+  of: [String],
+  default: {},
+  index: true
+}
+,
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
