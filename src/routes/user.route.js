@@ -142,6 +142,23 @@ router.get("/home-search", userController.homeSearch);
  *         description: A list of relations
  */
 router.get("/relations", cacheRoute(1800), userController.getAllRelations);
+
+/**
+ * @swagger
+ * /user/curated-collections:
+ *   get:
+ *     summary: Get all curated collections (user-facing)
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: A list of curated collections
+ */
+router.get(
+  "/curated-collections",
+  cacheRoute(1800),
+  userController.getAllCuratedCollections
+);
+
 /**
  * @swagger
  * /user/banners:

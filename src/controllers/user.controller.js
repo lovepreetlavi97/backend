@@ -22,7 +22,8 @@ const {
   Banner,
   Review,
   InstagramVideo,
-  Relation
+  Relation,
+  CuratedCollection
 } = require("../models/index");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -1655,6 +1656,49 @@ const getAllVideos = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+const getAllCuratedCollections = async (req, res) => {
+  try {
+    const cacheKey = "curated_collections_user";
+
+    // 1️⃣ Check cache
+    const cachedCurated = await cacheUtils.get(cacheKey);
+    if (cachedCurated) {
+      return successResponse(
+        res,
+        200,
+        "Curated collections retrieved successfully",
+        { curatedCollections: cachedCurated }
+      );
+    }
+
+    // 2️⃣ Fetch from DB
+    const curatedCollections = await CuratedCollection.find({
+      isDeleted: false,
+      isActive: true
+    })
+      .sort({ position: 1 })
+      .select("name slug image position") // keep response light
+      .lean();
+
+    // 3️⃣ Cache result
+    await cacheUtils.set(cacheKey, curatedCollections || [], 1800);
+
+    return successResponse(
+      res,
+      200,
+      "Curated collections retrieved successfully",
+      { curatedCollections: curatedCollections || [] }
+    );
+  } catch (error) {
+    console.error("Get curated collections (user) error:", error);
+    return errorResponse(
+      res,
+      500,
+      "Failed to retrieve curated collections",
+      { error: error.message }
+    );
+  }
+};
 module.exports = {
   getAllVideos,
   checkCartStock,
@@ -1682,5 +1726,6 @@ module.exports = {
   getTrendingProducts,
   getShopEssentials,
   homeSearch,
-  getRelatedProducts
+  getRelatedProducts,
+  getAllCuratedCollections
 };
