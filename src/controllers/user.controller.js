@@ -754,37 +754,38 @@ const homeSearch = async (req, res) => {
     const trimmedQuery = query?.trim();
     const cacheKey = `home_${trimmedQuery || "default"}`;
 
-    // 🧠 Try from cache first
+    // 🧠 Cache first (luxury = fast)
     const cached = await cacheUtils.get(cacheKey);
     if (cached) {
       return successResponse(res, 200, messages.HOME_DATA_RETRIEVED, cached);
     }
 
-    // 🧭 Build subcategory filter
+    // 🧭 Subcategory filter
     let subCategoryFilter = { isDeleted: false, isBlocked: false };
     if (trimmedQuery) {
       const regex = new RegExp(trimmedQuery, "i");
       subCategoryFilter.$or = [{ name: regex }, { slug: regex }];
     }
 
-    // 📂 Efficiently fetch matching subcategories
+    // 📂 ONLY 5 curated subcategories
     const subcategories = await SubCategory.find(subCategoryFilter)
       .select("_id name slug image categoryId")
-      .sort({ name: 1 }) // sorting for better UX
-      .limit(20)
+      .sort({ name: 1 })
+      .limit(5)
       .lean();
 
-    // 💎 Build product filter
+    // 💎 Product filter
     let productFilter = { isDeleted: false, isBlocked: false };
     if (trimmedQuery) {
       const regex = new RegExp(trimmedQuery, "i");
       productFilter.$or = [{ name: regex }, { description: regex }];
     }
 
+    // 💍 ONLY 5 premium products
     const products = await Product.find(productFilter)
-      .select("_id  name description title slug price actualPrice discountedPrice images categoryId")
+      .select("_id name description title slug price actualPrice discountedPrice images categoryId")
       .sort({ createdAt: -1 })
-      .limit(20)
+      .limit(5)
       .lean();
 
     const responseData = {
@@ -792,7 +793,7 @@ const homeSearch = async (req, res) => {
       products,
     };
 
-    // ⚡ Cache results for 1 hour
+    // ⚡ Cache for 1 hour
     await cacheUtils.set(cacheKey, responseData, 3600);
 
     return successResponse(res, 200, messages.HOME_DATA_RETRIEVED, responseData);
@@ -803,6 +804,7 @@ const homeSearch = async (req, res) => {
     });
   }
 };
+
 
 // Get all subcategories for user
 const getAllSubCategories = async (req, res) => {
