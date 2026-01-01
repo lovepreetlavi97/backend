@@ -76,7 +76,7 @@ function generateProduct({
     console.log("✅ MongoDB connected");
 
     const categories = await Category.find({ isDeleted: false });
-    const subcategories = await Subcategory.find({ isDeleted: false });
+    const subcategories = await SubCategory.find({ isDeleted: false });
     const relations = await Relation.find({ isDeleted: false });
 
     if (!categories.length || !subcategories.length) {
@@ -93,9 +93,9 @@ function generateProduct({
         sub => sub.category?.toString() === category._id.toString()
       );
 
-      for (const subcategory of relatedSubcategories) {
+      for (const SubCategory of relatedSubcategories) {
         console.log(
-          `📦 Seeding ${PRODUCTS_PER_SUBCATEGORY} products for → ${category.name} / ${subcategory.name}`
+          `📦 Seeding ${PRODUCTS_PER_SUBCATEGORY} products for → ${category.name} / ${SubCategory.name}`
         );
 
         for (let i = 0; i < PRODUCTS_PER_SUBCATEGORY; i++) {
