@@ -11,7 +11,7 @@ require("dotenv").config({
 const mongoose = require("mongoose");
 
 // ====== MODELS ======
-const { Product ,Category,Subcategory,Relation} = require("../models/index");
+const { Product ,Category,SubCategory,Relation} = require("../models/index");
 
 
 // ====== CONFIG ======
