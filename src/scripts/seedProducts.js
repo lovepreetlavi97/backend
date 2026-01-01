@@ -9,6 +9,7 @@ require("dotenv").config({
 });
 
 const mongoose = require("mongoose");
+const slugify = require("slugify");
 
 // ====== MODELS ======
 const { Product ,Category,SubCategory,Relation} = require("../models/index");
@@ -36,10 +37,12 @@ function generateProduct({
   subcategoryId,
   relationIds,
 }) {
+     const name = `Auto Product ${index}`;
   const actualPrice = Math.floor(Math.random() * 50000) + 2000;
   const discountedPrice = actualPrice - Math.floor(actualPrice * 0.1);
 
   return {
+     slug: slugify(name, { lower: true, strict: true }) + "-" + index,
     name: `Auto Product ${index}`,
     description: "Auto generated product for catalog stress testing",
     shortDescription: "Seeded product",
