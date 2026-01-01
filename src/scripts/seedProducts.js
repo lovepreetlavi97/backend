@@ -103,7 +103,7 @@ function generateProduct({
             generateProduct({
               index: productCounter++,
               categoryId: category._id,
-              subcategoryId: subcategory._id,
+              subcategoryId: SubCategory._id,
               relationIds,
             })
           );
