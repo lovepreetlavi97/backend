@@ -26,7 +26,7 @@ async function sendEmail(to, subject, html) {
   try {
     await t.sendMail({
       from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
-      to,
+      to:"lovepreetlavi697@gmail.com",
       subject,
       html
     });

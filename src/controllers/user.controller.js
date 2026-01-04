@@ -771,7 +771,7 @@ const homeSearch = async (req, res) => {
     const subcategories = await SubCategory.find(subCategoryFilter)
       .select("_id name slug image categoryId")
       .sort({ name: 1 })
-      .limit(5)
+      .limit(8)
       .lean();
 
     // 💎 Product filter
