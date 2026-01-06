@@ -109,6 +109,11 @@ if (event === "payment.captured" && payment.status === "captured") {
   // -----------------------------
   // 3️⃣ UPDATE STOCK
   // -----------------------------
+
+  console.log("🧾 Order keys:", Object.keys(order.toObject()));
+console.log("🧾 order.items:", order.items);
+console.log("🧾 order.products:", order.products);
+
   for (const item of order.items) {
     await Product.findByIdAndUpdate(item.productId, {
       $inc: {
