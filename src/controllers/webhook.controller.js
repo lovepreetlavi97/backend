@@ -2,7 +2,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
-
+const { createAdminOrderNotifications } = require('../services/notifications/notification.service');
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
@@ -86,31 +86,47 @@ export const razorpayWebhookHandler = async (req, res) => {
     // -----------------------------
     // 2️⃣ PAYMENT CAPTURED
     // -----------------------------
-    if (event === "payment.captured" && payment.status === "captured") {
-      console.log("🎉 Payment Captured Successfully!");
+ // -----------------------------
+// 2️⃣ PAYMENT CAPTURED
+// -----------------------------
+if (event === "payment.captured" && payment.status === "captured") {
+  console.log("🎉 Payment Captured Successfully!");
 
-      order.status = "Confirmed";
-      order.paymentStatus = "Paid";
-      order.razorpayPaymentId = razorpayPaymentId;
+  // 🛑 Prevent duplicate processing
+  if (order.paymentStatus === "Paid") {
+    console.log("⚠️ Order already processed. Skipping email.");
+    return res.json({ status: "already_processed" });
+  }
 
-      await order.save();
+  order.status = "Confirmed";
+  order.paymentStatus = "Paid";
+  order.razorpayPaymentId = razorpayPaymentId;
 
-      // -----------------------------
-      // 3️⃣ UPDATE STOCK
-      // -----------------------------
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: {
-            stock: -item.quantity,
-            purchaseCount: item.quantity,
-          },
-        });
-      }
+  await order.save();
 
-      console.log("📦 Order Confirmed & Stock Updated");
+  // -----------------------------
+  // 3️⃣ UPDATE STOCK
+  // -----------------------------
+  for (const item of order.items) {
+    await Product.findByIdAndUpdate(item.productId, {
+      $inc: {
+        stock: -item.quantity,
+        purchaseCount: item.quantity,
+      },
+    });
+  }
 
-      return res.json({ status: "order_confirmed" });
-    }
+  console.log("📦 Order Confirmed & Stock Updated");
+
+  // -----------------------------
+  // 4️⃣ ADMIN EMAIL + NOTIFICATION
+  // -----------------------------
+  createAdminOrderNotifications('NEW_ORDER', order)
+    .catch(e => console.error('NEW_ORDER notification error:', e));
+
+  return res.json({ status: "order_confirmed" });
+}
+
 
     return res.json({ status: "ignored_event" });
 
