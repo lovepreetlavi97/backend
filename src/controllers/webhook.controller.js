@@ -2,7 +2,9 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
-const { createAdminOrderNotifications } = require('../services/notifications/notification.service');
+import { createAdminOrderNotifications } 
+  from '../services/notifications/notification.service.js';
+
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
