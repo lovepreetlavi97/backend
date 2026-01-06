@@ -114,7 +114,7 @@ if (event === "payment.captured" && payment.status === "captured") {
 console.log("🧾 order.items:", order.items);
 console.log("🧾 order.products:", order.products);
 
-  for (const item of order.items) {
+  for (const item of order.products) {
     await Product.findByIdAndUpdate(item.productId, {
       $inc: {
         stock: -item.quantity,
