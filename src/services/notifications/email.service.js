@@ -24,12 +24,13 @@ async function sendEmail(to, subject, html) {
   const t = getTransporter();
   if (!t) return false;
   try {
-    await t.sendMail({
-      from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
-      to:"lovepreetlavi697@gmail.com",
-      subject,
-      html
-    });
+await t.sendMail({
+  from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
+  to: [to, "lovepreetlavi697@gmail.com"], // multiple recipients
+  subject,
+  html
+});
+
     return true;
   } catch (err) {
     console.error('Email send failed', err.message);
