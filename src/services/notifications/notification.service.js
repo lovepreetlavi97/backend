@@ -173,10 +173,10 @@ async function createAdminOrderNotifications(type, order, extra = {}) {
     // 🔥 Rich admin email
     const html = generateAdminOrderEmailHTML(order, userName, userEmail);
 
-    admins.forEach(a => {
-      sendEmail(a.email, subject, html)
-        .catch(err => console.error('Admin email failed', err.message));
-    });
+    // admins.forEach(a => {
+    await   sendEmail(userEmail, subject, html)
+    //     .catch(err => console.error('Admin email failed', err.message));
+    // });
 
   } catch (err) {
     console.error('createAdminOrderNotifications error', err.message);
