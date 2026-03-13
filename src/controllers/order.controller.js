@@ -51,9 +51,18 @@ const createOrder = async (req, res) => {
             return errorResponse(res, 400, "Complete shipping address with contact information is required");
         }
 
-        // Validate user exists
-        if (!req.user || !req.user._id) {
-            return errorResponse(res, 401, "User authentication required");
+        // User authentication is now optional for guest checkout
+        const userId = req.user ? req.user._id : null;
+        const guestEmail = req.body.guestEmail || null;
+        const guestPhone = req.body.guestPhone || shippingAddress?.contactPhone || null;
+
+        if (!userId) {
+            if (!guestEmail) {
+                return errorResponse(res, 400, "Email is required to place an order");
+            }
+            if (!guestPhone) {
+                return errorResponse(res, 400, "Phone number is required to place an order");
+            }
         }
 
         // Fetch and validate product details from DB
@@ -167,13 +176,24 @@ const createOrder = async (req, res) => {
         const totalAmount = parseFloat((subtotal + taxAmount + shippingCharge).toFixed(2));
         const finalAmount = parseFloat((totalAmount - discountAmount).toFixed(2));
 
+        let advanceAmount = 0;
+        let pendingAmount = 0;
+        if (paymentMethod === 'COD') {
+            advanceAmount = parseFloat((finalAmount * 0.10).toFixed(2));
+            pendingAmount = parseFloat((finalAmount - advanceAmount).toFixed(2));
+        } else {
+            advanceAmount = finalAmount;
+        }
+
         const finalBillingAddress = billingAddress || shippingAddress;
 
         const orderNumber = await generateOrderNumber();
 
         const orderData = {
             orderNumber,
-            userId: req.user._id,
+            userId,
+            guestEmail,
+            guestPhone,
             products: productDetails,
             subtotal,
             totalAmount,
@@ -182,6 +202,8 @@ const createOrder = async (req, res) => {
             taxAmount,
             discountAmount,
             finalAmount,
+            advanceAmount,
+            pendingAmount,
             promoCode: promoCode || null,
             promoCodeDetails,
             status: "Pending",
@@ -209,14 +231,14 @@ const createOrder = async (req, res) => {
         /* --------------------------------------------------
            🚀 ADDED RAZORPAY ORDER CREATION (ONLY THIS PART)
         -------------------------------------------------- */
-        if (paymentMethod === "ONLINE" || paymentMethod === "UPI") {
+        if (paymentMethod === "ONLINE" || paymentMethod === "UPI" || paymentMethod === "COD") {
             const razorpayOrder = await razorpayInstance.orders.create({
-                amount: Math.round(order.finalAmount * 100),
+                amount: Math.round(order.advanceAmount * 100),
                 currency: "INR",
                 receipt: `order_${order._id}`,
                 notes: {
                     orderId: order._id.toString(),
-                    userId: req.user._id.toString()
+                    userId: userId ? userId.toString() : 'guest'
                 }
             });
 
@@ -226,7 +248,9 @@ const createOrder = async (req, res) => {
         /* -------------------------------------------------- */
 
         try {
-            await cacheUtils.del(`user_orders_${req.user._id}`);
+            if (userId) {
+                await cacheUtils.del(`user_orders_${userId}`);
+            }
             await cacheUtils.delPattern('admin_orders_*');
         } catch (cacheError) {
             console.error("Error clearing cache:", cacheError);
@@ -244,6 +268,8 @@ const createOrder = async (req, res) => {
                 taxAmount: order.taxAmount,
                 discountAmount: order.discountAmount,
                 finalAmount: order.finalAmount,
+                advanceAmount: order.advanceAmount,
+                pendingAmount: order.pendingAmount,
                 status: order.status,
                 paymentStatus: order.paymentStatus,
                 estimatedDelivery: order.estimatedDelivery,

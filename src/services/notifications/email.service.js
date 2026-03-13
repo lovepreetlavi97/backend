@@ -20,16 +20,26 @@ function getTransporter() {
   }
 }
 
-async function sendEmail(to, subject, html) {
+async function sendEmail(to, subject, html, options = {}) {
   const t = getTransporter();
   if (!t) return false;
   try {
-await t.sendMail({
-  from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
-  to: [to, "lovepreetlavi697@gmail.com"], // multiple recipients
-  subject,
-  html
-});
+    const mailOptions = {
+      from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
+      to,
+      subject,
+      html,
+    };
+
+    if (options.cc) mailOptions.cc = options.cc;
+    if (options.bcc) mailOptions.bcc = options.bcc;
+    if (options.replyTo) mailOptions.replyTo = options.replyTo;
+
+    // Optional default BCC for internal tracking (do not hardcode personal emails)
+    const defaultBcc = process.env.MAIL_BCC;
+    if (!mailOptions.bcc && defaultBcc) mailOptions.bcc = defaultBcc;
+
+    await t.sendMail(mailOptions);
 
     return true;
   } catch (err) {

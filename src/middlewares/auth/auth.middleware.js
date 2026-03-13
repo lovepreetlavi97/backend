@@ -87,6 +87,38 @@ const authMiddleware = (requiredRoles) => {
   };
 };
 
+// Optional authentication middleware for guest checkout
+const optionalAuthMiddleware = () => {
+  return async (req, res, next) => {
+    try {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) return next();
+
+      const cachedUser = await cacheUtils.get(`auth_${token}`);
+      if (cachedUser) {
+        req.user = cachedUser;
+        return next();
+      }
+
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      } catch (error) {
+        return next();
+      }
+
+      const user = await findOne(User, { _id: decoded.id, token: token });
+      if (user && user.role === 'user') {
+        await cacheUtils.set(`auth_${token}`, user, 3600);
+        req.user = user;
+      }
+      return next();
+    } catch (error) {
+      return next();
+    }
+  };
+};
+
 // Permission check middleware for admin/superadmin
 const checkPermission = (requiredPermission) => {
   return (req, res, next) => {
@@ -124,5 +156,6 @@ module.exports = {
   superAdminAuth, 
   adminOrSuperAdminAuth,
   anyAuth,
-  checkPermission
+  checkPermission,
+  optionalUserAuth: optionalAuthMiddleware()
 };

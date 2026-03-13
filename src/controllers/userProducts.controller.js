@@ -88,12 +88,13 @@ const getProductBySlug = async (req, res) => {
       }
     }
 
-    ["metal", "style", "occasion"].forEach((key) => {
-      if (filters[key]) {
+    const excludeKeys = ["price", "sort", "search", "order"];
+    Object.keys(filters).forEach((key) => {
+      if (!excludeKeys.includes(key) && filters[key]) {
         const values = Array.isArray(filters[key])
           ? filters[key]
           : [filters[key]];
-        query.$and.push({ [key]: { $in: values } });
+        query.$and.push({ [`filters.${key}`]: { $in: values } });
       }
     });
 
@@ -122,8 +123,29 @@ const getProductBySlug = async (req, res) => {
       return product;
     });
 
+    const availableFilters = {};
+    products.forEach((p) => {
+      // Collect dynamic filters
+      if (p.filters && typeof p.filters === "object") {
+        Object.keys(p.filters).forEach((key) => {
+          if (!availableFilters[key]) availableFilters[key] = new Set();
+          if (Array.isArray(p.filters[key])) {
+             p.filters[key].forEach((v) => availableFilters[key].add(v));
+          } else if (typeof p.filters[key] === "string") {
+             availableFilters[key].add(p.filters[key]);
+          }
+        });
+      }
+    });
+
+    const parsedFilters = {};
+    Object.keys(availableFilters).forEach((key) => {
+      parsedFilters[key] = Array.from(availableFilters[key]);
+    });
+
     const responseData = {
       products: enhancedProducts,
+      availableFilters: parsedFilters,
       pagination: {
         total,
         page,

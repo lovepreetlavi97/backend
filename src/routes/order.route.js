@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/order.controller');
-const { userAuth, adminAuth } = require('../middlewares/auth/auth.middleware');
+const { userAuth, adminAuth, optionalUserAuth } = require('../middlewares/auth/auth.middleware');
 const { check } = require('express-validator');
 
 /**
@@ -179,7 +179,7 @@ const { check } = require('express-validator');
  */
 router.post(
   '/',
-  userAuth,
+  optionalUserAuth,
   [
     // Product validation
     check('products')

@@ -9,7 +9,15 @@ const orderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false, // Optional for guest checkout
+  },
+  guestEmail: {
+    type: String,
+    required: false,
+  },
+  guestPhone: {
+    type: String,
+    required: false,
   },
   products: [
     {
@@ -117,6 +125,16 @@ const orderSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  advanceAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  pendingAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   promoCode: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PromoCode',
@@ -194,6 +212,12 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'],
     default: 'Pending',
+  },
+  razorpayOrderId: {
+    type: String,
+  },
+  razorpayPaymentId: {
+    type: String,
   },
   paymentDetails: {
     transactionId: String,
