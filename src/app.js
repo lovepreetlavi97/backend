@@ -22,9 +22,14 @@ app.use('/api/v1/webhook', WebhookRoutes); // Mounting the routes under /api/v1
 // Middleware for parsing JSON and handling CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({
-  origin: '*',
-}));
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.options("*", cors());
 // Import versioned routes
 const v1Routes = require('./routes'); // Import the index.js in routes
 

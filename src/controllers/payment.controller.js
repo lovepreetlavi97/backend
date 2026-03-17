@@ -1,5 +1,6 @@
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const kittyService = require("../services/kitty.service");
 
 // initialize Razorpay instance
 const razorpay = new Razorpay({
@@ -62,6 +63,16 @@ async function verifyPayment(req, res) {
       .digest("hex");
 
     if (expectedSignature === razorpay_signature) {
+      const orderDetails = await razorpay.orders.fetch(razorpay_order_id);
+      if (orderDetails && orderDetails.notes && orderDetails.notes.type === 'KITTY') {
+         await kittyService.markPaymentAsPaid({
+             paymentId: orderDetails.notes.kittyPaymentId,
+             razorpayPaymentId: razorpay_payment_id,
+             razorpayOrderId: razorpay_order_id,
+             razorpaySignature: razorpay_signature,
+             paymentMethod: "razorpay",
+         });
+      }
       return res.json({ success: true, message: "Payment verified successfully" });
     }
 
