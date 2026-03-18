@@ -129,9 +129,7 @@ function generateAdminOrderEmailHTML(order, userName, userEmail) {
         Phone: ${order.shippingAddress.contactPhone}
       </p>
 
-      <p style="font-size:12px; color:#777;">
-        Internal notification for admin use only.
-      </p>
+ 
 
     </div>
   </div>

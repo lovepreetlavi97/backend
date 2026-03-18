@@ -11,7 +11,7 @@ const {
 } = require("../middlewares/uploadMiddleware");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
-const { Product, Category, SubCategory } = require("../models/index");
+const { Product, Category, SubCategory, PriceRule } = require("../models/index");
 const mongoose = require("mongoose");
 
 const { cacheUtils } = require("../config/redis");
@@ -74,6 +74,7 @@ const createProduct = async (req, res) => {
       shortDescription,
       actualPrice,
       discountedPrice,
+      discountPercent,
       weight,
       unit = "gm",
       stock,
@@ -91,6 +92,9 @@ const createProduct = async (req, res) => {
       sku,
       image,
       images,
+      isPriceFixed,
+      priceRuleId,
+      makingCharges,
     } = req.body;
     console.log("Request Body: ", req.body);
     // return
@@ -103,12 +107,24 @@ const createProduct = async (req, res) => {
       );
     }
 
-    if (
-      !actualPrice ||
-      isNaN(parseFloat(actualPrice)) ||
-      parseFloat(actualPrice) <= 0
-    ) {
-      return errorResponse(res, 400, "Valid actual price is required");
+    const parsedIsPriceFixed = String(isPriceFixed) === "true";
+    if (parsedIsPriceFixed) {
+      if (!actualPrice || isNaN(parseFloat(actualPrice)) || parseFloat(actualPrice) <= 0) {
+        return errorResponse(res, 400, "Valid actual price is required for fixed price products");
+      }
+    } else {
+      if (!priceRuleId || !mongoose.Types.ObjectId.isValid(priceRuleId)) {
+        return errorResponse(res, 400, "Valid price rule ID is required for dynamic price products");
+      }
+      if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
+        return errorResponse(res, 400, "Valid weight is required for dynamic price products");
+      }
+      if (discountPercent !== undefined && discountPercent !== null && discountPercent !== "") {
+        const d = parseFloat(discountPercent);
+        if (isNaN(d) || d < 0 || d > 100) {
+          return errorResponse(res, 400, "Discount percent must be between 0 and 100 for dynamic price products");
+        }
+      }
     }
 
     if (
@@ -123,7 +139,7 @@ const createProduct = async (req, res) => {
     }
 
     if (
-      discountedPrice &&
+      parsedIsPriceFixed && discountedPrice &&
       parseFloat(discountedPrice) > parseFloat(actualPrice)
     ) {
       return errorResponse(
@@ -184,6 +200,10 @@ const createProduct = async (req, res) => {
       }
     }
 
+    // For fixed price products we store actualPrice directly.
+    // For dynamic products we keep stored actualPrice at 0 and always compute it at read-time from priceRuleId.
+    let computedActualPrice = parsedIsPriceFixed ? parseFloat(actualPrice || 0) : 0;
+
     // Build product data
     const productData = {
       name,
@@ -192,10 +212,16 @@ const createProduct = async (req, res) => {
       image: image,
       images: images,
       shortDescription,
-      actualPrice: parseFloat(actualPrice),
-      discountedPrice: discountedPrice
-        ? parseFloat(discountedPrice)
+      actualPrice: computedActualPrice,
+      discountedPrice: parsedIsPriceFixed
+        ? (discountedPrice ? parseFloat(discountedPrice) : undefined)
         : undefined,
+      discountPercent: !parsedIsPriceFixed && discountPercent !== undefined && discountPercent !== null && discountPercent !== ""
+        ? parseFloat(discountPercent)
+        : 0,
+      isPriceFixed: parsedIsPriceFixed,
+      priceRuleId: !parsedIsPriceFixed ? new mongoose.Types.ObjectId(priceRuleId) : undefined,
+      makingCharges: makingCharges ? parseFloat(makingCharges) : 0,
       weight: parseFloat(weight),
       unit,
       stock: stock ? parseInt(stock) : 0,
@@ -322,14 +348,31 @@ const getAllProducts = async (req, res) => {
     const sortOptions = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
     // Execute query with pagination
-    const products = await Product.find(query)
+    let productsQuery = Product.find(query)
       .populate({ path: "categoryId", select: "name slug" })
       .populate({ path: "subcategoryId", select: "name slug" })
       .populate({ path: "festivalIds", select: "name slug" })
+      .populate({ path: "priceRuleId", select: "name price" })
       .skip(skip)
       .limit(parseInt(limit))
       .sort(sortOptions)
       .lean();
+
+    let products = await productsQuery.exec();
+
+    // Use a lightweight fast processing instead of an expensive map closure when available
+    for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+           product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
+           if (product.discountPercent && product.discountPercent > 0) {
+             const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+             product.discountedPrice = parseFloat(discounted.toFixed(2));
+           } else {
+             product.discountedPrice = product.discountedPrice ?? undefined;
+           }
+        }
+    }
 
     const total = await Product.countDocuments(query);
 
@@ -388,13 +431,23 @@ const getProductById = async (req, res) => {
       .populate({ path: "subcategoryId", select: "name" })
       .populate({ path: "festivalIds", select: "name" })
       .populate({ path: "relationIds", select: "name" })
-            .populate({ path: "relatedProductIds", select: "name" })
+      .populate({ path: "relatedProductIds", select: "name" })
+      .populate({ path: "priceRuleId", select: "name price" })
       .lean();
 
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
     console;
+    // Dynamic Price Calculation
+    if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+        product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
+        if (product.discountPercent && product.discountPercent > 0) {
+          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+          product.discountedPrice = parseFloat(discounted.toFixed(2));
+        }
+    }
+
     // Calculate discount percentage
     if (product.actualPrice && product.discountedPrice) {
       product.discountPercentage = Math.round(
@@ -433,8 +486,34 @@ const updateProductById = async (req, res) => {
     }
 
     // Handle numeric fields
-    if (updatedData.actualPrice) {
-      updatedData.actualPrice = parseFloat(updatedData.actualPrice);
+    if (updatedData.isPriceFixed !== undefined) {
+      updatedData.isPriceFixed = String(updatedData.isPriceFixed) === "true";
+    }
+
+    // Only update actualPrice from input if fixed; for dynamic keep stored actualPrice at 0 (computed at read-time)
+    if (updatedData.isPriceFixed) {
+      if (updatedData.actualPrice) {
+        updatedData.actualPrice = parseFloat(updatedData.actualPrice);
+      }
+    } else {
+      updatedData.actualPrice = 0;
+      // If dynamic, ensure priceRuleId is captured
+      if (updatedData.priceRuleId) {
+        updatedData.priceRuleId = new mongoose.Types.ObjectId(updatedData.priceRuleId);
+      }
+    }
+
+    // discountPercent (dynamic)
+    if (updatedData.discountPercent !== undefined) {
+      const d = parseFloat(updatedData.discountPercent);
+      if (isNaN(d) || d < 0 || d > 100) {
+        return errorResponse(res, 400, "Discount percent must be between 0 and 100");
+      }
+      updatedData.discountPercent = d;
+    }
+    
+    if (updatedData.makingCharges !== undefined) {
+        updatedData.makingCharges = parseFloat(updatedData.makingCharges);
     }
 
     if (updatedData.discountedPrice) {
@@ -493,6 +572,15 @@ const updateProductById = async (req, res) => {
       if (!validTags.includes(updatedData.tags)) {
         updatedData.tags = "New";
       }
+    }
+
+    // If switching to dynamic pricing, discountedPrice should not be stored (it's computed at read-time)
+    if (updatedData.isPriceFixed === false) {
+      delete updatedData.discountedPrice;
+    }
+    // If switching to fixed pricing, discountPercent is not needed
+    if (updatedData.isPriceFixed === true) {
+      updatedData.discountPercent = 0;
     }
 
     // Process boolean fields

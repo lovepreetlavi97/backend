@@ -5,6 +5,8 @@ const { createAdminOrderNotifications } = require('../services/notifications/not
 const mongoose = require('mongoose');
 const { cacheUtils } = require("../config/redis");
 const { generateOrderNumber } = require("../utils/orderUtils");
+const { sendEmail } = require("../services/notifications/email.service");
+const jwt = require("jsonwebtoken");
 const Razorpay = require("razorpay");
 
 
@@ -83,7 +85,7 @@ const createOrder = async (req, res) => {
                 _id: p.productId,
                 isDeleted: { $ne: true },
                 isBlocked: { $ne: true }
-            });
+            }).populate("priceRuleId", "price");
 
             if (!product) {
                 unavailableProducts.push(p.productId);
@@ -101,15 +103,34 @@ const createOrder = async (req, res) => {
                 continue;
             }
 
-            const price = product.discountedPrice || product.actualPrice;
+            // Dynamic Price Calculation
+            let actualPrice = product.actualPrice;
+            if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+                const liveRate = product.priceRuleId.price;
+                const weight = product.weight || 0;
+                const making = product.makingCharges || 0;
+                actualPrice = (liveRate * weight) + making;
+            }
+
+            // Calculate active price based on dynamic actualPrice
+            let price = actualPrice;
+            let discountedPrice = product.discountedPrice;
+            
+            // If there's a discountedPrice stored in DB AND it's less than actual price, we honor it.
+            // A more robust system would re-apply the discount percentage to the dynamic price.
+            if (discountedPrice && discountedPrice < actualPrice) {
+                 price = discountedPrice;
+            } else {
+                 discountedPrice = null; // reset if invalid
+            }
 
             productDetails.push({
                 productId: product._id,
                 name: product.name,
                 slug: product.slug,
                 price: price,
-                actualPrice: product.actualPrice,
-                discountedPrice: product.discountedPrice,
+                actualPrice: actualPrice,
+                discountedPrice: discountedPrice,
                 quantity: p.quantity,
                 subtotal: parseFloat((price * p.quantity).toFixed(2)),
                 image: product.images && product.images.length > 0 ? product.images[0] : null,
@@ -143,30 +164,41 @@ const createOrder = async (req, res) => {
 
         let discountAmount = 0;
         let promoCodeDetails = null;
+        let promoDoc = null;
 
-        // Apply promo code discount if valid
+        // Apply promo code discount if valid (accept either code string or Mongo _id)
         if (promoCode) {
-            const promo = await PromoCode.findOne({
-                _id: promoCode,
-                isActive: true,
-                expiryDate: { $gt: new Date() },
-                minPurchaseAmount: { $lte: subtotal }
-            });
+            const isObjectId = mongoose.Types.ObjectId.isValid(promoCode) && String(new mongoose.Types.ObjectId(promoCode)) === promoCode;
+            const query = isObjectId
+                ? { _id: promoCode, status: 'active', endDate: { $gt: new Date() }, isDeleted: { $ne: true } }
+                : { code: String(promoCode).toUpperCase(), status: 'active', endDate: { $gt: new Date() }, isDeleted: { $ne: true } };
+            promoDoc = await PromoCode.findOne(query);
 
-            if (promo) {
-                if (promo.discountType === 'PERCENTAGE') {
-                    discountAmount = parseFloat(((subtotal * promo.discountValue) / 100).toFixed(2));
-                    if (promo.maxDiscountAmount && discountAmount > promo.maxDiscountAmount) {
-                        discountAmount = parseFloat(promo.maxDiscountAmount.toFixed(2));
+            if (promoDoc) {
+                if (promoDoc.minPurchase && subtotal < promoDoc.minPurchase) {
+                    return errorResponse(res, 400, `Minimum order value for this promo is ₹${promoDoc.minPurchase}`);
+                }
+                if (promoDoc.usageLimit != null && (promoDoc.usedCount || 0) >= promoDoc.usageLimit) {
+                    return errorResponse(res, 400, "This promo code has reached its usage limit");
+                }
+                if (userId && promoDoc.usedBy && promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
+                    return errorResponse(res, 400, "You have already used this promo code");
+                }
+
+                const typeLower = (promoDoc.type || '').toLowerCase();
+                if (typeLower === 'percentage') {
+                    discountAmount = parseFloat(((subtotal * promoDoc.value) / 100).toFixed(2));
+                    if (promoDoc.maxDiscount != null && discountAmount > promoDoc.maxDiscount) {
+                        discountAmount = parseFloat(Number(promoDoc.maxDiscount).toFixed(2));
                     }
                 } else {
-                    discountAmount = parseFloat(promo.discountValue.toFixed(2));
+                    discountAmount = Math.min(parseFloat(Number(promoDoc.value).toFixed(2)), subtotal);
                 }
 
                 promoCodeDetails = {
-                    code: promo.code,
-                    discountType: promo.discountType,
-                    discountValue: promo.discountValue
+                    code: promoDoc.code,
+                    discountType: typeLower === 'percentage' ? 'PERCENTAGE' : 'FIXED',
+                    discountValue: promoDoc.value
                 };
             } else {
                 return errorResponse(res, 400, "Invalid or expired promo code");
@@ -179,7 +211,8 @@ const createOrder = async (req, res) => {
         let advanceAmount = 0;
         let pendingAmount = 0;
         if (paymentMethod === 'COD') {
-            advanceAmount = parseFloat((finalAmount * 0.10).toFixed(2));
+            // COD: collect 20% advance online, rest on delivery
+            advanceAmount = parseFloat((finalAmount * 0.20).toFixed(2));
             pendingAmount = parseFloat((finalAmount - advanceAmount).toFixed(2));
         } else {
             advanceAmount = finalAmount;
@@ -204,7 +237,7 @@ const createOrder = async (req, res) => {
             finalAmount,
             advanceAmount,
             pendingAmount,
-            promoCode: promoCode || null,
+            promoCode: promoDoc ? promoDoc._id : null,
             promoCodeDetails,
             status: "Pending",
             shippingAddress,
@@ -228,6 +261,27 @@ const createOrder = async (req, res) => {
 
         const order = await create(Order, orderData);
 
+        // Update promo code usage so it reflects in admin panel
+        if (promoDoc && order._id) {
+            try {
+                promoDoc.usedCount = (promoDoc.usedCount || 0) + 1;
+                promoDoc.usageCount = (promoDoc.usageCount || 0) + 1;
+                if (userId && promoDoc.usedBy) {
+                    if (!promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
+                        promoDoc.usedBy.push(userId);
+                    }
+                } else if (userId) {
+                    promoDoc.usedBy = promoDoc.usedBy || [];
+                    if (!promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
+                        promoDoc.usedBy.push(userId);
+                    }
+                }
+                await promoDoc.save();
+            } catch (e) {
+                console.error("Failed to update promo usage:", e);
+            }
+        }
+
         /* --------------------------------------------------
            🚀 ADDED RAZORPAY ORDER CREATION (ONLY THIS PART)
         -------------------------------------------------- */
@@ -246,6 +300,60 @@ const createOrder = async (req, res) => {
             await order.save();
         }
         /* -------------------------------------------------- */
+
+        // Send order confirmation email with magic link / tracking link
+        try {
+            // Determine customer email & phone (supporting both guest and logged-in user)
+            let customerEmail = guestEmail;
+            let customerPhone = guestPhone;
+
+            if (userId && !customerEmail) {
+                const user = await User.findById(userId).select("email phone name");
+                if (user) {
+                    customerEmail = user.email;
+                    if (!customerPhone && user.phone) {
+                        customerPhone = user.phone;
+                    }
+                }
+            }
+
+            if (customerEmail) {
+                const webBaseUrl = process.env.WEB_BASE_URL || "https://yourwebsite.com";
+
+                // Create a magic JWT token so user can open order directly from email
+                const magicToken = jwt.sign(
+                    {
+                        type: "ORDER_MAGIC",
+                        orderId: order._id.toString(),
+                        orderNumber: order.orderNumber,
+                        phone: customerPhone || guestPhone || shippingAddress?.contactPhone || null,
+                    },
+                    process.env.JWT_SECRET_KEY,
+                    { expiresIn: "30d" }
+                );
+
+                const trackUrl = `${webBaseUrl}/order/${order.orderNumber}?token=${magicToken}`;
+                const trackPageUrl = `${webBaseUrl}/track-order`;
+
+                const discountLine = order.discountAmount > 0 && order.promoCodeDetails
+                    ? `<p>Discount applied: <strong>${order.promoCodeDetails.code}</strong> (−₹${order.discountAmount.toFixed(2)})</p>`
+                    : '';
+                const html = `
+                  <p>Hi ${shippingAddress?.contactName || "Customer"},</p>
+                  <p>Your order <strong>${order.orderNumber}</strong> has been placed successfully.</p>
+                  ${discountLine}
+                  <p>Track your order directly here:</p>
+                  <p><a href="${trackUrl}">${trackUrl}</a></p>
+                  <p>Or visit the Track Order page and enter your Order ID <strong>${order.orderNumber}</strong> and your phone number:</p>
+                  <p><a href="${trackPageUrl}">${trackPageUrl}</a></p>
+                  <p>Thank you for shopping with us.</p>
+                `;
+
+                await sendEmail(customerEmail, "Order Confirmed", html);
+            }
+        } catch (emailError) {
+            console.error("Order confirmation email failed:", emailError);
+        }
 
         try {
             if (userId) {
@@ -492,6 +600,117 @@ const getRefundRequests = async (req, res) => {
     } catch (error) {
         console.error("Get Refund Requests Error:", error);
         return errorResponse(res, 500, error.message || "Failed to retrieve refund requests");
+    }
+};
+
+// Helpers for public tracking / magic link
+function computeOrderActionFlags(order) {
+    const nonCancellableStatuses = ['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Refunded'];
+    const canCancel = !nonCancellableStatuses.includes(order.status);
+
+    let canReturn = false;
+    if (order.status === 'Delivered' && order.deliveredAt) {
+        const diffDays = (Date.now() - new Date(order.deliveredAt).getTime()) / (1000 * 60 * 60 * 24);
+        canReturn = diffDays <= 7;
+    }
+
+    return { canCancel, canReturn };
+}
+
+// Track order by orderNumber + phone (guest or logged-in)
+const trackOrderPublic = async (req, res) => {
+    try {
+        const { orderNumber, phone } = req.body || {};
+
+        if (!orderNumber || !phone) {
+            return errorResponse(res, 400, "Order number and phone are required");
+        }
+
+        const normalizedPhone = String(phone).trim();
+
+        const order = await Order.findOne({
+            orderNumber,
+            guestPhone: normalizedPhone
+        }).lean();
+
+        if (!order) {
+            return errorResponse(res, 404, "Order not found");
+        }
+
+        const { canCancel, canReturn } = computeOrderActionFlags(order);
+
+        return successResponse(res, 200, "Order retrieved successfully", {
+            order: {
+                _id: order._id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                products: order.products,
+                finalAmount: order.finalAmount,
+                shippingAddress: order.shippingAddress,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                estimatedDelivery: order.estimatedDelivery,
+                deliveredAt: order.deliveredAt,
+                statusHistory: order.statusHistory,
+                createdAt: order.createdAt,
+            },
+            canCancel,
+            canReturn
+        });
+    } catch (error) {
+        console.error("Track Order Public Error:", error);
+        return errorResponse(res, 500, error.message || "Failed to track order");
+    }
+};
+
+// Get order using magic token from email
+const getOrderByMagicToken = async (req, res) => {
+    try {
+        const { token } = req.body || {};
+
+        if (!token) {
+            return errorResponse(res, 400, "Token is required");
+        }
+
+        let payload;
+        try {
+            payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+        } catch (err) {
+            return errorResponse(res, 400, "Invalid or expired link");
+        }
+
+        if (!payload || payload.type !== "ORDER_MAGIC" || !payload.orderId) {
+            return errorResponse(res, 400, "Invalid link payload");
+        }
+
+        const order = await Order.findById(payload.orderId).lean();
+        if (!order) {
+            return errorResponse(res, 404, "Order not found");
+        }
+
+        const { canCancel, canReturn } = computeOrderActionFlags(order);
+
+        return successResponse(res, 200, "Order retrieved successfully", {
+            order: {
+                _id: order._id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                products: order.products,
+                finalAmount: order.finalAmount,
+                shippingAddress: order.shippingAddress,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                estimatedDelivery: order.estimatedDelivery,
+                deliveredAt: order.deliveredAt,
+                statusHistory: order.statusHistory,
+                createdAt: order.createdAt,
+            },
+            canCancel,
+            canReturn
+        });
+    } catch (error) {
+        console.error("Get Order By Magic Token Error:", error);
+        return errorResponse(res, 500, error.message || "Failed to fetch order");
     }
 };
 
@@ -821,6 +1040,76 @@ const cancelOrder = async (req, res) => {
     }
 };
 
+// Cancel order from public Track Order page (by orderNumber + phone)
+const cancelOrderPublic = async (req, res) => {
+    try {
+        const { orderNumber, phone, reason } = req.body || {};
+
+        if (!orderNumber || !phone) {
+            return errorResponse(res, 400, "Order number and phone are required");
+        }
+
+        const normalizedPhone = String(phone).trim();
+
+        const order = await Order.findOne({
+            orderNumber,
+            guestPhone: normalizedPhone
+        });
+
+        if (!order) {
+            return errorResponse(res, 404, "Order not found");
+        }
+
+        // Allow cancel only in Pending or Confirmed (per requirement)
+        if (!['Pending', 'Confirmed'].includes(order.status)) {
+            return errorResponse(res, 400, `Cannot cancel order in ${order.status} status`);
+        }
+
+        order.status = "Cancelled";
+        order.cancelDetails = {
+            cancelledAt: new Date(),
+            reason: reason || 'Customer cancelled from track page',
+            cancelledBy: 'User'
+        };
+
+        order.statusHistory.push({
+            status: 'Cancelled',
+            timestamp: new Date(),
+            notes: reason || 'Customer cancelled from track page'
+        });
+
+        if (order.paymentStatus === 'Paid') {
+            order.refundStatus = 'Pending';
+        }
+
+        await order.save();
+
+        // Restore product stock
+        for (const item of order.products) {
+            await Product.findByIdAndUpdate(
+                item.productId,
+                {
+                    $inc: { stock: item.quantity },
+                    $set: { isInStock: true }
+                }
+            );
+        }
+
+        await cacheUtils.delPattern(`order_${order._id}_*`);
+        await cacheUtils.delPattern('admin_orders_*');
+        if (order.userId) {
+            await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
+        }
+
+        createAdminOrderNotifications('ORDER_CANCELLED', order).catch(e => console.error('ORDER_CANCELLED notification error:', e));
+
+        return successResponse(res, 200, "Order cancelled successfully", { order });
+    } catch (error) {
+        console.error("Cancel Order Public Error:", error);
+        return errorResponse(res, 500, error.message || "Failed to cancel order");
+    }
+};
+
 // Update payment status
 const updatePaymentStatus = async (req, res) => {
     try {
@@ -928,6 +1217,66 @@ const updatePaymentStatus = async (req, res) => {
     }
 };
 
+// Request return from public Track Order page (Delivered within 7 days)
+const requestReturnPublic = async (req, res) => {
+    try {
+        const { orderNumber, phone, reason } = req.body || {};
+
+        if (!orderNumber || !phone) {
+            return errorResponse(res, 400, "Order number and phone are required");
+        }
+
+        const normalizedPhone = String(phone).trim();
+
+        const order = await Order.findOne({
+            orderNumber,
+            guestPhone: normalizedPhone
+        });
+
+        if (!order) {
+            return errorResponse(res, 404, "Order not found");
+        }
+
+        // Allow return only when Delivered and within 7 days
+        if (order.status !== 'Delivered' || !order.deliveredAt) {
+            return errorResponse(res, 400, "Return is allowed only for delivered orders");
+        }
+
+        const diffDays = (Date.now() - new Date(order.deliveredAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays > 7) {
+            return errorResponse(res, 400, "Return window (7 days) has expired");
+        }
+
+        order.status = 'Returned';
+        order.returnDetails = {
+            returnedAt: new Date(),
+            reason: reason || 'Customer requested return from track page',
+            returnInitiatedBy: 'User'
+        };
+
+        order.statusHistory.push({
+            status: 'Returned',
+            timestamp: new Date(),
+            notes: reason || 'Customer requested return from track page'
+        });
+
+        await order.save();
+
+        await cacheUtils.delPattern(`order_${order._id}_*`);
+        await cacheUtils.delPattern('admin_orders_*');
+        if (order.userId) {
+            await cacheUtils.delPattern(`user_orders_${order.userId}_*`);
+        }
+
+        createAdminOrderNotifications('ORDER_RETURNED', order).catch(e => console.error('ORDER_RETURNED notification error:', e));
+
+        return successResponse(res, 200, "Return requested successfully", { order });
+    } catch (error) {
+        console.error("Request Return Public Error:", error);
+        return errorResponse(res, 500, error.message || "Failed to request return");
+    }
+};
+
 // Delete order (Admin only - soft delete)
 const deleteOrder = async (req, res) => {
     try {
@@ -999,5 +1348,9 @@ module.exports = {
     cancelOrder,
     updatePaymentStatus,
     deleteOrder,
-    updateProductStatus
+    updateProductStatus,
+    trackOrderPublic,
+    getOrderByMagicToken,
+    cancelOrderPublic,
+    requestReturnPublic
 };

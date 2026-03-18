@@ -82,7 +82,8 @@ const createUser = async (req, res) => {
 };
 const getRelatedProducts = async (req, res) => {
   try {
-    console.log("88888888888888888888888888888888888888888888888")
+    console.log("88888888888888888888888888888888888888888888888");
+
     const { ids } = req.query;
 
     if (!ids) {
@@ -103,16 +104,40 @@ const getRelatedProducts = async (req, res) => {
       _id: { $in: idArray },
       isDeleted: false,
       isBlocked: false,
-    }).lean();
+    })
+      .populate("priceRuleId", "name price")
+      .lean();
 
     const enhancedProducts = products.map((product) => {
-      if (product.actualPrice && product.discountedPrice) {
+
+      // Dynamic price calculation
+      if (
+        product.isPriceFixed === false &&
+        product.priceRuleId &&
+        product.priceRuleId.price
+      ) {
+        const pricePerUnit = product.priceRuleId.price;
+        const weight = product.weight || 0;
+        const makingCharges = product.makingCharges || 0;
+
+        product.actualPrice = (pricePerUnit * weight) + makingCharges;
+      }
+
+      // Discount calculation
+      if (
+        product.actualPrice &&
+        product.discountedPrice &&
+        product.actualPrice > 0
+      ) {
         product.discountPercentage = Math.round(
           ((product.actualPrice - product.discountedPrice) /
             product.actualPrice) *
-            100
+          100
         );
+      } else {
+        product.discountPercentage = 0;
       }
+
       return product;
     });
 
@@ -123,6 +148,7 @@ const getRelatedProducts = async (req, res) => {
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {
     console.error("Get related products error:", error);
+
     return errorResponse(
       res,
       500,
@@ -143,7 +169,7 @@ const getAllUsers = async (req, res) => {
       search
     } = req.query;
 
-    
+
     // Create cache key based on query parameters (include search)
     const cacheKey = `users_${page}_${limit}_${sortBy}_${sortOrder}_${status || "all"}_${search || ""}`;
 
@@ -657,7 +683,7 @@ const logoutUser = async (req, res) => {
     });
   }
 };
- const checkCartStock = async (req, res) => {
+const checkCartStock = async (req, res) => {
   try {
     const { items } = req.body;
 
@@ -697,7 +723,7 @@ const logoutUser = async (req, res) => {
 const getAllFestivals = async (req, res) => {
   try {
     const { date } = req.query;
-    
+
     let targetDate;
     if (date) {
       targetDate = new Date(date);
@@ -707,10 +733,10 @@ const getAllFestivals = async (req, res) => {
     } else {
       targetDate = new Date();
     }
-    
+
     const dateStr = targetDate.toISOString().split('T')[0];
     const cacheKey = `festival_${dateStr}`;
-    
+
     const cachedFestival = await cacheUtils.get(cacheKey);
     if (cachedFestival) {
       return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, {
@@ -721,7 +747,7 @@ const getAllFestivals = async (req, res) => {
     // Set up date range for precise matching
     const startOfDayUTC = new Date(targetDate);
     startOfDayUTC.setUTCHours(0, 0, 0, 0);
-    
+
     const endOfDayUTC = new Date(targetDate);
     endOfDayUTC.setUTCHours(23, 59, 59, 999);
 
@@ -731,8 +757,8 @@ const getAllFestivals = async (req, res) => {
       isActive: true,
       startDate: { $lte: endOfDayUTC },  // Started before or on end of target day
       endDate: { $gte: startOfDayUTC },  // Ends after or on start of target day
-    }).sort({ 
-      startDate: -1 
+    }).sort({
+      startDate: -1
     });
 
     await cacheUtils.set(cacheKey, festival || null, 3600); // Cache for 1 hour
@@ -783,10 +809,22 @@ const homeSearch = async (req, res) => {
 
     // 💍 ONLY 5 premium products
     const products = await Product.find(productFilter)
-      .select("_id name description title slug price actualPrice discountedPrice images categoryId")
+      .select("_id name description title slug actualPrice discountedPrice discountPercent images categoryId isPriceFixed weight makingCharges priceRuleId")
+      .populate("priceRuleId", "name price")
       .sort({ createdAt: -1 })
       .limit(5)
       .lean();
+
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+        product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
+        if (product.discountPercent && product.discountPercent > 0) {
+          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+          product.discountedPrice = parseFloat(discounted.toFixed(2));
+        }
+      }
+    }
 
     const responseData = {
       subcategories,
@@ -936,13 +974,34 @@ const getAllProducts = async (req, res) => {
     }
 
     // Execute query with pagination and sorting
-    const products = await Product.find(query)
+    const productsQuery = Product.find(query)
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit))
       .populate("categoryId", "name")
       .populate("subcategoryId", "name")
-      .populate("festivalIds", "name");
+      .populate("festivalIds", "name")
+      .populate("priceRuleId", "name price")
+      .lean();
+
+    const products = await productsQuery.exec();
+
+    // Dynamic Pricing Calculation
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+
+      if (
+        product.isPriceFixed === false &&
+        product.priceRuleId &&
+        product.priceRuleId.price
+      ) {
+        const rate = product.priceRuleId.price;
+        const weight = product.weight || 0;
+        const makingCharges = product.makingCharges || 0;
+
+        product.actualPrice = (rate * weight) + makingCharges;
+      }
+    }
 
     // Get total count for pagination
     const totalProducts = await Product.countDocuments(query);
@@ -1016,10 +1075,19 @@ const getProductBySlug = async (req, res) => {
       .populate({ path: "subcategoryId", select: "name" })
       .populate({ path: "festivalIds", select: "name" })
       .populate({ path: "relationIds", select: "name" })
+      .populate({ path: "priceRuleId", select: "name price" })
       .lean();
 
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
+    }
+
+    if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+      product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
+      if (product.discountPercent && product.discountPercent > 0) {
+        const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+        product.discountedPrice = parseFloat(discounted.toFixed(2));
+      }
     }
 
     // 🔢 Discount percentage
@@ -1027,20 +1095,20 @@ const getProductBySlug = async (req, res) => {
       product.discountPercentage = Math.round(
         ((product.actualPrice - product.discountedPrice) /
           product.actualPrice) *
-          100
+        100
       );
     }
 
     // ⭐ REVIEWS (summary + latest 3)
-const reviews = await Review.find({ productId: product._id })
-  .select("rating title reviewText images createdAt userId")
-  .populate({
-    path: "userId",
-    select: "name"
-  })
-  .sort({ createdAt: -1 })
-  .limit(3)
-  .lean();
+    const reviews = await Review.find({ productId: product._id })
+      .select("rating title reviewText images createdAt userId")
+      .populate({
+        path: "userId",
+        select: "name"
+      })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
 
 
     const reviewStats = await Review.aggregate([
@@ -1056,9 +1124,9 @@ const reviews = await Review.find({ productId: product._id })
 
     const reviewSummary = reviewStats.length
       ? {
-          averageRating: Number(reviewStats[0].averageRating.toFixed(1)),
-          totalReviews: reviewStats[0].totalReviews
-        }
+        averageRating: Number(reviewStats[0].averageRating.toFixed(1)),
+        totalReviews: reviewStats[0].totalReviews
+      }
       : { averageRating: 0, totalReviews: 0 };
 
     const responseData = {
@@ -1207,14 +1275,14 @@ const checkPromoCode = async (req, res) => {
       return errorResponse(res, 403, messages.PROMO_CODE_NOT_ELIGIBLE);
     }
 
-const promoDetails = {
-  code: promoCode.code,
-  discountType: promoCode.type,              // <- changed
-  discountValue: promoCode.value,            // <- changed
-  maxDiscount: promoCode.maxDiscount,
-  minOrderValue: promoCode.minPurchase,      // <- changed
-  expiryDate: promoCode.endDate,             // <- use endDate not expiryDate
-};
+    const promoDetails = {
+      code: promoCode.code,
+      discountType: promoCode.type,              // <- changed
+      discountValue: promoCode.value,            // <- changed
+      maxDiscount: promoCode.maxDiscount,
+      minOrderValue: promoCode.minPurchase,      // <- changed
+      expiryDate: promoCode.endDate,             // <- use endDate not expiryDate
+    };
     // Cache the result
     await cacheUtils.set(cacheKey, promoDetails, 300); // Cache for 5 minutes
 
@@ -1444,7 +1512,6 @@ const resendOTP = async (req, res) => {
   }
 };
 
-// Get trending products
 const getTrendingProducts = async (req, res) => {
   try {
     const { limit = 4 } = req.query;
@@ -1465,7 +1532,7 @@ const getTrendingProducts = async (req, res) => {
         },
       },
 
-      // 🔗 Join reviews
+      // Join reviews
       {
         $lookup: {
           from: "reviews",
@@ -1475,26 +1542,85 @@ const getTrendingProducts = async (req, res) => {
         },
       },
 
-      // ⭐ Reviews + 💸 Discount (NO JS LOOP)
+      // Join price rules
+      {
+        $lookup: {
+          from: "pricerules",
+          localField: "priceRuleId",
+          foreignField: "_id",
+          as: "priceRule",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$priceRule",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      // Calculate everything in ONE stage
       {
         $addFields: {
-          totalReviews: { $size: "$reviews" },
-
-          averageRating: {
+          actualPrice: {
             $cond: [
-              { $gt: [{ $size: "$reviews" }, 0] },
-              { $round: [{ $avg: "$reviews.rating" }, 1] },
-              0,
-            ],
-          },
+              {
+                $and: [
+                  { $eq: ["$isPriceFixed", false] },
+                  { $ifNull: ["$priceRule.price", false] }
+                ]
+              },
+              {
+                $add: [
+                  { $multiply: ["$priceRule.price", "$weight"] },
+                  "$makingCharges"
+                ]
+              },
+              "$actualPrice"
+            ]
+          }
+        }
+      },
 
+      // If dynamic + discountPercent present, compute discountedPrice from the updated actualPrice
+      {
+        $addFields: {
+          discountedPrice: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$isPriceFixed", false] },
+                  { $gt: ["$discountPercent", 0] },
+                  { $gt: ["$actualPrice", 0] }
+                ]
+              },
+              {
+                $round: [
+                  {
+                    $multiply: [
+                      "$actualPrice",
+                      { $subtract: [1, { $divide: ["$discountPercent", 100] }] }
+                    ]
+                  },
+                  2
+                ]
+              },
+              "$discountedPrice"
+            ]
+          }
+        }
+      },
+
+      // Discount calculation AFTER actual price updated
+      {
+        $addFields: {
           discountPercentage: {
             $cond: [
               {
                 $and: [
                   { $gt: ["$actualPrice", 0] },
-                  { $gt: ["$discountedPrice", 0] },
-                ],
+                  { $gt: ["$discountedPrice", 0] }
+                ]
               },
               {
                 $round: [
@@ -1503,28 +1629,27 @@ const getTrendingProducts = async (req, res) => {
                       {
                         $divide: [
                           { $subtract: ["$actualPrice", "$discountedPrice"] },
-                          "$actualPrice",
-                        ],
+                          "$actualPrice"
+                        ]
                       },
-                      100,
-                    ],
-                  },
-                ],
+                      100
+                    ]
+                  }
+                ]
               },
-              0,
-            ],
-          },
-        },
+              0
+            ]
+          }
+        }
       },
 
-      // 🧹 Remove reviews array
       {
         $project: {
           reviews: 0,
-        },
+          priceRule: 0
+        }
       },
 
-      // 🔥 Trending sort logic
       {
         $sort: {
           viewCount: -1,
@@ -1533,16 +1658,20 @@ const getTrendingProducts = async (req, res) => {
         },
       },
 
-      { $limit: parsedLimit },
+      {
+        $limit: parsedLimit,
+      },
     ]);
 
     const responseData = { products };
-
+    console.log(products, "products");
     await cacheUtils.set(cacheKey, responseData, 3600);
 
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
+
   } catch (error) {
     console.error("Get trending products error:", error);
+
     return errorResponse(
       res,
       500,
@@ -1554,7 +1683,7 @@ const getTrendingProducts = async (req, res) => {
 
 const getShopEssentials = async (req, res) => {
   try {
-    const LIMIT = 4; // 🔒 fixed, permanent
+    const LIMIT = 4; // 🔒 fixed
 
     const cacheKey = `shop_essentials_${LIMIT}`;
     const cached = await cacheUtils.get(cacheKey);
@@ -1575,6 +1704,8 @@ const getShopEssentials = async (req, res) => {
           isBlocked: false,
         },
       },
+
+      // Join reviews
       {
         $lookup: {
           from: "reviews",
@@ -1583,9 +1714,47 @@ const getShopEssentials = async (req, res) => {
           as: "reviews",
         },
       },
+
+      // Join price rules
+      {
+        $lookup: {
+          from: "pricerules",
+          localField: "priceRuleId",
+          foreignField: "_id",
+          as: "priceRule",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$priceRule",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      // Dynamic price calculation
       {
         $addFields: {
+          actualPrice: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$isPriceFixed", false] },
+                  { $ifNull: ["$priceRule.price", false] },
+                ],
+              },
+              {
+                $add: [
+                  { $multiply: ["$priceRule.price", "$weight"] },
+                  "$makingCharges",
+                ],
+              },
+              "$actualPrice",
+            ],
+          },
+
           totalReviews: { $size: "$reviews" },
+
           averageRating: {
             $cond: [
               { $gt: [{ $size: "$reviews" }, 0] },
@@ -1593,6 +1762,41 @@ const getShopEssentials = async (req, res) => {
               0,
             ],
           },
+        },
+      },
+
+      // If dynamic + discountPercent present, compute discountedPrice from the updated actualPrice
+      {
+        $addFields: {
+          discountedPrice: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$isPriceFixed", false] },
+                  { $gt: ["$discountPercent", 0] },
+                  { $gt: ["$actualPrice", 0] }
+                ]
+              },
+              {
+                $round: [
+                  {
+                    $multiply: [
+                      "$actualPrice",
+                      { $subtract: [1, { $divide: ["$discountPercent", 100] }] }
+                    ]
+                  },
+                  2
+                ]
+              },
+              "$discountedPrice"
+            ]
+          }
+        }
+      },
+
+      // Discount calculation
+      {
+        $addFields: {
           discountPercentage: {
             $cond: [
               {
@@ -1621,14 +1825,22 @@ const getShopEssentials = async (req, res) => {
           },
         },
       },
-      { $project: { reviews: 0 } },
+
+      {
+        $project: {
+          reviews: 0,
+          priceRule: 0,
+        },
+      },
+
       {
         $sort: {
           purchaseCount: -1,
           averageRating: -1,
         },
       },
-      { $limit: LIMIT }, // 🔥 ONLY 4
+
+      { $limit: LIMIT },
     ]);
 
     const responseData = {
@@ -1639,13 +1851,17 @@ const getShopEssentials = async (req, res) => {
 
     await cacheUtils.set(cacheKey, responseData, 3600);
 
-    return successResponse(res, 200, "Shop essentials retrieved successfully", responseData);
+    return successResponse(
+      res,
+      200,
+      "Shop essentials retrieved successfully",
+      responseData
+    );
   } catch (error) {
     console.error("Get shop essentials error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
-
 
 
 const getAllVideos = async (req, res) => {

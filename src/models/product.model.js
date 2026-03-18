@@ -32,7 +32,7 @@ const productSchema = new mongoose.Schema({
     type: Number,
     min: [0, 'Discounted price cannot be negative'],
     validate: {
-      validator: function(value) {
+      validator: function (value) {
         return value <= this.actualPrice;
       },
       message: 'Discounted price must be less than or equal to actual price'
@@ -63,7 +63,7 @@ const productSchema = new mongoose.Schema({
     default: [DEFAULT_IMAGE_URL],
     validate: [
       {
-        validator: function(v) {
+        validator: function (v) {
           return v.length <= 10;
         },
         message: 'Cannot have more than 10 images per product'
@@ -71,12 +71,12 @@ const productSchema = new mongoose.Schema({
     ]
   },
   filters: {
-  type: Map,
-  of: [String],
-  default: {},
-  index: true
-}
-,
+    type: Map,
+    of: [String],
+    default: {},
+    index: true
+  }
+  ,
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
@@ -114,10 +114,18 @@ const productSchema = new mongoose.Schema({
     default: false,
     select: false,
   },
-    isPriceFixed: {
+  isPriceFixed: {
     type: Boolean,
     default: false,
-   
+  },
+  priceRuleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PriceRule',
+  },
+  makingCharges: {
+    type: Number,
+    default: 0,
+    min: [0, 'Making charges cannot be negative']
   },
   isBlocked: {
     type: Boolean,
@@ -146,10 +154,18 @@ const productSchema = new mongoose.Schema({
     min: 0,
     max: 100,
     default: 0,
-    get: function() {
+    get: function () {
       if (!this.actualPrice || !this.discountedPrice) return 0;
       return Math.round(((this.actualPrice - this.discountedPrice) / this.actualPrice) * 100);
     }
+  },
+  // For dynamic-priced products: store discount percentage to apply on computed actualPrice
+  // (fixed-price products should use actualPrice + discountedPrice)
+  discountPercent: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 0,
   },
   sku: {
     type: String,
@@ -200,10 +216,10 @@ const productSchema = new mongoose.Schema({
     default: 0,
   },
   relatedProductIds: [
-  { type: mongoose.Schema.Types.ObjectId, ref: "Product" }
-],
+    { type: mongoose.Schema.Types.ObjectId, ref: "Product" }
+  ],
 
-}, { 
+}, {
   timestamps: true,
   toJSON: { getters: true, virtuals: true },
   toObject: { getters: true, virtuals: true }
@@ -217,7 +233,7 @@ productSchema.index({ categoryId: 1, subcategoryId: 1 });
 productSchema.index({ isFeatured: 1 });
 
 // Virtual for calculating discount percentage
-productSchema.virtual('discountPercentage').get(function() {
+productSchema.virtual('discountPercentage').get(function () {
   if (!this.actualPrice || !this.discountedPrice) return 0;
   return Math.round(((this.actualPrice - this.discountedPrice) / this.actualPrice) * 100);
 });
@@ -226,24 +242,34 @@ productSchema.virtual('discountPercentage').get(function() {
 productSchema.pre('save', function (next) {
   if (this.isModified('name') || !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
-    
+
     // Add a random string to ensure uniqueness
     if (this.isNew) {
       const randomStr = Math.random().toString(36).substring(2, 8);
       this.slug = `${this.slug}-${randomStr}`;
     }
   }
-  
+
   // Auto-update stock status
   if (this.isModified('stock')) {
     this.isInStock = this.stock > 0;
   }
-  
+
+  // Dynamic Pricing Validation
+  if (!this.isPriceFixed) {
+    if (!this.priceRuleId) {
+      return next(new Error('priceRuleId is required when price is set to dynamic (isPriceFixed = false)'));
+    }
+    if (!this.weight || this.weight <= 0) {
+      return next(new Error('A valid weight is required for dynamic pricing calculation'));
+    }
+  }
+
   next();
 });
 
 // Don't show deleted products in queries
-productSchema.pre(/^find/, function(next) {
+productSchema.pre(/^find/, function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });

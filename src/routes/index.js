@@ -27,6 +27,7 @@ const webhookRoute = require("./webhook.route");
 const dashboardRoute = require("./dashboard.route");
 const notificationRoute = require("./notification.route");
 const instagramVideos = require("./instagramVideo.routes");
+const returnRequestRoute = require("./returnRequest.route");
 
 const router = express.Router();
 
@@ -60,4 +61,5 @@ router.use("/addresses", addressRoute);
 router.use("/payment", paymentRoute);
 router.use("/curated-collections", curatedCollectionRoute);
 // router.use("/webhook", webhookRoute);
+router.use("/returns", returnRequestRoute);
 module.exports = router;

@@ -224,11 +224,11 @@ router.post(
       .isIn(['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'])
       .withMessage('Invalid payment method'),
       
-    // Optional fields validation
+    // Optional fields validation (promoCode can be Mongo ID or code string e.g. WELCOME20)
     check('promoCode')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid promo code ID'),
+      .custom((val) => !val || typeof val === 'string')
+      .withMessage('Invalid promo code'),
     check('giftWrap')
       .optional()
       .isBoolean()
@@ -244,6 +244,12 @@ router.post(
   ],
   orderController.createOrder
 );
+
+// Public track-order endpoints (guest or logged-in user by Order ID + Phone)
+router.post('/track', orderController.trackOrderPublic);
+router.post('/track/cancel', orderController.cancelOrderPublic);
+router.post('/track/return', orderController.requestReturnPublic);
+router.post('/magic', orderController.getOrderByMagicToken);
 
 /**
  * @swagger

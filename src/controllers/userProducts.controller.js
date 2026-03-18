@@ -99,11 +99,13 @@ const getProductBySlug = async (req, res) => {
     });
 
     const total = await Product.countDocuments(query);
+
     const products = await Product.find(query)
       .populate({ path: "categoryId", select: "name" })
       .populate({ path: "subcategoryId", select: "name" })
       .populate({ path: "festivalIds", select: "name" })
       .populate({ path: "relationIds", select: "name" })
+      .populate({ path: "priceRuleId", select: "name price" })
       .skip(skip)
       .limit(limit)
       .lean();
@@ -113,26 +115,45 @@ const getProductBySlug = async (req, res) => {
     }
 
     const enhancedProducts = products.map((product) => {
+
+      // Dynamic price calculation
+      if (
+        product.isPriceFixed === false &&
+        product.priceRuleId &&
+        product.priceRuleId.price
+      ) {
+        const rate = product.priceRuleId.price;
+        const weight = product.weight || 0;
+        const making = product.makingCharges || 0;
+
+        product.actualPrice = (rate * weight) + making;
+        if (product.discountPercent && product.discountPercent > 0) {
+          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+          product.discountedPrice = parseFloat(discounted.toFixed(2));
+        }
+      }
+
+      // Discount calculation
       if (product.actualPrice && product.discountedPrice) {
         product.discountPercentage = Math.round(
           ((product.actualPrice - product.discountedPrice) /
             product.actualPrice) *
-            100
+          100
         );
       }
+
       return product;
     });
 
     const availableFilters = {};
     products.forEach((p) => {
-      // Collect dynamic filters
       if (p.filters && typeof p.filters === "object") {
         Object.keys(p.filters).forEach((key) => {
           if (!availableFilters[key]) availableFilters[key] = new Set();
           if (Array.isArray(p.filters[key])) {
-             p.filters[key].forEach((v) => availableFilters[key].add(v));
+            p.filters[key].forEach((v) => availableFilters[key].add(v));
           } else if (typeof p.filters[key] === "string") {
-             availableFilters[key].add(p.filters[key]);
+            availableFilters[key].add(p.filters[key]);
           }
         });
       }
