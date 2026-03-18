@@ -134,7 +134,7 @@ router.post(
     next();
   },
   userAuth,
-  clearRouteCache,
+  // clearRouteCache,
   kittyController.enrollInKittyPlan,
 );
 

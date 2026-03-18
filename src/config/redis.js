@@ -87,6 +87,11 @@ const cacheUtils = {
     }
   },
 
+  // Backwards-compatible alias used across controllers/middlewares
+  async clearPattern(pattern) {
+    return cacheUtils.delPattern(pattern);
+  },
+
   // Clear entire cache
   async clear() {
     try {

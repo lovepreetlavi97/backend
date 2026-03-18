@@ -18,7 +18,7 @@ const ObjectId = mongoose.Types.ObjectId;
 const getAllKittyPlans = async (req, res) => {
   try {
     const { category, minAmount, maxAmount, page = 1, limit = 10 } = req.query;
-    
+
     // Build filter (no isActive filter for admin)
     const filter = {};
     if (category) filter.category = category;
@@ -29,7 +29,7 @@ const getAllKittyPlans = async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const plans = await findMany(KittyPlan, filter, {}, {
       sort: { createdAt: -1 },
       skip,
@@ -56,7 +56,7 @@ const getAllKittyPlans = async (req, res) => {
 const getActiveKittyPlans = async (req, res) => {
   try {
     const { category, minAmount, maxAmount, page = 1, limit = 10 } = req.query;
-    
+
     // Build filter
     const filter = { isActive: true };
     if (category) filter.category = category;
@@ -67,7 +67,7 @@ const getActiveKittyPlans = async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const plans = await findMany(KittyPlan, filter, {}, {
       sort: { createdAt: -1 },
       skip,
@@ -94,7 +94,7 @@ const getActiveKittyPlans = async (req, res) => {
 const getKittyPlanById = async (req, res) => {
   try {
     const { planId } = req.params;
-    
+
     if (!ObjectId.isValid(planId)) {
       return errorResponse(res, 400, messages.INVALID_ID);
     }
@@ -198,8 +198,8 @@ const deleteKittyPlan = async (req, res) => {
     }
 
     // Check if there are active enrollments
-    const activeEnrollments = await UserKitty.countDocuments({ 
-      planId, 
+    const activeEnrollments = await UserKitty.countDocuments({
+      planId,
       status: { $in: ['active', 'paused'] }
     });
 
@@ -219,35 +219,48 @@ const deleteKittyPlan = async (req, res) => {
   }
 };
 
-// Enroll user in kitty plan
 const enrollInKittyPlan = async (req, res) => {
   try {
+    console.log("👉 [STEP 1] API HIT");
+
     const { planId } = req.body;
     const userId = req.user?._id;
 
+    console.log("👉 [STEP 2] Data Extracted", { planId, userId });
+
     if (!userId) {
+      console.log("❌ [FAIL] No userId");
       return errorResponse(res, 401, "Unauthorized: missing user");
     }
 
     if (!planId) {
+      console.log("❌ [FAIL] No planId");
       return errorResponse(res, 400, "planId is required");
     }
 
     if (!ObjectId.isValid(planId)) {
+      console.log("❌ [FAIL] Invalid planId");
       return errorResponse(res, 400, messages.INVALID_ID);
     }
 
-    // Check if plan exists and is available
+    console.log("👉 [STEP 3] Fetching Plan");
+
     const plan = await KittyPlan.findById(planId);
+
+    console.log("👉 [STEP 4] Plan Fetched", plan?._id);
+
     if (!plan) {
+      console.log("❌ [FAIL] Plan not found");
       return errorResponse(res, 404, 'Kitty plan not found');
     }
 
     if (!plan.isAvailableForEnrollment()) {
+      console.log("❌ [FAIL] Plan not available");
       return errorResponse(res, 400, 'Plan is not available for enrollment');
     }
 
-    // Check if user is already enrolled
+    console.log("👉 [STEP 5] Checking Existing Enrollment");
+
     const existingEnrollment = await UserKitty.findOne({
       userId,
       planId,
@@ -255,17 +268,21 @@ const enrollInKittyPlan = async (req, res) => {
     });
 
     if (existingEnrollment) {
+      console.log("❌ [FAIL] Already enrolled");
       return errorResponse(res, 400, 'You are already enrolled in this plan');
     }
 
-    // Calculate dates
+    console.log("👉 [STEP 6] Calculating Dates");
+
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + plan.duration);
-    const nextPaymentDate = new Date(startDate);
-    nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
 
-    // Create user kitty enrollment
+    const nextPaymentDate = new Date(startDate);
+    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+
+    console.log("👉 [STEP 7] Creating UserKitty");
+
     const userKitty = await UserKitty.create({
       planId,
       userId,
@@ -283,21 +300,20 @@ const enrollInKittyPlan = async (req, res) => {
       }]
     });
 
-    // Increment plan participants
-    await plan.incrementParticipants();
+    console.log("👉 [STEP 8] Created", userKitty._id);
 
-    // Populate plan details
     await userKitty.populate('planId');
 
-    // Clear cache
+    console.log("👉 [STEP 9] Populated Plan");
+
     await cacheUtils.clearPattern(`user:${userId}:kitties:*`);
 
+    console.log("👉 [STEP 10] Cache Cleared");
+
     return successResponse(res, 201, 'Successfully enrolled in kitty plan', userKitty);
+
   } catch (error) {
-    console.error('Error enrolling in kitty plan:', error);
-    if (error.message === 'Plan has reached maximum participants') {
-      return errorResponse(res, 400, error.message);
-    }
+    console.error("💥 [CRASH]", error);
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };
@@ -408,39 +424,73 @@ const getKittyDetails = async (req, res) => {
 // Initiate kitty payment
 const initiateKittyPayment = async (req, res) => {
   try {
+    console.log("🚀 [STEP 0] API HIT");
+
     const { paymentId } = req.body;
     const userId = req.user?._id;
 
+    console.log("👉 [STEP 1] Data Extracted", { paymentId, userId });
+
+    if (!userId) {
+      console.log("❌ [FAIL] No userId");
+      return errorResponse(res, 401, "Unauthorized");
+    }
+
+    if (!paymentId) {
+      console.log("❌ [FAIL] paymentId missing");
+      return errorResponse(res, 400, "paymentId is required");
+    }
+
     if (!ObjectId.isValid(paymentId)) {
+      console.log("❌ [FAIL] Invalid paymentId");
       return errorResponse(res, 400, messages.INVALID_ID);
     }
 
-    // Find the user's kitty and payment
+    console.log("👉 [STEP 2] Fetching UserKitty");
+
     const userKitty = await UserKitty.findOne({
       userId,
       'payments._id': paymentId,
       status: 'active'
     }).populate('planId');
 
+    console.log("👉 [STEP 3] UserKitty Result:", userKitty?._id);
+
     if (!userKitty) {
+      console.log("❌ [FAIL] UserKitty not found");
       return errorResponse(res, 404, 'Payment not found');
     }
 
     const payment = userKitty.payments.id(paymentId);
+
+    console.log("👉 [STEP 4] Payment Found:", payment);
+
+    if (!payment) {
+      console.log("❌ [FAIL] Payment object null");
+      return errorResponse(res, 404, 'Payment not found in array');
+    }
+
     if (payment.status !== 'pending') {
+      console.log("❌ [FAIL] Payment not pending:", payment.status);
       return errorResponse(res, 400, 'Payment is not pending');
     }
 
+    console.log("👉 [STEP 5] Checking Razorpay keys");
+
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.log("❌ [FAIL] Razorpay keys missing");
       return errorResponse(res, 500, "Razorpay keys are not configured");
     }
+
+    console.log("👉 [STEP 6] Creating Razorpay instance");
 
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    // Create Razorpay order and tag it as KITTY in notes (used during verification)
+    console.log("👉 [STEP 7] Creating Razorpay order");
+
     const order = await razorpay.orders.create({
       amount: Math.round(payment.amount * 100),
       currency: "INR",
@@ -456,9 +506,15 @@ const initiateKittyPayment = async (req, res) => {
       },
     });
 
-    // Update payment with order ID
+    console.log("👉 [STEP 8] Razorpay Order Created:", order.id);
+
     payment.razorpayOrderId = order.id;
+
+    console.log("👉 [STEP 9] Saving userKitty");
+
     await userKitty.save();
+
+    console.log("👉 [STEP 10] Saved successfully");
 
     return successResponse(res, 200, 'Payment initiated successfully', {
       orderId: order.id,
@@ -469,8 +525,10 @@ const initiateKittyPayment = async (req, res) => {
       description: `Kitty payment for ${userKitty.planId.name}`,
       paymentId: payment._id
     });
+
   } catch (error) {
-    console.error('Error initiating kitty payment:', error);
+    console.log("eroorroororooro")
+    console.error("💥 [CRASH] Error initiating kitty payment:", error);
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };

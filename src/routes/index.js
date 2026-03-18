@@ -27,14 +27,10 @@ const webhookRoute = require("./webhook.route");
 const dashboardRoute = require("./dashboard.route");
 const notificationRoute = require("./notification.route");
 const instagramVideos = require("./instagramVideo.routes");
-<<<<<<< HEAD
-const returnRequestRoute = require("./returnRequest.route");
-=======
 const kittyRoutes = require("./kitty.route");
 const siteSettingsRoutes = require("./siteSettings.route");
 const adminSiteSettingsRoutes = require("./adminSiteSettings.route");
->>>>>>> d7786a3b657878dfbe240953211ec637cb37a3a1
-
+const returnRequestRoute = require("./returnRequest.route");
 const router = express.Router();
 
 // Register your routes

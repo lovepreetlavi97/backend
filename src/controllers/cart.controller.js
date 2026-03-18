@@ -167,7 +167,7 @@ const getCart = async (req, res) => {
       .populate({
         path: "items.productId",
         select:
-          "name image actualPrice discountedPrice weight images isPriceFixed makingCharges",
+          "name image slug actualPrice discountedPrice discountPercent weight images isPriceFixed makingCharges",
         populate: { path: "priceRuleId", select: "name price" },
       })
       .lean();
@@ -176,7 +176,7 @@ const getCart = async (req, res) => {
       return errorResponse(res, 404, messages.CART_NOT_FOUND);
     }
 
-    // Dynamic Price Calculation
+    // Dynamic Price Calculation (align with trending-products)
     if (cart.items && cart.items.length) {
       cart.items = cart.items.map((item) => {
         const product = item.productId;
@@ -194,6 +194,12 @@ const getCart = async (req, res) => {
           const makingCharges = product.makingCharges || 0;
 
           product.actualPrice = pricePerUnit * weight + makingCharges;
+
+          // If discountPercent exists, compute discountedPrice from updated actualPrice
+          if (product.discountPercent && product.discountPercent > 0) {
+            const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+            product.discountedPrice = parseFloat(discounted.toFixed(2));
+          }
         }
 
         // Discount calculation
@@ -236,7 +242,7 @@ const updateCartQuantity = async (req, res) => {
     const cart = await Cart.findOne({ userId })
       .populate({
         path: "items.productId",
-        select: "name image actualPrice discountedPrice weight images isPriceFixed makingCharges",
+        select: "name image slug actualPrice discountedPrice discountPercent weight images isPriceFixed makingCharges",
         populate: { path: "priceRuleId", select: "name price" }
       });
     if (!cart) return errorResponse(res, 404, "Cart not found");
@@ -271,7 +277,7 @@ const updateCartQuantity = async (req, res) => {
     const populatedCart = await Cart.findOne({ userId })
       .populate({
         path: "items.productId",
-        select: "name image actualPrice discountedPrice weight images isPriceFixed makingCharges",
+        select: "name image slug actualPrice discountedPrice discountPercent weight images isPriceFixed makingCharges",
         populate: { path: "priceRuleId", select: "name price" }
       })
       .lean();
@@ -284,6 +290,11 @@ const updateCartQuantity = async (req, res) => {
           const weight = product.weight || 0;
           const making = product.makingCharges || 0;
           product.actualPrice = (liveRate * weight) + making;
+
+          if (product.discountPercent && product.discountPercent > 0) {
+            const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+            product.discountedPrice = parseFloat(discounted.toFixed(2));
+          }
         }
         return item;
       });

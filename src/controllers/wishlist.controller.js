@@ -127,7 +127,9 @@ const getWishlist = async (req, res) => {
     const wishlist = await Wishlist.findOne({ userId })
       .populate({
         path: "products",
-        select: "name slug actualPrice discountedPrice weight images isInStock stock image",
+        // Include fields required to compute pricing consistently with trending-products
+        select: "name slug actualPrice discountedPrice discountPercent weight images isInStock stock image isPriceFixed makingCharges priceRuleId",
+        populate: { path: "priceRuleId", select: "name price" },
         match: { isDeleted: false, isBlocked: false }
       })
       .lean();
@@ -148,6 +150,40 @@ const getWishlist = async (req, res) => {
     
     // Filter out any null products (may happen if products were deleted/blocked after being added to wishlist)
     wishlist.products = wishlist.products.filter(product => product !== null);
+
+    // Align pricing with trending-products (dynamic actualPrice + discountedPrice from discountPercent)
+    if (wishlist.products && wishlist.products.length) {
+      wishlist.products = wishlist.products.map((product) => {
+        if (
+          product &&
+          product.isPriceFixed === false &&
+          product.priceRuleId &&
+          product.priceRuleId.price
+        ) {
+          const liveRate = product.priceRuleId.price;
+          const weight = product.weight || 0;
+          const makingCharges = product.makingCharges || 0;
+
+          product.actualPrice = (liveRate * weight) + makingCharges;
+
+          if (product.discountPercent && product.discountPercent > 0) {
+            const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+            product.discountedPrice = parseFloat(discounted.toFixed(2));
+          }
+        }
+
+        // Keep a computed percentage for UI parity (optional)
+        if (product?.actualPrice && product?.discountedPrice && product.actualPrice > 0) {
+          product.discountPercentage = Math.round(
+            ((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100
+          );
+        } else if (product) {
+          product.discountPercentage = 0;
+        }
+
+        return product;
+      });
+    }
     
     // Cache the wishlist data
     await cacheUtils.set(cacheKey, wishlist, 600); // Cache for 10 minutes
@@ -247,13 +283,46 @@ const syncGuestWishlist = async (req, res) => {
     const populatedWishlist = await Wishlist.findOne({ userId })
       .populate({
         path: "products",
-        select: "name slug actualPrice discountedPrice weight images isInStock stock image",
+        select: "name slug actualPrice discountedPrice discountPercent weight images isInStock stock image isPriceFixed makingCharges priceRuleId",
+        populate: { path: "priceRuleId", select: "name price" },
         match: { isDeleted: false, isBlocked: false }
       })
       .lean();
 
     // Filter out null products
     populatedWishlist.products = populatedWishlist.products.filter(product => product !== null);
+
+    // Align pricing with trending-products
+    if (populatedWishlist.products && populatedWishlist.products.length) {
+      populatedWishlist.products = populatedWishlist.products.map((product) => {
+        if (
+          product &&
+          product.isPriceFixed === false &&
+          product.priceRuleId &&
+          product.priceRuleId.price
+        ) {
+          const liveRate = product.priceRuleId.price;
+          const weight = product.weight || 0;
+          const makingCharges = product.makingCharges || 0;
+
+          product.actualPrice = (liveRate * weight) + makingCharges;
+          if (product.discountPercent && product.discountPercent > 0) {
+            const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+            product.discountedPrice = parseFloat(discounted.toFixed(2));
+          }
+        }
+
+        if (product?.actualPrice && product?.discountedPrice && product.actualPrice > 0) {
+          product.discountPercentage = Math.round(
+            ((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100
+          );
+        } else if (product) {
+          product.discountPercentage = 0;
+        }
+
+        return product;
+      });
+    }
 
     // Clear cache
     await cacheUtils.del(`wishlist_${userId}`);
