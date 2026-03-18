@@ -29,6 +29,10 @@ const os = require("os");
     // Worker process - run the Express app
     const app = require("./app");
     const port = process.env.PORT || 5000;
+    const { initKittyCron } = require("./cron/kittyJobs");
+    
+    // Start cron jobs
+    initKittyCron();
     
     app.listen(port, () => {
         console.log(`Worker ${process.pid} started, running on http://localhost:${port}`);

@@ -22,6 +22,9 @@ const Grievance = require('./grievance.model');
 const Banner = require('./banner.model');
 const Notification = require('./notification.model');
 const CuratedCollection = require('./curatedCollection.model');
+const KittyPlan = require('./kittyPlan.model');
+const UserKitty = require('./userKitty.model');
+const SiteSettings = require('./siteSettings.model');
 
 module.exports = {
   Cart,
@@ -45,5 +48,8 @@ module.exports = {
   Grievance,
   Banner,
   Notification,
-  CuratedCollection
+  CuratedCollection,
+  KittyPlan,
+  UserKitty,
+  SiteSettings
 };
