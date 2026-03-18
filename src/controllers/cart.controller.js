@@ -249,7 +249,8 @@ const updateCartQuantity = async (req, res) => {
     console.log("User's cart:", cart);
     // Find product in cart
     const productIndex = cart.items.findIndex((item) => {
-      const match = item.productId._id.toString() == productId;
+      if (!item.productId) return false; // Prevent crash if product is deleted
+      const match = item.productId._id.toString() === productId;
       console.log("checking item =>", item.productId._id.toString(), productId, match);
       return match;
     });
@@ -268,10 +269,11 @@ const updateCartQuantity = async (req, res) => {
       return errorResponse(res, 400, "Quantity cannot be less than 1");
     }
 
-    item.quantity = newQty;
-
-    // Save changes
-    await cart.save();
+    // Save changes iteratively via atomic update
+    await Cart.updateOne(
+      { userId, "items.productId": new mongoose.Types.ObjectId(productId) },
+      { $set: { "items.$.quantity": newQty } }
+    );
 
     // Return fully populated cart with dynamic prices
     const populatedCart = await Cart.findOne({ userId })
