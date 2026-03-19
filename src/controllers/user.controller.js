@@ -907,18 +907,25 @@ const getAllSubCategories = async (req, res) => {
 // Get all categories for user
 const getAllCategories = async (req, res) => {
   try {
+    const { limit } = req.query;
+    const cacheKey = `categories_user_${limit || "all"}`;
+
     // Try to get from cache first
-    const cachedCategories = await cacheUtils.get("categories_user");
+    const cachedCategories = await cacheUtils.get(cacheKey);
     if (cachedCategories) {
       return successResponse(res, 200, messages.CATEGORIES_RETRIEVED, {
         categories: cachedCategories,
       });
     }
 
+    const queryLimit = parseInt(limit) || 1000;
+    console.log(`🚀 DEBUG: Fetching categories with limit ${queryLimit}`);
+
     const [categories, subcategories] = await Promise.all([
-      Category.find({ isDeleted: false, isBlocked: false }).select("_id name slug image").lean(),
+      Category.find({ isDeleted: false, isBlocked: false }).select("_id name slug image").limit(queryLimit).lean(),
       SubCategory.find({ isDeleted: false, isBlocked: false })
-        .select("_id name image category categoryId parentId")
+        .select("_id name slug image category categoryId parentId")
+        .limit(queryLimit * 5) // fetch more subcategories to cover the tree
         .lean(),
     ]);
 
@@ -942,12 +949,12 @@ const getAllCategories = async (req, res) => {
     // Attach nested subcategory trees to categories
     const categoriesWithTree = categories.map((c) => {
       const flat = byCategory.get(String(c._id)) || [];
-      const tree = buildTree(flat, { idKey: "_id", parentKey: "parentId", childrenKey: "children" });
+      const tree = buildTree(flat, { idKey: "_id", parentKey: "parentId", childrenKey: "subcategories" });
       return { ...c, subcategories: tree };
     });
 
     // Cache the result
-    await cacheUtils.set("categories_user", categoriesWithTree || [], 1800);
+    await cacheUtils.set(cacheKey, categoriesWithTree || [], 1800);
 
     return successResponse(res, 200, messages.CATEGORIES_RETRIEVED, {
       categories: categoriesWithTree || [],
@@ -1085,6 +1092,72 @@ const getAllProducts = async (req, res) => {
     return errorResponse(res, 500, messages.PRODUCTS_RETRIEVAL_FAILED, {
       error: error.message,
     });
+  }
+};
+
+// Get products by category/subcategory slug or 'all'
+const getProductsBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { page = 1, limit = 12, sort = "createdAt", order = "desc" } = req.query;
+
+    let query = { isDeleted: false, isBlocked: false };
+
+    if (slug !== "all") {
+      // Find category or subcategory by slug
+      const [category, subcategory] = await Promise.all([
+        Category.findOne({ slug, isDeleted: false }),
+        SubCategory.findOne({ slug, isDeleted: false }),
+      ]);
+
+      if (subcategory) {
+        query.subcategoryId = subcategory._id;
+      } else if (category) {
+        query.categoryId = category._id;
+      } else {
+        // If slug doesn't match anything, return empty but success
+        return successResponse(res, 200, "Collection not found", {
+          products: [],
+          pagination: { totalPages: 0, totalItems: 0 }
+        });
+      }
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sortObj = {};
+    sortObj[sort] = order === "desc" ? -1 : 1;
+
+    const products = await Product.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate("categoryId", "name")
+      .populate("subcategoryId", "name")
+      .lean();
+
+    // Price calculation
+    products.forEach(p => {
+      if (!p.isPriceFixed && p.priceRuleId && p.priceRuleId.price) {
+        p.actualPrice = (p.priceRuleId.price * (p.weight || 0)) + (p.makingCharges || 0);
+      }
+    });
+
+    const totalProducts = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalProducts / parseInt(limit));
+
+    const result = {
+      products,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: totalProducts,
+      },
+    };
+
+    return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
+  } catch (error) {
+    console.error("Get products by slug error:", error);
+    return errorResponse(res, 500, error.message);
   }
 };
 
@@ -2001,5 +2074,6 @@ module.exports = {
   getShopEssentials,
   homeSearch,
   getRelatedProducts,
-  getAllCuratedCollections
+  getAllCuratedCollections,
+  getProductsBySlug
 };

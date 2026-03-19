@@ -164,9 +164,29 @@ const getProductBySlug = async (req, res) => {
       parsedFilters[key] = Array.from(availableFilters[key]);
     });
 
+    // Fetch CATEGORY TREE for sidebar
+    const [allCategories, allSubcategories] = await Promise.all([
+      Category.find({ isDeleted: false, isBlocked: false }).select("name slug").lean(),
+      SubCategory.find({ isDeleted: false, isBlocked: false }).select("name slug parentId categoryId").lean()
+    ]);
+
+    const { buildTree } = require("../utils/treeBuilder");
+    const byCategory = new Map();
+    for (const s of allSubcategories) {
+      if (!s.categoryId) continue;
+      const cid = String(s.categoryId);
+      if (!byCategory.has(cid)) byCategory.set(cid, []);
+      byCategory.get(cid).push(s);
+    }
+    const categoryTree = allCategories.map(c => {
+      const flat = byCategory.get(String(c._id)) || [];
+      return { ...c, subcategories: buildTree(flat, { idKey: "_id", parentKey: "parentId" }) };
+    });
+
     const responseData = {
       products: enhancedProducts,
       availableFilters: parsedFilters,
+      categoryTree,
       pagination: {
         total,
         page,

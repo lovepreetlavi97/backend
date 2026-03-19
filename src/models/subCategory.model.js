@@ -46,7 +46,20 @@ const subcategorySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  slug: {
+    type: String,
+    unique: true
+  },
 }, { timestamps: true });
+
+// Generate slug from name
+subcategorySchema.pre('save', function(next) {
+  const slugify = require('slugify');
+  if (this.isModified('name') || !this.slug) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  next();
+});
 
 // Keep backward compatibility: if only one of category/categoryId is set, mirror it.
 subcategorySchema.pre('save', function (next) {
@@ -55,6 +68,6 @@ subcategorySchema.pre('save', function (next) {
   next();
 });
 
-subcategorySchema.index({ categoryId: 1, parentId: 1, name: 1 });
+subcategorySchema.index({ categoryId: 1, parentId: 1, name: 1, slug: 1 });
 
 module.exports = mongoose.model('Subcategory', subcategorySchema);

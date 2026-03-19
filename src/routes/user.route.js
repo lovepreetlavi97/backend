@@ -297,6 +297,7 @@ router.get("/categories", cacheRoute(1800), userController.getAllCategories);
  *         description: A list of products with pagination
  */
 router.get("/products", cacheRoute(600), userController.getAllProducts);
+router.get("/products/:slug", cacheRoute(600), userController.getProductsBySlug);
 
 /**
  * @swagger
