@@ -14,24 +14,31 @@ const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add th
 // Create a new subcategory
 const createSubcategory = async (req, res) => {
   try {
-    const { name, category, isFeatured } = req.body;
+    const { name, category, categoryId, parentId, isFeatured } = req.body;
     console.log(name, category, isFeatured ,"name, category, isFeatured ")
     // Basic validation
     if (!name) {
       return errorResponse(res, 400, "Subcategory name is required");
     }
 
+    const resolvedCategoryId = categoryId || category;
+
     // Validate category ID if provided
-    if (category && !mongoose.Types.ObjectId.isValid(category)) {
+    if (resolvedCategoryId && !mongoose.Types.ObjectId.isValid(resolvedCategoryId)) {
       return errorResponse(res, 400, "Invalid category ID format");
     }
 
     // Check if category exists if provided
-    if (category) {
-      const categoryExists = await Category.findById(category);
+    if (resolvedCategoryId) {
+      const categoryExists = await Category.findById(resolvedCategoryId);
       if (!categoryExists) {
         return errorResponse(res, 404, "Category not found");
       }
+    }
+
+    // Validate parentId (optional)
+    if (parentId && !mongoose.Types.ObjectId.isValid(parentId)) {
+      return errorResponse(res, 400, "Invalid parentId format");
     }
    // Handle image
     if (!req.file) {
@@ -43,7 +50,9 @@ const createSubcategory = async (req, res) => {
 
     const subcategoryData = {
       name,
-      category,
+      category: resolvedCategoryId,
+      categoryId: resolvedCategoryId,
+      parentId: parentId ? new mongoose.Types.ObjectId(parentId) : null,
       image: imageKey,
       isFeatured: isFeatured,
       isBlocked: false
@@ -66,7 +75,9 @@ const getAllSubcategories = async (req, res) => {
       sortOrder = 'asc',
       isBlocked,
       search,
-      category
+      category,
+      categoryId,
+      parentId
     } = req.query;
 
     // Build query
@@ -80,15 +91,25 @@ const getAllSubcategories = async (req, res) => {
       query.name = { $regex: search, $options: 'i' };
     }
 
-    if (category) {
-      query.category = category;
+    const resolvedCategoryId = categoryId || category;
+    if (resolvedCategoryId) {
+      query.$or = [{ category: resolvedCategoryId }, { categoryId: resolvedCategoryId }];
+    }
+    if (parentId !== undefined) {
+      // parentId can be "null" to fetch roots
+      if (parentId === "null" || parentId === "") query.parentId = null;
+      else query.parentId = parentId;
     }
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sortOptions = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
 
-    const populate = { path: 'category', select: 'name' };
+    const populate = [
+      { path: 'category', select: 'name' },
+      { path: 'categoryId', select: 'name' },
+      { path: 'parentId', select: 'name' },
+    ];
     const subcategories = await SubCategory.find(query)
       .skip(skip)
       .limit(parseInt(limit))

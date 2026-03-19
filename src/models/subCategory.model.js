@@ -9,10 +9,25 @@ const subcategorySchema = new mongoose.Schema({
     required: true,
     trim: true, // Trim whitespace from the name
   },
+  // Backward-compatible category reference (legacy)
   category: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category', // Reference to the Category model
-    required: false, // Ensure every subcategory is tied to a category
+    ref: 'Category',
+    required: false,
+  },
+  // New canonical category reference
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: false,
+    index: true,
+  },
+  // New parent reference for multi-level nesting
+  parentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subcategory',
+    default: null,
+    index: true,
   },
   image: {
     type: String,
@@ -32,5 +47,14 @@ const subcategorySchema = new mongoose.Schema({
     default: false,
   },
 }, { timestamps: true });
+
+// Keep backward compatibility: if only one of category/categoryId is set, mirror it.
+subcategorySchema.pre('save', function (next) {
+  if (!this.categoryId && this.category) this.categoryId = this.category;
+  if (!this.category && this.categoryId) this.category = this.categoryId;
+  next();
+});
+
+subcategorySchema.index({ categoryId: 1, parentId: 1, name: 1 });
 
 module.exports = mongoose.model('Subcategory', subcategorySchema);

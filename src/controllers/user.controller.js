@@ -82,8 +82,6 @@ const createUser = async (req, res) => {
 };
 const getRelatedProducts = async (req, res) => {
   try {
-    console.log("88888888888888888888888888888888888888888888888");
-
     const { ids } = req.query;
 
     if (!ids) {
@@ -91,25 +89,50 @@ const getRelatedProducts = async (req, res) => {
     }
 
     // Convert URL ?ids=1,2,3 into array
-    const idArray = ids.split(",").map((id) => id.trim());
-
-    const cacheKey = `related_products_${idArray.join("_")}`;
-    const cached = await cacheUtils.get(cacheKey);
-
-    if (cached) {
-      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
+    const idArray = ids.split(",").map((id) => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+    
+    if (idArray.length === 0) {
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { products: [] });
     }
 
-    const products = await Product.find({
-      _id: { $in: idArray },
-      isDeleted: false,
-      isBlocked: false,
-    })
-      .populate("priceRuleId", "name price")
+    const cacheKey = `related_products_v2_${idArray.sort().join("_")}`;
+    const cachedRaw = await cacheUtils.get(cacheKey);
+
+    if (cachedRaw) {
+      return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cachedRaw);
+    }
+
+    // 1. Find the categories/subcategories of the products in the cart
+    const cartProducts = await Product.find({ _id: { $in: idArray } })
+      .select("categoryId subcategoryId relatedProductIds")
       .lean();
 
-    const enhancedProducts = products.map((product) => {
+    const categoryIds = cartProducts.map(p => p.categoryId).filter(Boolean);
+    const subCategoryIds = cartProducts.map(p => p.subcategoryId).filter(Boolean);
+    const manualRelatedIds = cartProducts.flatMap(p => p.relatedProductIds || []).filter(Boolean);
 
+    // 2. Find products that are related (same subcategory, same category, or manually linked)
+    // and are NOT already in the cart
+    const query = {
+      _id: { $nin: idArray.map(id => new mongoose.Types.ObjectId(id)) },
+      isDeleted: false,
+      isBlocked: false,
+      $or: [
+        { _id: { $in: manualRelatedIds } },
+        { subcategoryId: { $in: subCategoryIds } },
+        { categoryId: { $in: categoryIds } }
+      ]
+    };
+
+    const relatedProducts = await Product.find(query)
+      .select("_id name description title slug actualPrice discountedPrice discountPercent images categoryId subcategoryId tags isPriceFixed weight makingCharges priceRuleId averageRating totalReviews")
+      .populate("priceRuleId", "name price")
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // 3. Enhance products with dynamic prices
+    const enhancedProducts = relatedProducts.map((product) => {
       // Dynamic price calculation
       if (
         product.isPriceFixed === false &&
@@ -121,9 +144,15 @@ const getRelatedProducts = async (req, res) => {
         const makingCharges = product.makingCharges || 0;
 
         product.actualPrice = (pricePerUnit * weight) + makingCharges;
+        
+        // If there's a discount percentage, calculate discountedPrice
+        if (product.discountPercent && product.discountPercent > 0) {
+          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+          product.discountedPrice = Math.floor(discounted); // Match frontend floor logic
+        }
       }
 
-      // Discount calculation
+      // Final discount percentage for display
       if (
         product.actualPrice &&
         product.discountedPrice &&
@@ -148,7 +177,6 @@ const getRelatedProducts = async (req, res) => {
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {
     console.error("Get related products error:", error);
-
     return errorResponse(
       res,
       500,
@@ -858,7 +886,9 @@ const getAllSubCategories = async (req, res) => {
     const subcategories = await SubCategory.find({
       isDeleted: false,
       isBlocked: false,
-    });
+    })
+      .select("_id name image category categoryId parentId")
+      .lean();
 
     // Cache the result
     await cacheUtils.set("subcategories_user", subcategories || []);
@@ -885,16 +915,42 @@ const getAllCategories = async (req, res) => {
       });
     }
 
-    const categories = await Category.find({
-      isDeleted: false,
-      isBlocked: false,
+    const [categories, subcategories] = await Promise.all([
+      Category.find({ isDeleted: false, isBlocked: false }).select("_id name slug image").lean(),
+      SubCategory.find({ isDeleted: false, isBlocked: false })
+        .select("_id name image category categoryId parentId")
+        .lean(),
+    ]);
+
+    // Normalize categoryId for backward compatibility
+    for (let i = 0; i < subcategories.length; i++) {
+      const s = subcategories[i];
+      if (!s.categoryId && s.category) s.categoryId = s.category;
+    }
+
+    const { buildTree } = require("../utils/treeBuilder");
+
+    // Group subcategories by categoryId (O(n))
+    const byCategory = new Map();
+    for (const s of subcategories) {
+      const cid = s.categoryId ? String(s.categoryId) : null;
+      if (!cid) continue;
+      if (!byCategory.has(cid)) byCategory.set(cid, []);
+      byCategory.get(cid).push(s);
+    }
+
+    // Attach nested subcategory trees to categories
+    const categoriesWithTree = categories.map((c) => {
+      const flat = byCategory.get(String(c._id)) || [];
+      const tree = buildTree(flat, { idKey: "_id", parentKey: "parentId", childrenKey: "children" });
+      return { ...c, subcategories: tree };
     });
 
     // Cache the result
-    await cacheUtils.set("categories_user", categories || []);
+    await cacheUtils.set("categories_user", categoriesWithTree || [], 1800);
 
     return successResponse(res, 200, messages.CATEGORIES_RETRIEVED, {
-      categories: categories || [],
+      categories: categoriesWithTree || [],
     });
   } catch (error) {
     console.error("Get categories error:", error);
