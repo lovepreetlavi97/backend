@@ -95,6 +95,7 @@ const createProduct = async (req, res) => {
       isPriceFixed,
       priceRuleId,
       makingCharges,
+      attributes,
     } = req.body;
     console.log("Request Body: ", req.body);
     // return
@@ -200,6 +201,20 @@ const createProduct = async (req, res) => {
       }
     }
 
+    // Process attributes
+    let processedAttributes = {};
+    if (attributes) {
+      if (typeof attributes === "string") {
+        try {
+          processedAttributes = JSON.parse(attributes);
+        } catch (e) {
+          return errorResponse(res, 400, "Invalid attributes format");
+        }
+      } else if (typeof attributes === "object") {
+        processedAttributes = attributes;
+      }
+    }
+
     // For fixed price products we store actualPrice directly.
     // For dynamic products we keep stored actualPrice at 0 and always compute it at read-time from priceRuleId.
     let computedActualPrice = parsedIsPriceFixed ? parseFloat(actualPrice || 0) : 0;
@@ -236,6 +251,7 @@ const createProduct = async (req, res) => {
       relatedProductIds : parseObjectIdArray(req.body.relatedProductIds),
 
       specifications: processedSpecs,
+      attributes: processedAttributes,
       tags: productTag,
       isFeatured: isFeatured === "true" || isFeatured === true,
       // isInStock: stock ? parseInt(stock) > 0 : false,
@@ -259,6 +275,7 @@ const createProduct = async (req, res) => {
 
     // Clear product cache
     await cacheUtils.delPattern("products_*");
+    await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 201, messages.PRODUCT_CREATED, { product });
   } catch (error) {
@@ -283,6 +300,9 @@ const getAllProducts = async (req, res) => {
       inStock,
       search,
       isFeatured,
+      color,
+      material,
+      purity,
     } = req.query;
 
     // Create cache key based on query parameters
@@ -290,7 +310,7 @@ const getAllProducts = async (req, res) => {
       categoryId || ""
     }_${subcategoryId || ""}_${festivalId || ""}_${minPrice || ""}_${
       maxPrice || ""
-    }_${inStock || ""}_${search || ""}_${isFeatured || ""}`;
+    }_${inStock || ""}_${search || ""}_${isFeatured || ""}_${color || ""}_${material || ""}_${purity || ""}`;
 
     // Try to get from cache first
     const cachedData = await cacheUtils.get(cacheKey);
@@ -343,6 +363,18 @@ const getAllProducts = async (req, res) => {
       ];
     }
 
+    if (color) {
+      query['attributes.color'] = color;
+    }
+
+    if (material) {
+      query['attributes.material'] = material;
+    }
+
+    if (purity) {
+      query['attributes.purity'] = purity;
+    }
+
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sortOptions = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
@@ -376,6 +408,24 @@ const getAllProducts = async (req, res) => {
 
     const total = await Product.countDocuments(query);
 
+    // Compute available filters for the current category context (ignoring currently selected colors/materials/etc)
+    const baseQuery = { isDeleted: false };
+    if (query.categoryId) baseQuery.categoryId = query.categoryId;
+    if (query.subcategoryId) baseQuery.subcategoryId = query.subcategoryId;
+    if (query.festivalIds) baseQuery.festivalIds = query.festivalIds;
+    if (query.search) baseQuery.$or = query.$or;
+
+    const [colors, materials, purities] = await Promise.all([
+      Product.distinct("attributes.color", { ...baseQuery, "attributes.color": { $ne: null, $ne: "" } }),
+      Product.distinct("attributes.material", { ...baseQuery, "attributes.material": { $ne: null, $ne: "" } }),
+      Product.distinct("attributes.purity", { ...baseQuery, "attributes.purity": { $ne: null, $ne: "" } })
+    ]);
+
+    const availableFilters = {};
+    if (colors && colors.length > 0) availableFilters.color = colors.filter(Boolean);
+    if (materials && materials.length > 0) availableFilters.material = materials.filter(Boolean);
+    if (purities && purities.length > 0) availableFilters.purity = purities.filter(Boolean);
+
     const result = {
       products,
       pagination: {
@@ -384,6 +434,7 @@ const getAllProducts = async (req, res) => {
         limit: parseInt(limit),
         pages: Math.ceil(total / parseInt(limit)),
       },
+      availableFilters
     };
 
     // Cache the result
@@ -566,6 +617,17 @@ const updateProductById = async (req, res) => {
       }
     }
 
+    // Process attributes
+    if (updatedData.attributes) {
+      if (typeof updatedData.attributes === "string") {
+        try {
+          updatedData.attributes = JSON.parse(updatedData.attributes);
+        } catch (e) {
+          delete updatedData.attributes;
+        }
+      }
+    }
+
     // Validate tags
     if (updatedData.tags) {
       const validTags = ["New", "Sale", "Bestseller"];
@@ -621,6 +683,7 @@ const updateProductById = async (req, res) => {
     // Clear product cache
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
+    await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 200, messages.PRODUCT_UPDATED, {
       product: updatedProduct,
@@ -655,6 +718,7 @@ const deleteProductById = async (req, res) => {
     // Clear product cache
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
+    await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 200, messages.PRODUCT_DELETED);
   } catch (error) {
@@ -685,6 +749,7 @@ const toggleBlockStatus = async (req, res) => {
     // Clear product cache
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
+    await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(
       res,

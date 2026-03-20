@@ -92,19 +92,26 @@ const getAllSubcategories = async (req, res) => {
     }
 
     const resolvedCategoryId = categoryId || category;
-    if (resolvedCategoryId) {
-      query.$or = [{ category: resolvedCategoryId }, { categoryId: resolvedCategoryId }];
+    if (resolvedCategoryId && mongoose.Types.ObjectId.isValid(resolvedCategoryId)) {
+      const oid = new mongoose.Types.ObjectId(resolvedCategoryId);
+      query.$or = [{ category: oid }, { categoryId: oid }];
     }
     if (parentId !== undefined) {
       // parentId can be "null" to fetch roots
-      if (parentId === "null" || parentId === "") query.parentId = null;
-      else query.parentId = parentId;
+      if (parentId === "null" || parentId === "") {
+        query.parentId = null;
+      } else if (mongoose.Types.ObjectId.isValid(parentId)) {
+        query.parentId = new mongoose.Types.ObjectId(parentId);
+      } else {
+        query.parentId = parentId;
+      }
     }
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sortOptions = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
 
+    console.log("Subcategory Query:", JSON.stringify(query, null, 2));
     const populate = [
       { path: 'category', select: 'name' },
       { path: 'categoryId', select: 'name' },
@@ -162,14 +169,16 @@ const getSubcategoryById = async (req, res) => {
 const updateSubcategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, isBlocked, isFeatured } = req.body;
+    const { name, category, categoryId, isBlocked, isFeatured, parentId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, "Invalid subcategory ID format");
     }
 
+    const resolvedCategoryId = categoryId || category;
+
     // Validate category ID if provided
-    if (category && !mongoose.Types.ObjectId.isValid(category)) {
+    if (resolvedCategoryId && !mongoose.Types.ObjectId.isValid(resolvedCategoryId)) {
       return errorResponse(res, 400, "Invalid category ID format");
     }
 
@@ -183,7 +192,13 @@ const updateSubcategoryById = async (req, res) => {
 
     const updateData = {};
     if (name) updateData.name = name;
-    if (category) updateData.category = category;
+    if (resolvedCategoryId) {
+      updateData.category = resolvedCategoryId;
+      updateData.categoryId = resolvedCategoryId;
+    }
+    if (parentId !== undefined) {
+      updateData.parentId = (parentId === "null" || parentId === "") ? null : parentId;
+    }
     if (isBlocked !== undefined) updateData.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) updateData.isFeatured = isFeatured === 'true' || isFeatured === true;
     if (req.file) {
@@ -195,7 +210,11 @@ const updateSubcategoryById = async (req, res) => {
       id,
       updateData,
       { new: true }
-    ).populate('category', 'name');
+    ).populate([
+      { path: 'category', select: 'name' },
+      { path: 'categoryId', select: 'name' },
+      { path: 'parentId', select: 'name' }
+    ]);
 
     if (!subcategory) {
       return errorResponse(res, 404, messages.SUBCATEGORY_NOT_FOUND);

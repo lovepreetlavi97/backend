@@ -75,8 +75,21 @@ const productSchema = new mongoose.Schema({
     of: [String],
     default: {},
     index: true
-  }
-  ,
+  },
+  attributes: {
+    color: {
+      type: String,
+      trim: true
+    },
+    material: {
+      type: String,
+      trim: true
+    },
+    purity: {
+      type: String,
+      trim: true
+    }
+  },
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
@@ -231,6 +244,16 @@ productSchema.index({ actualPrice: 1, discountedPrice: 1 });
 productSchema.index({ isDeleted: 1, isBlocked: 1, isInStock: 1 });
 productSchema.index({ categoryId: 1, subcategoryId: 1 });
 productSchema.index({ isFeatured: 1 });
+
+// Dynamic Attribute Single Field Indexes
+productSchema.index({ 'attributes.color': 1 });
+productSchema.index({ 'attributes.material': 1 });
+productSchema.index({ 'attributes.purity': 1 });
+
+// Dynamic Attribute Compound Indexes
+productSchema.index({ 'attributes.color': 1, subcategoryId: 1 });
+productSchema.index({ 'attributes.color': 1, 'attributes.material': 1 });
+productSchema.index({ 'attributes.color': 1, 'attributes.material': 1, 'attributes.purity': 1 });
 
 // Virtual for calculating discount percentage
 productSchema.virtual('discountPercentage').get(function () {
