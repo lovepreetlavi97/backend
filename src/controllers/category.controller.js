@@ -329,8 +329,65 @@ const deleteCategoryById = async (req, res) => {
   }
 };
 
+// Get category menu structure (Nested Category → Subcategory → Child Subcategory)
+const getCategoryMenu = async (req, res) => {
+  try {
+    const cacheKey = 'category_menu_structure';
+    const cachedMenu = await cacheUtils.get(cacheKey);
+
+    if (cachedMenu) {
+      return successResponse(res, 200, "Category menu retrieved", cachedMenu);
+    }
+
+    // Fetch all active categories and subcategories
+    const [categories, subcategories] = await Promise.all([
+      Category.find({ isBlocked: false, isDeleted: false }).lean(),
+      require('../models/subCategory.model').find({ isBlocked: false, isDeleted: false }).lean()
+    ]);
+
+    // Create a map of subcategories by ID for easy lookup
+    const subcategoryMap = {};
+    subcategories.forEach(sub => {
+      subcategoryMap[sub._id.toString()] = { ...sub, subcategories: [] };
+    });
+
+    // Build subcategory hierarchy (Child Subcategory → Parent Subcategory)
+    const rootSubcategories = [];
+    subcategories.forEach(sub => {
+      const subObj = subcategoryMap[sub._id.toString()];
+      if (sub.parentId) {
+        const parent = subcategoryMap[sub.parentId.toString()];
+        if (parent) {
+          parent.subcategories.push(subObj);
+        }
+      } else {
+        rootSubcategories.push(subObj);
+      }
+    });
+
+    // Attach root subcategories to their respective categories
+    const menu = categories.map(cat => {
+      const catSubcategories = rootSubcategories.filter(sub => 
+        sub.categoryId && sub.categoryId.toString() === cat._id.toString()
+      );
+      return {
+        ...cat,
+        subcategories: catSubcategories
+      };
+    });
+
+    await cacheUtils.set(cacheKey, menu, 3600); // Cache for 1 hour
+
+    return successResponse(res, 200, "Category menu retrieved", menu);
+  } catch (error) {
+    console.error("Get category menu error:", error);
+    return errorResponse(res, 500, error.message || "Failed to retrieve category menu");
+  }
+};
+
 // Export the functions
 module.exports = {
+  getCategoryMenu,
   createCategory,
   getAllCategories,
   getActiveCategories,

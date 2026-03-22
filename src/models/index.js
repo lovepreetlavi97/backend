@@ -25,6 +25,7 @@ const CuratedCollection = require('./curatedCollection.model');
 const KittyPlan = require('./kittyPlan.model');
 const UserKitty = require('./userKitty.model');
 const SiteSettings = require('./siteSettings.model');
+const Gift = require('./gift.model');
 
 module.exports = {
   Cart,
@@ -51,5 +52,6 @@ module.exports = {
   CuratedCollection,
   KittyPlan,
   UserKitty,
-  SiteSettings
+  SiteSettings,
+  Gift
 };

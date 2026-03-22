@@ -143,6 +143,24 @@ const toggleCuratedCollectionStatus = async (req, res) => {
 };
 
 /**
+ * PUBLIC: GET ACTIVE COLLECTIONS (for navbar + product form dropdown)
+ */
+const getPublicCollections = async (req, res) => {
+  try {
+    const collections = await CuratedCollection.find({
+      isActive: true,
+      isDeleted: false
+    })
+      .select("_id name slug")
+      .sort({ position: 1 });
+
+    return successResponse(res, 200, "Collections fetched", { collections });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+/**
  * USER: GET PRODUCTS BY CURATED COLLECTION
  */
 const getCuratedCollectionProducts = async (req, res) => {
@@ -156,21 +174,37 @@ const getCuratedCollectionProducts = async (req, res) => {
     return errorResponse(res, 404, "Curated collection not found");
   }
 
-  const f = curated.filters;
-  const query = { isBlocked: false, isInStock: true };
+  // Query by direct collectionIds assignment (new way)
+  const directProducts = await Product.find({
+    collectionIds: curated._id,
+    isBlocked: false
+  }).limit(40);
 
-  if (f.categoryIds?.length) query.categoryId = { $in: f.categoryIds };
-  if (f.subcategoryIds?.length) query.subcategoryId = { $in: f.subcategoryIds };
-  if (f.relationIds?.length) query.relationIds = { $in: f.relationIds };
-  if (f.festivalIds?.length) query.festivalIds = { $in: f.festivalIds };
-
+  // Also query by filters (legacy way)
+  const f = curated.filters || {};
+  const filterQuery = { isBlocked: false, isInStock: true };
+  if (f.categoryIds?.length) filterQuery.categoryId = { $in: f.categoryIds };
+  if (f.subcategoryIds?.length) filterQuery.subcategoryId = { $in: f.subcategoryIds };
+  if (f.relationIds?.length) filterQuery.relationIds = { $in: f.relationIds };
+  if (f.festivalIds?.length) filterQuery.festivalIds = { $in: f.festivalIds };
   if (f.priceRange?.min || f.priceRange?.max) {
-    query.discountedPrice = {};
-    if (f.priceRange.min) query.discountedPrice.$gte = f.priceRange.min;
-    if (f.priceRange.max) query.discountedPrice.$lte = f.priceRange.max;
+    filterQuery.discountedPrice = {};
+    if (f.priceRange.min) filterQuery.discountedPrice.$gte = f.priceRange.min;
+    if (f.priceRange.max) filterQuery.discountedPrice.$lte = f.priceRange.max;
   }
 
-  const products = await Product.find(query).limit(40);
+  const filteredProducts = Object.keys(filterQuery).length > 2
+    ? await Product.find(filterQuery).limit(40)
+    : [];
+
+  // Merge and deduplicate
+  const seen = new Set();
+  const products = [...directProducts, ...filteredProducts].filter(p => {
+    const id = p._id.toString();
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 
   return successResponse(res, 200, "Curated products fetched", {
     curated,
@@ -185,5 +219,6 @@ module.exports = {
   updateCuratedCollectionById,
   deleteCuratedCollectionById,
   toggleCuratedCollectionStatus,
-  getCuratedCollectionProducts
+  getCuratedCollectionProducts,
+  getPublicCollections
 };

@@ -62,6 +62,7 @@ const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
  *         description: Internal server error
  */
 router.post('/', uploadSingleImage, categoryController.createCategory);
+router.get('/menu', categoryController.getCategoryMenu);
 
 /**
  * @swagger

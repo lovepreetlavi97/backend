@@ -17,6 +17,16 @@ const bannerSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  subtitle: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  buttonText: {
+    type: String,
+    trim: true,
+    default: "Shop Now"
+  },
   type: {
     type: String,
     required: true,

@@ -84,4 +84,43 @@ const getFilterCounts = async (req, res) => {
   }
 };
 
-module.exports = { getColors, getMaterials, getPurity, getFilterCounts };
+const getFilters = async (req, res) => {
+  try {
+    const { subcategoryId, gender } = req.query;
+    const query = { isDeleted: false, isBlocked: false };
+
+    if (subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId)) {
+      query.subcategoryId = new mongoose.Types.ObjectId(subcategoryId);
+    }
+    if (gender) {
+      query['attributes.gender'] = gender;
+    }
+
+    const [colors, materials, purities, styles] = await Promise.all([
+      Product.distinct("attributes.color", { ...query, "attributes.color": { $ne: null, $ne: "" } }),
+      Product.distinct("attributes.material", { ...query, "attributes.material": { $ne: null, $ne: "" } }),
+      Product.distinct("attributes.purity", { ...query, "attributes.purity": { $ne: null, $ne: "" } }),
+      Product.distinct("attributes.style", { ...query, "attributes.style": { $ne: null, $ne: "" } })
+    ]);
+
+    // Static Price Ranges according to GIVA style
+    const priceRanges = [
+      { label: "Under 1500", min: 0, max: 1500 },
+      { label: "1500–3000", min: 1500, max: 3000 },
+      { label: "3000–5000", min: 3000, max: 5000 },
+      { label: "Above 5000", min: 5000, max: 1000000 }
+    ];
+
+    return successResponse(res, 200, "Filters retrieved", {
+      colors: colors.filter(Boolean),
+      materials: materials.filter(Boolean),
+      purities: purities.filter(Boolean),
+      styles: styles.filter(Boolean),
+      priceRanges
+    });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
+};
+
+module.exports = { getColors, getMaterials, getPurity, getFilterCounts, getFilters };

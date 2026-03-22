@@ -14,5 +14,6 @@ router.get('/colors', cacheRoute(300), filterController.getColors);
 router.get('/materials', cacheRoute(300), filterController.getMaterials);
 router.get('/purity', cacheRoute(300), filterController.getPurity);
 router.get('/counts', cacheRoute(300), filterController.getFilterCounts);
+router.get('/', cacheRoute(300), filterController.getFilters);
 
 module.exports = router;

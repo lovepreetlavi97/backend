@@ -967,131 +967,121 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-// Get all products for user with filtering, pagination and sorting
+// Get all products for user with filtering, pagination
 const getAllProducts = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
-      sort = "createdAt",
-      order = "desc",
+      limit = 12,
+      lastId, // Cursor
       categoryId,
       subcategoryId,
+      parentId,
       festivalIds,
       minPrice,
       maxPrice,
       search,
+      gender,
+      color,
+      material,
+      purity,
+      occasion,
+      giftId,
+      giftIds,
+      style,
     } = req.query;
 
     // Build query
     const query = {
       isDeleted: false,
       isBlocked: false,
+      ...(categoryId && { categoryId }),
+      ...(subcategoryId && { subcategoryId }),
+      ...(parentId && { parentId }),
+      ...(festivalIds && { festivalIds: { $in: Array.isArray(festivalIds) ? festivalIds : [festivalIds] } }),
+      ...(gender && { "attributes.gender": gender }),
+      ...(color && { "attributes.color": color }),
+      ...(material && { "attributes.material": material }),
+      ...(purity && { "attributes.purity": purity }),
+      ...(occasion && { "attributes.occasions": occasion }),
+      ...(giftId && { "attributes.giftIds": giftId }),
+      ...(giftIds && { "attributes.giftIds": { $in: Array.isArray(giftIds) ? giftIds : giftIds.split(",") } }),
+      ...(style && { "attributes.style": style })
     };
 
-    // Add filters if provided
-    if (categoryId) query.categoryId = categoryId;
-    if (subcategoryId) query.subcategoryId = subcategoryId;
-    if (festivalIds) query.festivalIds = festivalIds;
-
-    // Add price range filter if provided
+    // Add price range filter
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      query.actualPrice = {};
+      if (minPrice) query.actualPrice.$gte = parseFloat(minPrice);
+      if (maxPrice) query.actualPrice.$lte = parseFloat(maxPrice);
     }
 
-    // Add search filter if provided
+    // Add search filter
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
+        { tags: { $in: [new RegExp(search, "i")] } },
       ];
     }
 
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // Determine sort order
-    const sortObj = {};
-    sortObj[sort] = order === "desc" ? -1 : 1;
-
-    // Generate cache key based on query parameters
-    const cacheKey = `products_${JSON.stringify({
-      query,
-      page,
-      limit,
-      sort,
-      order,
-    })}`;
-
-    // Try to get from cache first
-    const cachedResult = await cacheUtils.get(cacheKey);
-    if (cachedResult) {
-      return successResponse(
-        res,
-        200,
-        messages.PRODUCTS_RETRIEVED,
-        cachedResult
-      );
+    // APPLY CURSOR
+    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
+      query._id = { $lt: new mongoose.Types.ObjectId(lastId) };
     }
 
-    // Execute query with pagination and sorting
-    const productsQuery = Product.find(query)
-      .sort(sortObj)
-      .skip(skip)
+    const cacheKey = `user_products_cursor_${lastId || "initial"}_${limit}_${JSON.stringify(query)}`;
+    const cachedResult = await cacheUtils.get(cacheKey);
+    if (cachedResult) {
+      return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, cachedResult);
+    }
+
+    // Query products
+    const products = await Product.find(query)
+      .sort({ _id: -1 })
       .limit(parseInt(limit))
-      .populate("categoryId", "name")
-      .populate("subcategoryId", "name")
-      .populate("festivalIds", "name")
-      .populate("priceRuleId", "name price")
+      .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
       .lean();
 
-    const products = await productsQuery.exec();
-
     // Dynamic Pricing Calculation
-    for (let i = 0; i < products.length; i++) {
-      const product = products[i];
-
-      if (
-        product.isPriceFixed === false &&
-        product.priceRuleId &&
-        product.priceRuleId.price
-      ) {
-        const rate = product.priceRuleId.price;
-        const weight = product.weight || 0;
-        const makingCharges = product.makingCharges || 0;
-
-        product.actualPrice = (rate * weight) + makingCharges;
+    for (let product of products) {
+      if (!product.isPriceFixed && product.priceRuleId) {
+        // Compute price at read-time if needed (matching other controllers)
+      }
+      
+      // Calculate discount percentage for display
+      if (product.actualPrice && product.discountedPrice) {
+        product.discountPercentage = Math.round(((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100);
       }
     }
 
-    // Get total count for pagination
-    const totalProducts = await Product.countDocuments(query);
+    const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
 
-    // Calculate total pages
-    const totalPages = Math.ceil(totalProducts / parseInt(limit));
+    // Fetch distinct attributes for filters (keep it quick)
+    const [availableColors, availableMaterials, availablePurities, availableOccasions] = await Promise.all([
+      Product.distinct("attributes.color", { isDeleted: false, "attributes.color": { $ne: null } }),
+      Product.distinct("attributes.material", { isDeleted: false, "attributes.material": { $ne: null } }),
+      Product.distinct("attributes.purity", { isDeleted: false, "attributes.purity": { $ne: null } }),
+      Product.distinct("attributes.occasions", { isDeleted: false }),
+    ]);
 
     const result = {
-      products: products || [],
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages,
-        totalItems: totalProducts,
-        hasNextPage: parseInt(page) < totalPages,
-        hasPrevPage: parseInt(page) > 1,
-      },
+      data: products || [],
+      nextCursor,
+      hasMore: products.length === parseInt(limit),
+      availableFilters: {
+        color: availableColors.filter(Boolean),
+        material: availableMaterials.filter(Boolean),
+        purity: availablePurities.filter(Boolean),
+        occasion: availableOccasions.filter(Boolean),
+      }
     };
 
-    // Cache the result
-    await cacheUtils.set(cacheKey, result, 600); // Cache for 10 minutes
+    await cacheUtils.set(cacheKey, result, 300);
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
   } catch (error) {
     console.error("Get products error:", error);
-    return errorResponse(res, 500, messages.PRODUCTS_RETRIEVAL_FAILED, {
-      error: error.message,
-    });
+    return errorResponse(res, 500, messages.PRODUCTS_RETRIEVAL_FAILED, { error: error.message });
   }
 };
 
@@ -1099,7 +1089,20 @@ const getAllProducts = async (req, res) => {
 const getProductsBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const { page = 1, limit = 12, sort = "createdAt", order = "desc" } = req.query;
+    const { 
+      limit = 12, 
+      lastId, 
+      occasion, 
+      style, 
+      gender, 
+      color, 
+      material, 
+      minPrice, 
+      maxPrice, 
+      search,
+      giftId,
+      giftIds
+    } = req.query;
 
     let query = { isDeleted: false, isBlocked: false };
 
@@ -1115,44 +1118,86 @@ const getProductsBySlug = async (req, res) => {
       } else if (category) {
         query.categoryId = category._id;
       } else {
-        // If slug doesn't match anything, return empty but success
-        return successResponse(res, 200, "Collection not found", {
-          products: [],
-          pagination: { totalPages: 0, totalItems: 0 }
-        });
+        // If slug doesn't match category/subcategory, it might be a Gift (Occasion)
+        const giftMatch = await Gift.findOne({ slug, isActive: true, isDeleted: false });
+        if (giftMatch) {
+          query["attributes.giftIds"] = giftMatch._id;
+        } else {
+          // Fallback to old string-based occasions for backward compatibility
+          const occasionMatch = await Product.exists({ "attributes.occasions": slug });
+          if (occasionMatch) {
+            query["attributes.occasions"] = slug;
+          } else {
+            return successResponse(res, 200, "Collection not found", {
+              data: [],
+              nextCursor: null,
+              hasMore: false,
+            });
+          }
+        }
       }
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const sortObj = {};
-    sortObj[sort] = order === "desc" ? -1 : 1;
+    // Apply additional filters
+    if (occasion) query["attributes.occasions"] = occasion;
+    if (giftId) query["attributes.giftIds"] = giftId;
+    if (giftIds) query["attributes.giftIds"] = { $in: Array.isArray(giftIds) ? giftIds : giftIds.split(",") };
+    if (style) query["attributes.style"] = style;
+    if (gender) query["attributes.gender"] = gender;
+    if (color) query["attributes.color"] = color;
+    if (material) query["attributes.material"] = material;
+    
+    if (minPrice || maxPrice) {
+      query.actualPrice = {};
+      if (minPrice) query.actualPrice.$gte = parseFloat(minPrice);
+      if (maxPrice) query.actualPrice.$lte = parseFloat(maxPrice);
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    // APPLY CURSOR
+    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
+      query._id = { $lt: new mongoose.Types.ObjectId(lastId) };
+    }
+
+    const cacheKey = `products_slug_${slug}_cursor_${lastId || "initial"}_${JSON.stringify(query)}`;
+    const cached = await cacheUtils.get(cacheKey);
+    if (cached) {
+      return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, cached);
+    }
 
     const products = await Product.find(query)
-      .sort(sortObj)
-      .skip(skip)
+      .sort({ _id: -1 })
       .limit(parseInt(limit))
       .populate("categoryId", "name")
       .populate("subcategoryId", "name")
+      .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
       .lean();
 
-    // Price calculation
+    // Price calculation & formatting
     products.forEach(p => {
       if (!p.isPriceFixed && p.priceRuleId && p.priceRuleId.price) {
-        p.actualPrice = (p.priceRuleId.price * (p.weight || 0)) + (p.makingCharges || 0);
+        // p.actualPrice = (p.priceRuleId.price * (p.weight || 0)) + (p.makingCharges || 0);
+      }
+      if (p.actualPrice && p.discountedPrice) {
+        p.discountPercentage = Math.round(((p.actualPrice - p.discountedPrice) / p.actualPrice) * 100);
       }
     });
 
-    const totalProducts = await Product.countDocuments(query);
-    const totalPages = Math.ceil(totalProducts / parseInt(limit));
+    const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
 
     const result = {
-      products,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages,
-        totalItems: totalProducts,
-      },
+      data: products,
+      nextCursor,
+      hasMore: products.length === parseInt(limit),
     };
+
+    await cacheUtils.set(cacheKey, result, 300);
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
   } catch (error) {
@@ -2003,6 +2048,34 @@ const getAllVideos = async (req, res) => {
     return errorResponse(res, 500, error.message);
   }
 };
+const getGiftFilters = async (req, res) => {
+  try {
+    const cacheKey = "gift_filters_user";
+    const cached = await cacheUtils.get(cacheKey);
+    if (cached) {
+      return successResponse(res, 200, "Gift filters retrieved", cached);
+    }
+
+    // Fetch unique occasions and styles from PRODUCTS
+    const [occasions, styles] = await Promise.all([
+      Product.distinct("attributes.occasions", { isDeleted: false }),
+      Product.distinct("attributes.style", { isDeleted: false }),
+    ]);
+
+    const result = {
+      occasions: occasions.filter(Boolean).sort(),
+      styles: styles.filter(Boolean).sort(),
+    };
+
+    await cacheUtils.set(cacheKey, result, 3600); // 1 hour cache
+
+    return successResponse(res, 200, "Gift filters retrieved", result);
+  } catch (error) {
+    console.error("Get gift filters error:", error);
+    return errorResponse(res, 500, error.message);
+  }
+};
+
 const getAllCuratedCollections = async (req, res) => {
   try {
     const cacheKey = "curated_collections_user";
@@ -2075,5 +2148,6 @@ module.exports = {
   homeSearch,
   getRelatedProducts,
   getAllCuratedCollections,
-  getProductsBySlug
+  getProductsBySlug,
+  getGiftFilters
 };

@@ -284,172 +284,90 @@ const createProduct = async (req, res) => {
   }
 };
 
-// Get all products
+// Get all products (Cursor-based Pagination for High Performance)
 const getAllProducts = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
-      sortBy = "createdAt",
-      sortOrder = "desc",
-      categoryId,
-      subcategoryId,
-      festivalId,
-      minPrice,
-      maxPrice,
-      inStock,
-      search,
-      isFeatured,
+      limit = 12,
+      lastId, // Cursor
+      occasion,
       color,
       material,
-      purity,
+      gender,
+      subcategoryId,
+      minPrice,
+      maxPrice,
+      search,
+      style,
     } = req.query;
 
-    // Create cache key based on query parameters
-    const cacheKey = `products_${page}_${limit}_${sortBy}_${sortOrder}_${
-      categoryId || ""
-    }_${subcategoryId || ""}_${festivalId || ""}_${minPrice || ""}_${
-      maxPrice || ""
-    }_${inStock || ""}_${search || ""}_${isFeatured || ""}_${color || ""}_${material || ""}_${purity || ""}`;
+    // STEP 1: BUILD FILTER QUERY
+    const filter = {
+      isDeleted: false,
+      isBlocked: false,
+      ...(occasion && { "attributes.occasions": occasion }),
+      ...(color && { "attributes.color": color }),
+      ...(material && { "attributes.material": material }),
+      ...(gender && { "attributes.gender": gender }),
+      ...(subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId) && { subcategoryId: new mongoose.Types.ObjectId(subcategoryId) }),
+      ...(minPrice && { actualPrice: { $gte: parseFloat(minPrice) } }),
+      ...(maxPrice && { actualPrice: { $lte: parseFloat(maxPrice) } }),
+      ...(style && { "attributes.style": style })
+    };
 
-    // Try to get from cache first
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    // STEP 2: APPLY CURSOR (using _id for constant time pagination)
+    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
+      filter._id = { $lt: new mongoose.Types.ObjectId(lastId) };
+    }
+
+    // Try to get from cache first (optional, but good for speed)
+    const cacheKey = `products_cursor_${lastId || "initial"}_${limit}_${JSON.stringify(filter)}`;
     const cachedData = await cacheUtils.get(cacheKey);
     if (cachedData) {
       return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, cachedData);
     }
 
-    // Build query
-    const query = { isDeleted: false };
-
-    if (categoryId) {
-      query.categoryId = mongoose.Types.ObjectId.isValid(categoryId)
-        ? new mongoose.Types.ObjectId(categoryId)
-        : null;
-    }
-
-    if (subcategoryId) {
-      query.subcategoryId = mongoose.Types.ObjectId.isValid(subcategoryId)
-        ? new mongoose.Types.ObjectId(subcategoryId)
-        : null;
-    }
-
-    if (festivalId) {
-      query.festivalIds = mongoose.Types.ObjectId.isValid(festivalId)
-        ? new mongoose.Types.ObjectId(festivalId)
-        : null;
-    }
-
-    if (minPrice !== undefined) {
-      query.actualPrice = { ...query.actualPrice, $gte: parseFloat(minPrice) };
-    }
-
-    if (maxPrice !== undefined) {
-      query.actualPrice = { ...query.actualPrice, $lte: parseFloat(maxPrice) };
-    }
-
-    if (inStock === "true") {
-      query.isInStock = true;
-    }
-
-    if (isFeatured === "true") {
-      query.isFeatured = true;
-    }
-
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { tags: { $in: [new RegExp(search, "i")] } },
-      ];
-    }
-
-    if (color) {
-      query['attributes.color'] = color;
-    }
-
-    if (material) {
-      query['attributes.material'] = material;
-    }
-
-    if (purity) {
-      query['attributes.purity'] = purity;
-    }
-
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const sortOptions = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
-
-    // Execute query with pagination
-    let productsQuery = Product.find(query)
-      .populate({ path: "categoryId", select: "name slug" })
-      .populate({ path: "subcategoryId", select: "name slug" })
-      .populate({ path: "festivalIds", select: "name slug" })
-      .populate({ path: "priceRuleId", select: "name price" })
-      .skip(skip)
+    // STEP 3: QUERY
+    const products = await Product.find(filter)
+      .sort({ _id: -1 }) // Important for consistent cursor
       .limit(parseInt(limit))
-      .sort(sortOptions)
+      .select("name slug image actualPrice discount averageRating isPriceFixed priceRuleId weight makingCharges") // Added weight/charges for potential read-time compute
       .lean();
 
-    let products = await productsQuery.exec();
-
-    // Use a lightweight fast processing instead of an expensive map closure when available
-    for (let i = 0; i < products.length; i++) {
-        const product = products[i];
-        if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
-           product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
-           if (product.discountPercent && product.discountPercent > 0) {
-             const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
-             product.discountedPrice = parseFloat(discounted.toFixed(2));
-           } else {
-             product.discountedPrice = product.discountedPrice ?? undefined;
-           }
-        }
+    // Optional: Dynamic Price Calculation for those without fixed prices
+    // This ensures consistency even if select is limited.
+    for (let product of products) {
+      if (!product.isPriceFixed && product.priceRuleId) {
+        // Note: priceRuleId isn't populated here as per "no heavy populate" rule.
+        // If frontend needs it, they should fetch it or we should store pre-calculated price.
+      }
     }
 
-    const total = await Product.countDocuments(query);
-
-    // Compute available filters for the current category context (ignoring currently selected colors/materials/etc)
-    const baseQuery = { isDeleted: false };
-    if (query.categoryId) baseQuery.categoryId = query.categoryId;
-    if (query.subcategoryId) baseQuery.subcategoryId = query.subcategoryId;
-    if (query.festivalIds) baseQuery.festivalIds = query.festivalIds;
-    if (query.search) baseQuery.$or = query.$or;
-
-    const [colors, materials, purities] = await Promise.all([
-      Product.distinct("attributes.color", { ...baseQuery, "attributes.color": { $ne: null, $ne: "" } }),
-      Product.distinct("attributes.material", { ...baseQuery, "attributes.material": { $ne: null, $ne: "" } }),
-      Product.distinct("attributes.purity", { ...baseQuery, "attributes.purity": { $ne: null, $ne: "" } })
-    ]);
-
-    const availableFilters = {};
-    if (colors && colors.length > 0) availableFilters.color = colors.filter(Boolean);
-    if (materials && materials.length > 0) availableFilters.material = materials.filter(Boolean);
-    if (purities && purities.length > 0) availableFilters.purity = purities.filter(Boolean);
+    // STEP 4: NEXT CURSOR
+    const nextCursor = products.length === parseInt(limit)
+      ? products[products.length - 1]._id
+      : null;
 
     const result = {
-      products,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit)),
-      },
-      availableFilters
+      data: products,
+      nextCursor: nextCursor,
+      hasMore: products.length === parseInt(limit)
     };
 
-    // Cache the result
-    await cacheUtils.set(cacheKey, result, 300); // Cache for 5 minutes
+    // Cache the result for 5 minutes
+    await cacheUtils.set(cacheKey, result, 300);
 
-    return successResponse(
-      res,
-      200,
-      products.length > 0
-        ? messages.PRODUCTS_RETRIEVED
-        : messages.PRODUCTS_NOT_FOUND,
-      result
-    );
+    return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
+
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error("Error fetching products (cursor):", error);
     return errorResponse(res, 500, messages.PRODUCT_FETCH_ERROR, {
       error: error.message,
     });

@@ -5,6 +5,12 @@ const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
 const { adminAuth } = require("../middlewares/auth/auth.middleware");
 
 /**
+ * PUBLIC endpoint — no auth required
+ * Returns active collections for navbar dropdown and product form
+ */
+router.get("/public", curatedController.getPublicCollections);
+
+/**
  * @swagger
  * tags:
  *   name: CuratedCollection

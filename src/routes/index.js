@@ -32,6 +32,7 @@ const kittyRoutes = require("./kitty.route");
 const siteSettingsRoutes = require("./siteSettings.route");
 const adminSiteSettingsRoutes = require("./adminSiteSettings.route");
 const returnRequestRoute = require("./returnRequest.route");
+const giftRoute = require("./gift.route");
 const router = express.Router();
 
 // Register your routes
@@ -69,4 +70,6 @@ router.use("/settings", siteSettingsRoutes);
 router.use("/admin/site-settings", adminSiteSettingsRoutes);
 // router.use("/webhook", webhookRoute);
 router.use("/returns", returnRequestRoute);
+router.use("/user/gift", giftRoute);
+router.use("/admin/gift", giftRoute);
 module.exports = router;

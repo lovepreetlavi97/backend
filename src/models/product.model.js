@@ -76,6 +76,19 @@ const productSchema = new mongoose.Schema({
     default: {},
     index: true
   },
+  variants: [
+    {
+      size: String, // "6", "7", "2.4"
+      price: Number,
+      stock: Number,
+      sku: String
+    }
+  ],
+  sizeType: {
+    type: String,
+    enum: ["ring", "bangle", "none"],
+    default: "none"
+  },
   attributes: {
     color: {
       type: String,
@@ -88,7 +101,25 @@ const productSchema = new mongoose.Schema({
     purity: {
       type: String,
       trim: true
-    }
+    },
+    gender: {
+      type: String,
+      trim: true,
+      enum: ['Men', 'Women', 'Unisex']
+    },
+    style: {
+      type: String,
+      trim: true
+    },
+    occasions: {
+      type: [String],
+      default: []
+    },
+    giftIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Gift',
+      default: []
+    }]
   },
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -232,6 +263,12 @@ const productSchema = new mongoose.Schema({
     { type: mongoose.Schema.Types.ObjectId, ref: "Product" }
   ],
 
+  collectionIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CuratedCollection',
+    default: []
+  }],
+
 }, {
   timestamps: true,
   toJSON: { getters: true, virtuals: true },
@@ -239,21 +276,27 @@ const productSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
+productSchema.index({ _id: -1 }); // Critical for cursor-based pagination
 productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 productSchema.index({ actualPrice: 1, discountedPrice: 1 });
 productSchema.index({ isDeleted: 1, isBlocked: 1, isInStock: 1 });
 productSchema.index({ categoryId: 1, subcategoryId: 1 });
+productSchema.index({ subcategoryId: 1 }); // Individual index for faster subcategory filtering
+productSchema.index({ actualPrice: 1 }); // Individual index for faster price filtering
 productSchema.index({ isFeatured: 1 });
 
 // Dynamic Attribute Single Field Indexes
 productSchema.index({ 'attributes.color': 1 });
 productSchema.index({ 'attributes.material': 1 });
 productSchema.index({ 'attributes.purity': 1 });
+productSchema.index({ 'attributes.gender': 1 });
+productSchema.index({ 'attributes.occasions': 1 });
+productSchema.index({ 'attributes.giftIds': 1 });
 
 // Dynamic Attribute Compound Indexes
 productSchema.index({ 'attributes.color': 1, subcategoryId: 1 });
 productSchema.index({ 'attributes.color': 1, 'attributes.material': 1 });
-productSchema.index({ 'attributes.color': 1, 'attributes.material': 1, 'attributes.purity': 1 });
+productSchema.index({ 'attributes.color': 1, 'attributes.material': 1, 'attributes.purity': 1, 'attributes.gender': 1 });
 
 // Virtual for calculating discount percentage
 productSchema.virtual('discountPercentage').get(function () {
