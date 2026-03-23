@@ -396,6 +396,9 @@ router.get(
   userController.getRelatedProducts
 );
 
+router.get("/price-filters", cacheRoute(3600), userController.getPriceFilters);
+
+
 /**
  * @swagger
  * /user/products/essentials:

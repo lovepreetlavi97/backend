@@ -22,9 +22,12 @@ const {
   Banner,
   Review,
   InstagramVideo,
-  Relation,
-  CuratedCollection
+  CuratedCollection,
+  Gift,
+  PriceFilter
 } = require("../models/index");
+
+
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const ObjectId = mongoose.Types.ObjectId;
@@ -125,11 +128,12 @@ const getRelatedProducts = async (req, res) => {
     };
 
     const relatedProducts = await Product.find(query)
-      .select("_id name description title slug actualPrice discountedPrice discountPercent images categoryId subcategoryId tags isPriceFixed weight makingCharges priceRuleId averageRating totalReviews")
+      .select("_id name image description title slug actualPrice discountedPrice discountPercent images categoryId subcategoryId tags isPriceFixed weight makingCharges priceRuleId averageRating totalReviews")
       .populate("priceRuleId", "name price")
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
+
 
     // 3. Enhance products with dynamic prices
     const enhancedProducts = relatedProducts.map((product) => {
@@ -988,6 +992,8 @@ const getAllProducts = async (req, res) => {
       giftId,
       giftIds,
       style,
+      relationId,
+      relationIds,
     } = req.query;
 
     // Build query
@@ -1005,8 +1011,11 @@ const getAllProducts = async (req, res) => {
       ...(occasion && { "attributes.occasions": occasion }),
       ...(giftId && { "attributes.giftIds": giftId }),
       ...(giftIds && { "attributes.giftIds": { $in: Array.isArray(giftIds) ? giftIds : giftIds.split(",") } }),
-      ...(style && { "attributes.style": style })
+      ...(style && { "attributes.style": style }),
+      ...(relationId && { relationIds: relationId }),
+      ...(relationIds && { relationIds: { $in: Array.isArray(relationIds) ? relationIds : relationIds.split(",") } }),
     };
+
 
     // Add price range filter
     if (minPrice || maxPrice) {
@@ -1039,20 +1048,33 @@ const getAllProducts = async (req, res) => {
     const products = await Product.find(query)
       .sort({ _id: -1 })
       .limit(parseInt(limit))
+      .populate("priceRuleId", "name price")
       .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
       .lean();
 
     // Dynamic Pricing Calculation
     for (let product of products) {
-      if (!product.isPriceFixed && product.priceRuleId) {
-        // Compute price at read-time if needed (matching other controllers)
+      if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
+        const pricePerUnit = product.priceRuleId.price;
+        const weight = product.weight || 0;
+        const makingCharges = product.makingCharges || 0;
+
+        product.actualPrice = (pricePerUnit * weight) + makingCharges;
+        
+        if (product.discountPercent && product.discountPercent > 0) {
+          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
+          product.discountedPrice = Math.floor(discounted);
+        }
       }
       
       // Calculate discount percentage for display
-      if (product.actualPrice && product.discountedPrice) {
+      if (product.actualPrice && product.discountedPrice && product.actualPrice > 0) {
         product.discountPercentage = Math.round(((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100);
+      } else {
+        product.discountPercentage = 0;
       }
     }
+
 
     const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
 
@@ -1108,17 +1130,20 @@ const getProductsBySlug = async (req, res) => {
 
     if (slug !== "all") {
       // Find category or subcategory by slug
-      const [category, subcategory] = await Promise.all([
+      const [category, subcategory, relation] = await Promise.all([
         Category.findOne({ slug, isDeleted: false }),
         SubCategory.findOne({ slug, isDeleted: false }),
+        Relation.findOne({ slug, isActive: true, isDeleted: false }),
       ]);
 
       if (subcategory) {
         query.subcategoryId = subcategory._id;
       } else if (category) {
         query.categoryId = category._id;
+      } else if (relation) {
+        query.relationIds = relation._id;
       } else {
-        // If slug doesn't match category/subcategory, it might be a Gift (Occasion)
+        // If slug doesn't match category/subcategory/relation, it might be a Gift (Occasion)
         const giftMatch = await Gift.findOne({ slug, isActive: true, isDeleted: false });
         if (giftMatch) {
           query["attributes.giftIds"] = giftMatch._id;
@@ -1136,6 +1161,7 @@ const getProductsBySlug = async (req, res) => {
           }
         }
       }
+
     }
 
     // Apply additional filters
@@ -1176,18 +1202,32 @@ const getProductsBySlug = async (req, res) => {
       .limit(parseInt(limit))
       .populate("categoryId", "name")
       .populate("subcategoryId", "name")
+      .populate("priceRuleId", "name price")
       .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
       .lean();
 
     // Price calculation & formatting
     products.forEach(p => {
       if (!p.isPriceFixed && p.priceRuleId && p.priceRuleId.price) {
-        // p.actualPrice = (p.priceRuleId.price * (p.weight || 0)) + (p.makingCharges || 0);
+        const pricePerUnit = p.priceRuleId.price;
+        const weight = p.weight || 0;
+        const makingCharges = p.makingCharges || 0;
+
+        p.actualPrice = (pricePerUnit * weight) + makingCharges;
+        
+        if (p.discountPercent && p.discountPercent > 0) {
+          const discounted = p.actualPrice * (1 - (p.discountPercent / 100));
+          p.discountedPrice = Math.floor(discounted);
+        }
       }
-      if (p.actualPrice && p.discountedPrice) {
+      
+      if (p.actualPrice && p.discountedPrice && p.actualPrice > 0) {
         p.discountPercentage = Math.round(((p.actualPrice - p.discountedPrice) / p.actualPrice) * 100);
+      } else {
+        p.discountPercentage = 0;
       }
     });
+
 
     const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
 
@@ -2050,21 +2090,23 @@ const getAllVideos = async (req, res) => {
 };
 const getGiftFilters = async (req, res) => {
   try {
-    const cacheKey = "gift_filters_user";
+    const cacheKey = "gift_filters_v3_user";
     const cached = await cacheUtils.get(cacheKey);
     if (cached) {
       return successResponse(res, 200, "Gift filters retrieved", cached);
     }
 
-    // Fetch unique occasions and styles from PRODUCTS
-    const [occasions, styles] = await Promise.all([
-      Product.distinct("attributes.occasions", { isDeleted: false }),
-      Product.distinct("attributes.style", { isDeleted: false }),
+    // Fetch unique occasions and styles from collections
+    const [occasions, relations, styles] = await Promise.all([
+      Gift.find({ isActive: true, isDeleted: false }).sort({ name: 1 }).lean(),
+      Relation.find({ isActive: true, isDeleted: false }).sort({ name: 1 }).lean(),
+      Product.distinct("attributes.style", { isDeleted: false, "attributes.style": { $ne: null } }),
     ]);
 
     const result = {
-      occasions: occasions.filter(Boolean).sort(),
-      styles: styles.filter(Boolean).sort(),
+      occasions: occasions || [],
+      recipients: relations || [],
+      styles: (styles || []).filter(Boolean).sort(),
     };
 
     await cacheUtils.set(cacheKey, result, 3600); // 1 hour cache
@@ -2076,7 +2118,30 @@ const getGiftFilters = async (req, res) => {
   }
 };
 
+
+const getPriceFilters = async (req, res) => {
+  try {
+    const cacheKey = "price_filters_user";
+    const cached = await cacheUtils.get(cacheKey);
+    if (cached) {
+      return successResponse(res, 200, "Price filters retrieved", { priceFilters: cached });
+    }
+
+    const priceFilters = await PriceFilter.find({ isActive: true, isDeleted: false })
+      .sort({ minPrice: 1 })
+      .lean();
+
+    await cacheUtils.set(cacheKey, priceFilters, 3600);
+
+    return successResponse(res, 200, "Price filters retrieved", { priceFilters });
+  } catch (error) {
+    console.error("Get price filters error:", error);
+    return errorResponse(res, 500, error.message);
+  }
+};
+
 const getAllCuratedCollections = async (req, res) => {
+
   try {
     const cacheKey = "curated_collections_user";
 
@@ -2149,5 +2214,6 @@ module.exports = {
   getRelatedProducts,
   getAllCuratedCollections,
   getProductsBySlug,
-  getGiftFilters
+  getGiftFilters,
+  getPriceFilters
 };

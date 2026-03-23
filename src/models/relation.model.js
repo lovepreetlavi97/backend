@@ -7,6 +7,14 @@ const relationSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+
   description: {
     type: String,
     required: true

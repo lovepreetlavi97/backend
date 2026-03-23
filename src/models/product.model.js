@@ -334,10 +334,19 @@ productSchema.pre('save', function (next) {
   next();
 });
 
+// Add indexes for efficient filtering
+productSchema.index({ categoryId: 1, subcategoryId: 1 });
+productSchema.index({ 'attributes.giftIds': 1 });
+productSchema.index({ relationIds: 1 });
+productSchema.index({ 'attributes.occasions': 1 });
+productSchema.index({ isDeleted: 1, isBlocked: 1 });
+productSchema.index({ name: 'text', description: 'text', tags: 'text' });
+
 // Don't show deleted products in queries
 productSchema.pre(/^find/, function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });
+
 
 module.exports = mongoose.model('Product', productSchema);

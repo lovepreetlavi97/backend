@@ -26,8 +26,10 @@ const KittyPlan = require('./kittyPlan.model');
 const UserKitty = require('./userKitty.model');
 const SiteSettings = require('./siteSettings.model');
 const Gift = require('./gift.model');
+const PriceFilter = require('./priceFilter.model');
 
 module.exports = {
+
   Cart,
   Wishlist,
   Admin,
@@ -53,5 +55,7 @@ module.exports = {
   KittyPlan,
   UserKitty,
   SiteSettings,
-  Gift
+  Gift,
+  PriceFilter
 };
+
