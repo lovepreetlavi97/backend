@@ -298,8 +298,8 @@ router.post("/payment/initiate", userAuth, kittyController.initiateKittyPayment)
  *       500:
  *         description: Server error
  */
-router.get("/admin/plans", adminAuth, cacheRoute(60), kittyController.getAllKittyPlans);
-router.post("/admin/plans", adminAuth, clearRouteCache, kittyController.createKittyPlan);
+router.get("/admin/plans", adminOrSuperAdminAuth, cacheRoute(60), kittyController.getAllKittyPlans);
+router.post("/admin/plans", adminOrSuperAdminAuth, clearRouteCache(), kittyController.createKittyPlan);
 
 /**
  * @swagger
@@ -339,7 +339,7 @@ router.post("/admin/plans", adminAuth, clearRouteCache, kittyController.createKi
  *       500:
  *         description: Server error
  */
-router.put("/admin/plans/:planId", adminAuth, clearRouteCache, kittyController.updateKittyPlan);
+router.put("/admin/plans/:planId", adminOrSuperAdminAuth, clearRouteCache(), kittyController.updateKittyPlan);
 
 /**
  * @swagger
@@ -366,7 +366,7 @@ router.put("/admin/plans/:planId", adminAuth, clearRouteCache, kittyController.u
  *       500:
  *         description: Server error
  */
-router.delete("/admin/plans/:planId", adminAuth, clearRouteCache, kittyController.deleteKittyPlan);
+router.delete("/admin/plans/:planId", adminOrSuperAdminAuth, clearRouteCache(), kittyController.deleteKittyPlan);
 
 /**
  * @swagger
@@ -411,7 +411,8 @@ router.delete("/admin/plans/:planId", adminAuth, clearRouteCache, kittyControlle
  *       500:
  *         description: Server error
  */
-router.get("/admin/enrollments", adminAuth, cacheRoute(60), kittyController.getAllKittyEnrollments);
+router.get("/admin/enrollments", adminOrSuperAdminAuth, cacheRoute(60), kittyController.getAllKittyEnrollments);
+router.get("/admin/enrollments/:kittyId", adminOrSuperAdminAuth, kittyController.getKittyDetailsForAdmin);
 
 /**
  * @swagger
@@ -427,9 +428,11 @@ router.get("/admin/enrollments", adminAuth, cacheRoute(60), kittyController.getA
  *       500:
  *         description: Server error
  */
-router.get("/admin/statistics", adminAuth, cacheRoute(300), kittyController.getKittyStatistics);
+router.get("/admin/statistics", adminOrSuperAdminAuth, cacheRoute(300), kittyController.getKittyStatistics);
+router.get("/admin/transactions", adminOrSuperAdminAuth, kittyController.getAllKittyTransactions);
+router.post("/admin/payment/manual", adminOrSuperAdminAuth, clearRouteCache(), kittyController.recordManualPayment);
 
 // Dev / QA helper: seed dummy kitty plans & enrollments
-router.post("/admin/dummy-seed", adminAuth, clearRouteCache, kittyController.seedDummyKittyData);
+router.post("/admin/dummy-seed", adminOrSuperAdminAuth, clearRouteCache(), kittyController.seedDummyKittyData);
 
 module.exports = router;

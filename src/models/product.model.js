@@ -276,7 +276,7 @@ const productSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-productSchema.index({ _id: -1 }); // Critical for cursor-based pagination
+// Indexes for performance
 productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 productSchema.index({ actualPrice: 1, discountedPrice: 1 });
 productSchema.index({ isDeleted: 1, isBlocked: 1, isInStock: 1 });

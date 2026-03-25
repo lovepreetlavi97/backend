@@ -38,7 +38,7 @@ const { uploadSingleImage } = require("../middlewares/uploadMiddleware");
  *               type:
  *                 type: string
  *                 description: Type of banner (home, category, popup, slider).
- *                 enum: [home, category, popup, slider]
+ *                 enum: [home, category, popup, slider, gift]
  *                 default: home
  *               image:
  *                 type: string
@@ -103,7 +103,7 @@ router.post('/', adminAuth, uploadSingleImage, bannerController.createBanner);
  *         name: type
  *         schema:
  *           type: string
- *           enum: [home, category, popup, slider]
+ *           enum: [home, category, popup, slider, gift]
  *         description: Filter by banner type
  *       - in: query
  *         name: status
@@ -182,7 +182,7 @@ router.get('/:id', adminAuth, bannerController.getBannerById);
  *               type:
  *                 type: string
  *                 description: Type of banner.
- *                 enum: [home, category, popup, slider]
+ *                 enum: [home, category, popup, slider, gift]
  *               image:
  *                 type: string
  *                 format: binary

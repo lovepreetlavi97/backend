@@ -106,7 +106,7 @@ adminSchema.index({ role: 1, status: 1 });
 adminSchema.index({ isDeleted: 1 });
 
 // Pre-save hook to automatically set all permissions to true for superadmin
-adminSchema.pre('save', function(next) {
+adminSchema.pre('save', function (next) {
   if (this.role === 'superadmin') {
     Object.keys(this.permissions).forEach(permission => {
       this.permissions[permission] = true;
@@ -116,13 +116,13 @@ adminSchema.pre('save', function(next) {
 });
 
 // Make sure deleted admins aren't returned in queries
-adminSchema.pre(/^find/, function(next) {
+adminSchema.pre(/^find/, function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });
 
 // Method to log admin actions
-adminSchema.methods.logAction = async function(action, details = {}) {
+adminSchema.methods.logAction = async function (action, details = {}) {
   this.actionLogs.push({
     action,
     details,
@@ -132,7 +132,7 @@ adminSchema.methods.logAction = async function(action, details = {}) {
 };
 
 // Method to log login activity
-adminSchema.methods.logLogin = async function(ipAddress, userAgent, status = 'success') {
+adminSchema.methods.logLogin = async function (ipAddress, userAgent, status = 'success') {
   this.loginHistory.push({
     ipAddress,
     userAgent,

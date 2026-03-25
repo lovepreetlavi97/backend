@@ -1,14 +1,16 @@
 // responseUtil.js
 const successResponse = (res, status, message, data = {}) => {
   return res.status(status).json({
-      status,
-      message,
-      data,
+    success: true,
+    status,
+    message,
+    data,
   });
 };
 
 const errorResponse = (res, status, message, error = {}) => {
   return res.status(status).json({
+    success: false,
     status,
     message,
     error,

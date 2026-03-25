@@ -18,6 +18,7 @@ const {
   Product,
   Wishlist,
   Cart,
+  Relation,
   PromoCode,
   Banner,
   Review,
@@ -93,7 +94,7 @@ const getRelatedProducts = async (req, res) => {
 
     // Convert URL ?ids=1,2,3 into array
     const idArray = ids.split(",").map((id) => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
-    
+
     if (idArray.length === 0) {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { products: [] });
     }
@@ -148,7 +149,7 @@ const getRelatedProducts = async (req, res) => {
         const makingCharges = product.makingCharges || 0;
 
         product.actualPrice = (pricePerUnit * weight) + makingCharges;
-        
+
         // If there's a discount percentage, calculate discountedPrice
         if (product.discountPercent && product.discountPercent > 0) {
           const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
@@ -1060,13 +1061,13 @@ const getAllProducts = async (req, res) => {
         const makingCharges = product.makingCharges || 0;
 
         product.actualPrice = (pricePerUnit * weight) + makingCharges;
-        
+
         if (product.discountPercent && product.discountPercent > 0) {
           const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
           product.discountedPrice = Math.floor(discounted);
         }
       }
-      
+
       // Calculate discount percentage for display
       if (product.actualPrice && product.discountedPrice && product.actualPrice > 0) {
         product.discountPercentage = Math.round(((product.actualPrice - product.discountedPrice) / product.actualPrice) * 100);
@@ -1111,16 +1112,16 @@ const getAllProducts = async (req, res) => {
 const getProductsBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const { 
-      limit = 12, 
-      lastId, 
-      occasion, 
-      style, 
-      gender, 
-      color, 
-      material, 
-      minPrice, 
-      maxPrice, 
+    const {
+      limit = 12,
+      lastId,
+      occasion,
+      style,
+      gender,
+      color,
+      material,
+      minPrice,
+      maxPrice,
       search,
       giftId,
       giftIds
@@ -1172,7 +1173,7 @@ const getProductsBySlug = async (req, res) => {
     if (gender) query["attributes.gender"] = gender;
     if (color) query["attributes.color"] = color;
     if (material) query["attributes.material"] = material;
-    
+
     if (minPrice || maxPrice) {
       query.actualPrice = {};
       if (minPrice) query.actualPrice.$gte = parseFloat(minPrice);
@@ -1214,13 +1215,13 @@ const getProductsBySlug = async (req, res) => {
         const makingCharges = p.makingCharges || 0;
 
         p.actualPrice = (pricePerUnit * weight) + makingCharges;
-        
+
         if (p.discountPercent && p.discountPercent > 0) {
           const discounted = p.actualPrice * (1 - (p.discountPercent / 100));
           p.discountedPrice = Math.floor(discounted);
         }
       }
-      
+
       if (p.actualPrice && p.discountedPrice && p.actualPrice > 0) {
         p.discountPercentage = Math.round(((p.actualPrice - p.discountedPrice) / p.actualPrice) * 100);
       } else {
@@ -1271,8 +1272,11 @@ const uploadImages = async (req, res) => {
 
 const getProductBySlug = async (req, res) => {
   try {
+    console.log(req.params, "req.paramsreq.paramsreq.params")
+    // return
     const { slug } = req.params;
 
+    // return
     if (!slug || typeof slug !== "string") {
       return errorResponse(res, 400, "Invalid product slug");
     }

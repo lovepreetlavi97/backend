@@ -1,33 +1,33 @@
 const mongoose = require("mongoose");
 
 const CartSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    required: true, 
-    index: true 
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+    index: true
   },
   items: [
     {
-      productId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "Product", 
-        required: true 
+      productId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        required: true
       },
-      quantity: { 
-        type: Number, 
+      quantity: {
+        type: Number,
         default: 1,
         min: [1, 'Quantity cannot be less than 1'],
         max: [50, 'Quantity cannot exceed 50 items']
       },
-      price: { 
+      price: {
         type: Number,
         min: 0
       },
-      name: { 
+      name: {
         type: String
       },
-      image: { 
+      image: {
         type: String
       },
       weight: {
@@ -85,7 +85,7 @@ const CartSchema = new mongoose.Schema({
     default: 0,
     min: 0
   }
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -98,7 +98,7 @@ CartSchema.index({ lastActive: 1 });
 CartSchema.index({ isAbandoned: 1 });
 
 // Recalculate cart totals on save
-CartSchema.pre('save', function(next) {
+CartSchema.pre('save', function (next) {
   this.totalItems = this.items.length;
   this.totalQuantity = this.items.reduce((total, item) => total + item.quantity, 0);
   this.subtotal = this.items.reduce((total, item) => {
@@ -110,15 +110,15 @@ CartSchema.pre('save', function(next) {
 });
 
 // Virtual to check if cart is empty
-CartSchema.virtual('isEmpty').get(function() {
+CartSchema.virtual('isEmpty').get(function () {
   return this.items.length === 0;
 });
 
 // Method to find abandoned carts
-CartSchema.statics.findAbandoned = function(hoursThreshold = 24) {
+CartSchema.statics.findAbandoned = function (hoursThreshold = 24) {
   const thresholdDate = new Date();
   thresholdDate.setHours(thresholdDate.getHours() - hoursThreshold);
-  
+
   return this.find({
     lastActive: { $lt: thresholdDate },
     isAbandoned: false,

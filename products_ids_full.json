@@ -1,0 +1,762 @@
+[
+  {
+    "_id": "69bc32ae2ba3da70c0a1acd1",
+    "name": "vercase kadda",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2ee64ed57e6f1e41ebed",
+    "discountPercentage": 0,
+    "id": "69bc32ae2ba3da70c0a1acd1"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c4",
+    "name": "18K Gold Bridal Necklace - Model 1",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c4"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c5",
+    "name": "18K Silver Engagement Rings - Model 2",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c5"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c9",
+    "name": "925 Silver Engagement Rings - Model 6",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c9"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c6",
+    "name": "18K Silver Gold Bangles - Model 3",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c6"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32cb",
+    "name": "925 Gold Stud Earrings - Model 8",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32cb"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ca",
+    "name": "18K Rose Gold Kada Bangles - Model 7",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2cb",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ca"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32cc",
+    "name": "22K Rose Gold Gold Chain Necklace - Model 9",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31b82ba3da70c0a1abb4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32cc"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32cd",
+    "name": "925 Rose Gold Casual Rings - Model 10",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c0",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32cd"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ce",
+    "name": "925 Silver Gold Bangles - Model 11",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ce"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32cf",
+    "name": "18K Rose Gold Jhumka Earrings - Model 12",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32cf"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d0",
+    "name": "22K Gold Bridal Necklace - Model 13",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d0"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d1",
+    "name": "22K Gold Casual Rings - Model 14",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c0",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d1"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d2",
+    "name": "18K Rose Gold Gold Bangles - Model 15",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d2"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d4",
+    "name": "18K Gold Diamond Necklace - Model 17",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31aa2ba3da70c0a1aba3",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d4"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d3",
+    "name": "18K Silver Jhumka Earrings - Model 16",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d3"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d5",
+    "name": "18K Gold Engagement Rings - Model 18",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d5"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d7",
+    "name": "18K Rose Gold Stud Earrings - Model 20",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d7"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d6",
+    "name": "22K Rose Gold Gold Bangles - Model 19",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d6"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d8",
+    "name": "22K Rose Gold Diamond Necklace - Model 21",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31aa2ba3da70c0a1aba3",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d8"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32d9",
+    "name": "18K Gold Casual Rings - Model 22",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c0",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32d9"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32da",
+    "name": "22K Gold Kada Bangles - Model 23",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2cb",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32da"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32dc",
+    "name": "22K Rose Gold Bridal Necklace - Model 25",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32dc"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32db",
+    "name": "22K Gold Jhumka Earrings - Model 24",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32db"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32dd",
+    "name": "22K Gold Engagement Rings - Model 26",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32dd"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c8",
+    "name": "925 Silver Gold Chain Necklace - Model 5",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31b82ba3da70c0a1abb4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c8"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32df",
+    "name": "925 Gold Jhumka Earrings - Model 28",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32df"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e1",
+    "name": "925 Silver Casual Rings - Model 30",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c0",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e1"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e0",
+    "name": "925 Silver Diamond Necklace - Model 29",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31aa2ba3da70c0a1aba3",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e0"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e2",
+    "name": "925 Rose Gold Kada Bangles - Model 31",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2cb",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e2"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e4",
+    "name": "925 Gold Bridal Necklace - Model 33",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e4"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32c7",
+    "name": "18K Silver Jhumka Earrings - Model 4",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32c7"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e6",
+    "name": "18K Rose Gold Gold Bangles - Model 35",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e6"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e5",
+    "name": "22K Silver Engagement Rings - Model 34",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e5"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e7",
+    "name": "925 Gold Jhumka Earrings - Model 36",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e7"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e8",
+    "name": "18K Silver Gold Chain Necklace - Model 37",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31b82ba3da70c0a1abb4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e8"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e9",
+    "name": "18K Rose Gold Engagement Rings - Model 38",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e9"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ea",
+    "name": "22K Gold Gold Bangles - Model 39",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ea"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32eb",
+    "name": "18K Silver Jhumka Earrings - Model 40",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d4",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32eb"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ed",
+    "name": "18K Rose Gold Engagement Rings - Model 42",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ed"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ec",
+    "name": "18K Silver Bridal Necklace - Model 41",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ec"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ee",
+    "name": "925 Rose Gold Kada Bangles - Model 43",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2cb",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ee"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32ef",
+    "name": "18K Rose Gold Stud Earrings - Model 44",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32ef"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f0",
+    "name": "925 Silver Diamond Necklace - Model 45",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31aa2ba3da70c0a1aba3",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f0"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f1",
+    "name": "925 Silver Casual Rings - Model 46",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c0",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f1"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f3",
+    "name": "925 Rose Gold Stud Earrings - Model 48",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f3"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f2",
+    "name": "22K Gold Kada Bangles - Model 47",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2cb",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f2"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f4",
+    "name": "22K Gold Bridal Necklace - Model 49",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f4"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f5",
+    "name": "18K Gold Engagement Rings - Model 50",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2bc",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f5"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f6",
+    "name": "18K Gold Gold Bangles - Model 51",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f6"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32f7",
+    "name": "925 Silver Stud Earrings - Model 52",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32f7"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32de",
+    "name": "22K Rose Gold Gold Bangles - Model 27",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74cec1fb9190d4db2c6",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32de"
+  },
+  {
+    "_id": "69bec88bb5f85b0fccda32e3",
+    "name": "925 Rose Gold Stud Earrings - Model 32",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bec74dec1fb9190d4db2d1",
+    "discountPercentage": 0,
+    "id": "69bec88bb5f85b0fccda32e3"
+  },
+  {
+    "_id": "69c01c802629fa1490178478",
+    "name": "Anniversary Special Bold Style 1",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01c802629fa1490178478"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1ce",
+    "name": "Wedding Special Romantic Style 2",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1ce"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1cd",
+    "name": "Anniversary Special Bold Style 1",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1cd"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1cf",
+    "name": "Valentine Special Bridal Style 3",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1cf"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d0",
+    "name": "Birthday Special Minimal Style 4",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d0"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d1",
+    "name": "Anniversary Special Bold Style 5",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d1"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d2",
+    "name": "Wedding Special Romantic Style 6",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d2"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d3",
+    "name": "Valentine Special Bridal Style 7",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d3"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d4",
+    "name": "Birthday Special Minimal Style 8",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d4"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d5",
+    "name": "Anniversary Special Bold Style 9",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d5"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d7",
+    "name": "Valentine Special Bridal Style 11",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d7"
+  },
+  {
+    "_id": "69c01d30c04a8d4c7462c1d6",
+    "name": "Wedding Special Romantic Style 10",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d30c04a8d4c7462c1d6"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1d8",
+    "name": "Birthday Special Minimal Style 12",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1d8"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1d9",
+    "name": "Anniversary Special Bold Style 13",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1d9"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1da",
+    "name": "Wedding Special Romantic Style 14",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1da"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1db",
+    "name": "Valentine Special Bridal Style 15",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1db"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1dc",
+    "name": "Birthday Special Minimal Style 16",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1dc"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1dd",
+    "name": "Anniversary Special Bold Style 17",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1dd"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1de",
+    "name": "Wedding Special Romantic Style 18",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1de"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1df",
+    "name": "Valentine Special Bridal Style 19",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1df"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e0",
+    "name": "Birthday Special Minimal Style 20",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e0"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e1",
+    "name": "Anniversary Special Bold Style 21",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e1"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e2",
+    "name": "Wedding Special Romantic Style 22",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e2"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e3",
+    "name": "Valentine Special Bridal Style 23",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e3"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e4",
+    "name": "Birthday Special Minimal Style 24",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e4"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e5",
+    "name": "Anniversary Special Bold Style 25",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e5"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e6",
+    "name": "Wedding Special Romantic Style 26",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e6"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e9",
+    "name": "Anniversary Special Bold Style 29",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e9"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1eb",
+    "name": "Valentine Special Bridal Style 31",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1eb"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1ea",
+    "name": "Wedding Special Romantic Style 30",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1ea"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1ec",
+    "name": "Birthday Special Minimal Style 32",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1ec"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1ed",
+    "name": "Anniversary Special Bold Style 33",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1ed"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1ee",
+    "name": "Wedding Special Romantic Style 34",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1ee"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1ef",
+    "name": "Valentine Special Bridal Style 35",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1ef"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1f0",
+    "name": "Birthday Special Minimal Style 36",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1f0"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1f1",
+    "name": "Anniversary Special Bold Style 37",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1f1"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1f2",
+    "name": "Wedding Special Romantic Style 38",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1f2"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1f3",
+    "name": "Valentine Special Bridal Style 39",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1f3"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1f4",
+    "name": "Birthday Special Minimal Style 40",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1f4"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e8",
+    "name": "Birthday Special Minimal Style 28",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e8"
+  },
+  {
+    "_id": "69c01d31c04a8d4c7462c1e7",
+    "name": "Valentine Special Bridal Style 27",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc2e9f4ed57e6f1e41eb90",
+    "discountPercentage": 0,
+    "id": "69c01d31c04a8d4c7462c1e7"
+  },
+  {
+    "_id": "69c0d516d5e4cdf09515b180",
+    "name": "New product",
+    "categoryId": "69bc2e424ed57e6f1e41eb07",
+    "subcategoryId": "69bc31d72ba3da70c0a1abc5",
+    "discountPercentage": 0,
+    "id": "69c0d516d5e4cdf09515b180"
+  }
+]

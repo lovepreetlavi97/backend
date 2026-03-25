@@ -20,7 +20,7 @@ const categorySchema = new mongoose.Schema({
   }],
   image: {
     type: String,
-     default: "",
+    default: "",
   },
   isFeatured: {
     type: Boolean,
@@ -48,7 +48,7 @@ const categorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
   },
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -60,7 +60,7 @@ categorySchema.index({ slug: 1 });
 categorySchema.index({ isDeleted: 1, isBlocked: 1 });
 
 // Generate slug from name
-categorySchema.pre('save', function(next) {
+categorySchema.pre('save', function (next) {
   if (this.isModified('name') || !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
@@ -68,7 +68,7 @@ categorySchema.pre('save', function(next) {
 });
 
 // Don't show deleted categories in queries
-categorySchema.pre(/^find/, function(next) {
+categorySchema.pre(/^find/, function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });

@@ -50,7 +50,7 @@ const festivalSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save middleware to generate slug
-festivalSchema.pre('save', function(next) {
+festivalSchema.pre('save', function (next) {
   // Only generate slug if name is modified or it's a new document
   if (this.isModified('name') || this.isNew) {
     this.slug = slugify(this.name, { lower: true, strict: true });
@@ -59,7 +59,7 @@ festivalSchema.pre('save', function(next) {
 });
 
 // Virtual to check if the festival is expired
-festivalSchema.virtual('isExpired').get(function() {
+festivalSchema.virtual('isExpired').get(function () {
   return Date.now() > this.endDate;
 });
 

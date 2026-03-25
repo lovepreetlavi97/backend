@@ -53,7 +53,7 @@ const subcategorySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Generate slug from name
-subcategorySchema.pre('save', function(next) {
+subcategorySchema.pre('save', function (next) {
   const slugify = require('slugify');
   if (this.isModified('name') || !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });

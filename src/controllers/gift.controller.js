@@ -1,4 +1,4 @@
-const { Product, Gift } = require("../models");
+const { Product, Gift, Banner } = require("../models");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const slugify = require("slugify");
 
@@ -10,10 +10,13 @@ const getGiftFilters = async (req, res) => {
     // Fetch active gifts (occasions) from the new model
     const activeGifts = await Gift.find({ isActive: true, isDeleted: false }).select("name slug image");
 
-    const [themes, recipients] = await Promise.all([
+    const [themes, recipients, giftBanner] = await Promise.all([
       Product.distinct("attributes.style"),
       Product.distinct("attributes.gender"),
+      Banner.findOne({ type: 'gift', isDeleted: false }).sort({ position: -1 })
     ]);
+
+    console.log("🔍 Found gift banner:", giftBanner ? giftBanner._id : "None");
 
     const priceRanges = [
       { label: "Under ₹1,000", min: 0, max: 1000 },
@@ -28,7 +31,20 @@ const getGiftFilters = async (req, res) => {
       themes: themes.filter(Boolean),
       recipients: recipients.filter(Boolean),
       priceRanges,
+      banner: giftBanner
     };
+
+    if (!giftBanner) {
+      console.log("⚠️ No active/gift banner found in database.");
+    } else {
+      console.log("✅ Gift banner found:", {
+        id: giftBanner._id,
+        title: giftBanner.title,
+        imageUrl: giftBanner.imageUrl,
+        type: giftBanner.type,
+        status: giftBanner.status
+      });
+    }
 
     return successResponse(res, 200, "Gift filters retrieved successfully", filters);
   } catch (error) {

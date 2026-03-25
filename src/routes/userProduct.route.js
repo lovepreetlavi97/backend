@@ -22,6 +22,6 @@ const { cacheRoute } = require("../middlewares/cache/cache.middleware");
  *       404:
  *         description: Product not found
  */
-router.get("/:slug", cacheRoute(1800), userProductController.getProductBySlug);
+router.get("/:slug", userProductController.getProductBySlug);
 
 module.exports = router;

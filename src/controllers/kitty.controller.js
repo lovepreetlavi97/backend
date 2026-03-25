@@ -569,6 +569,30 @@ const getAllKittyEnrollments = async (req, res) => {
   }
 };
 
+// Get specific kitty details for Admin
+const getKittyDetailsForAdmin = async (req, res) => {
+  try {
+    const { kittyId } = req.params;
+
+    if (!ObjectId.isValid(kittyId)) {
+      return errorResponse(res, 400, messages.INVALID_ID);
+    }
+
+    const kitty = await UserKitty.findById(kittyId)
+      .populate('planId')
+      .populate('userId', 'name email phoneNumber');
+
+    if (!kitty) {
+      return errorResponse(res, 404, 'Kitty enrollment not found');
+    }
+
+    return successResponse(res, 200, messages.DATA_FETCHED, kitty);
+  } catch (error) {
+    console.error('Error fetching kitty details for admin:', error);
+    return errorResponse(res, 500, messages.SERVER_ERROR);
+  }
+};
+
 // Get kitty statistics (Admin)
 const getKittyStatistics = async (req, res) => {
   try {
@@ -770,6 +794,103 @@ const seedDummyKittyData = async (req, res) => {
   }
 };
 
+// Record manual (offline) payment - Admin Only
+const recordManualPayment = async (req, res) => {
+  try {
+    const { paymentId, method, receiptId, amount } = req.body;
+
+    if (!paymentId || !method) {
+      return errorResponse(res, 400, "paymentId and method are required");
+    }
+
+    if (!["cash", "bank_transfer"].includes(method)) {
+      return errorResponse(res, 400, "Invalid manual payment method. Use 'cash' or 'bank_transfer'");
+    }
+
+    const { markPaymentAsPaid } = require("../services/kitty.service");
+    
+    const userKitty = await markPaymentAsPaid({
+      paymentId,
+      paymentMethod: method,
+      transactionId: receiptId, // Using receiptId as transactionId for manual payments
+    });
+
+    return successResponse(res, 200, "Manual payment recorded successfully", userKitty);
+  } catch (error) {
+    console.error("Error recording manual payment:", error);
+    return errorResponse(res, 500, error.message || messages.SERVER_ERROR);
+  }
+};
+
+// Get all kitty transactions (Admin Only)
+const getAllKittyTransactions = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const transactions = await UserKitty.aggregate([
+      { $unwind: "$payments" },
+      { $match: { "payments.status": "paid" } },
+      { $sort: { "payments.paymentDate": -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userDetails"
+        }
+      },
+      { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "kittyplans",
+          localField: "planId",
+          foreignField: "_id",
+          as: "planDetails"
+        }
+      },
+      { $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: "$payments._id",
+          enrollmentId: "$_id",
+          userId: 1,
+          userName: "$userDetails.name",
+          userEmail: "$userDetails.email",
+          planName: "$planDetails.name",
+          amount: "$payments.amount",
+          paymentDate: "$payments.paymentDate",
+          paymentMethod: "$payments.paymentMethod",
+          transactionId: "$payments.transactionId",
+          razorpayPaymentId: "$payments.razorpayPaymentId",
+          status: "$payments.status"
+        }
+      },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: parseInt(limit) }],
+          totalCount: [{ $count: "count" }]
+        }
+      }
+    ]);
+
+    const data = transactions[0].data;
+    const total = transactions[0].totalCount[0]?.count || 0;
+
+    return successResponse(res, 200, messages.DATA_FETCHED, {
+      transactions: data,
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / parseInt(limit)),
+        count: total
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching kitty transactions:", error);
+    return errorResponse(res, 500, messages.SERVER_ERROR);
+  }
+};
+
 module.exports = {
   getAllKittyPlans,
   getActiveKittyPlans,
@@ -783,5 +904,8 @@ module.exports = {
   initiateKittyPayment,
   getAllKittyEnrollments,
   getKittyStatistics,
-  seedDummyKittyData
+  getKittyDetailsForAdmin,
+  seedDummyKittyData,
+  recordManualPayment,
+  getAllKittyTransactions
 };

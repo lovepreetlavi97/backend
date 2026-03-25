@@ -60,8 +60,8 @@ router.use("/grievances", grievanceRoute);
 router.use("/instagram-videos", instagramVideos);
 
 router.use("/upload", uploadRoute);
-router.use("/user", userRoute);
 router.use("/user/products", userProductRoute);
+router.use("/user", userRoute);
 router.use("/addresses", addressRoute);
 router.use("/payment", paymentRoute);
 router.use("/curated-collections", curatedCollectionRoute);

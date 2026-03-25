@@ -9,3 +9,4 @@ WishlistSchema.index({ userId: 1 });
 
 const Wishlist = mongoose.model("Wishlist", WishlistSchema);
 module.exports = Wishlist;
+module.exports = Wishlist;

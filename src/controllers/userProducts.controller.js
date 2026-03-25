@@ -1,4 +1,4 @@
-const { Product, Category, SubCategory, Festival } = require("../models/index");
+const { Product, Category, SubCategory, Festival, Gift, Relation } = require("../models/index");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
@@ -15,6 +15,8 @@ const getProductBySlug = async (req, res) => {
       return errorResponse(res, 400, "Invalid product slug");
     }
 
+    console.log(`🔍 [getProductBySlug] Processing slug: ${slug}`);
+
     const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}_${color || ''}_${material || ''}_${purity || ''}_${style || ''}_${gender || ''}_${relation || ''}_${page}_${limit}`;
     const cached = await cacheUtils.get(cacheKey);
 
@@ -22,22 +24,37 @@ const getProductBySlug = async (req, res) => {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
     }
 
-    const [category, subcategory, festivals, relations] = await Promise.all([
-      Category.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
-      SubCategory.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
-      Festival.find({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
-      Relation.findOne({ name: { $regex: new RegExp(`^${slug}$`, "i") } }),
-    ]);
+    let slugConditions = [];
+    const lowerSlug = slug.toLowerCase();
 
-    const festivalIds = festivals.map((f) => f._id);
+    if (lowerSlug === 'all') {
+      slugConditions = [{}];
+    } else if (lowerSlug === 'gift-store') {
+      slugConditions = [{
+        $or: [
+          { "attributes.giftIds.0": { $exists: true } },
+          { "attributes.occasions.0": { $exists: true } },
+          { "relationIds.0": { $exists: true } }
+        ]
+      }];
+    } else {
+      const [category, subcategory, festivals, relations, gift] = await Promise.all([
+        Category.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+        SubCategory.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+        Festival.find({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+        Relation.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+        Gift.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+      ]);
 
-    const slugConditions = [
-      category ? { categoryId: category._id } : null,
-      subcategory ? { subcategoryId: subcategory._id } : null,
-      festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
-      relations ? { relationIds: relations._id } : null,
-      slug.toLowerCase() === 'all' ? {} : null
-    ].filter(Boolean);
+      const festivalIds = festivals.map((f) => f._id);
+      slugConditions = [
+        category ? { categoryId: category._id } : null,
+        subcategory ? { subcategoryId: subcategory._id } : null,
+        festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
+        relations ? { relationIds: relations._id } : null,
+        gift ? { "attributes.giftIds": gift._id } : null,
+      ].filter(Boolean);
+    }
 
     if (slugConditions.length === 0) {
       const responseData = {
@@ -235,12 +252,13 @@ const getProductBySlug = async (req, res) => {
 
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {
-    console.error("Get product by slug error:", error);
-    return errorResponse(
-      res,
-      500,
-      error.message || "Error retrieving product by slug"
-    );
+    console.error("❌ ERROR in getProductBySlug:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+      stack: error.stack,
+      slug: req.params.slug
+    });
   }
 };
 
