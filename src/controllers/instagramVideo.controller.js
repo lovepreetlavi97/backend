@@ -65,14 +65,32 @@ const createVideo = async (req, res) => {
 
 
 /**
- * ✅ READ (PUBLIC)
+ * ✅ READ (PUBLIC/ADMIN)
  */
 const getAllVideos = async (req, res) => {
   try {
-    const videos = await InstagramVideo.find({ isActive: true })
-      .sort({ sortOrder: 1, createdAt: -1 });
+    const { all, page = 1, limit = 10 } = req.query;
+    const filter = all === "true" ? {} : { isActive: true };
 
-    return successResponse(res, 200, "Instagram videos fetched", { videos });
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const videos = await InstagramVideo.find(filter)
+      .sort({ sortOrder: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await InstagramVideo.countDocuments(filter);
+
+    return successResponse(res, 200, "Instagram videos fetched", {
+      videos,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / limit),
+        hasNext: skip + videos.length < total,
+      },
+    });
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
@@ -92,28 +110,33 @@ const updateVideo = async (req, res) => {
     if (!video) {
       return errorResponse(res, 404, "Video not found");
     }
-if (req.files?.thumbnail?.[0]) {
-  if (video.thumbnail) {
-    const oldThumbKey = video.thumbnail.replace(
-      `${process.env.DO_PUBLIC_URL}/`,
-      ""
-    );
-    await deleteImageFromSpaces(oldThumbKey);
-  }
 
-  const thumbFile = req.files.thumbnail[0];
-  const thumbKey = await uploadToSpaces(
-    thumbFile.buffer,
-    thumbFile.originalname,
-    thumbFile.mimetype,
-    "instagram-thumbnails"
-  );
+    // Handle context-specific uploads from multer.fields()
+    const videoFile = req.files?.video?.[0];
+    const thumbFile = req.files?.thumbnail?.[0];
 
-  video.thumbnail = getPublicUrl(thumbKey);
-}
+    // If new thumbnail uploaded → delete old thumbnail
+    if (thumbFile) {
+      if (video.thumbnail) {
+        const oldThumbKey = video.thumbnail.replace(
+          `${process.env.DO_PUBLIC_URL}/`,
+          ""
+        );
+        await deleteImageFromSpaces(oldThumbKey);
+      }
+
+      const thumbKey = await uploadToSpaces(
+        thumbFile.buffer,
+        thumbFile.originalname,
+        thumbFile.mimetype,
+        "instagram-thumbnails"
+      );
+
+      video.thumbnail = getPublicUrl(thumbKey);
+    }
 
     // If new video uploaded → delete old video
-    if (req.file) {
+    if (videoFile) {
       const oldKey = video.videoUrl.replace(
         `${process.env.DO_PUBLIC_URL}/`,
         ""
@@ -121,9 +144,9 @@ if (req.files?.thumbnail?.[0]) {
       await deleteImageFromSpaces(oldKey);
 
       const newKey = await uploadToSpaces(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
+        videoFile.buffer,
+        videoFile.originalname,
+        videoFile.mimetype,
         "instagram-videos"
       );
 

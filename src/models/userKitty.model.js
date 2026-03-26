@@ -79,8 +79,8 @@ const userKittySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'completed', 'paused', 'cancelled'],
-    default: 'active'
+    enum: ['active', 'completed', 'paused', 'cancelled', 'pending'],
+    default: 'pending'
   },
   monthlyAmount: {
     type: Number,

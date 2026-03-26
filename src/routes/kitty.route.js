@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const kittyController = require("../controllers/kitty.controller");
-const { userAuth, adminAuth } = require("../middlewares/auth/auth.middleware");
+const { userAuth, adminAuth, adminOrSuperAdminAuth } = require("../middlewares/auth/auth.middleware");
 const {
   cacheRoute,
   clearRouteCache,

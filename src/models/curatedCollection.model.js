@@ -45,6 +45,11 @@ const curatedCollectionSchema = new mongoose.Schema(
       }
     },
 
+    productIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product"
+    }],
+
     position: {
       type: Number,
       default: 0

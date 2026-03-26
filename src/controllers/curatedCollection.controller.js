@@ -28,6 +28,10 @@ const createCuratedCollection = async (req, res) => {
       const { buffer, originalname, mimetype } = req.file;
       curatedData.image = await uploadToSpaces(buffer, originalname, mimetype);
     }
+    
+    if (req.body.productIds) {
+      curatedData.productIds = JSON.parse(req.body.productIds);
+    }
 
     const curated = await CuratedCollection.create(curatedData);
 
@@ -84,6 +88,10 @@ const updateCuratedCollectionById = async (req, res) => {
     if (req.file) {
       const { buffer, originalname, mimetype } = req.file;
       updateData.image = await uploadToSpaces(buffer, originalname, mimetype);
+    }
+    
+    if (updateData.productIds) {
+       updateData.productIds = JSON.parse(req.body.productIds);
     }
 
     updateData.updatedBy = req.user._id;
@@ -174,15 +182,20 @@ const getCuratedCollectionProducts = async (req, res) => {
     return errorResponse(res, 404, "Curated collection not found");
   }
 
-  // Query by direct collectionIds assignment (new way)
-  const directProducts = await Product.find({
+  // Manual assignment from productIds array in collection model
+  const explicitProducts = curated.productIds?.length
+    ? await Product.find({ _id: { $in: curated.productIds }, isBlocked: false }).limit(40)
+    : [];
+
+  // Query by reverse collectionIds assignment (legacy)
+  const reverseProducts = await Product.find({
     collectionIds: curated._id,
     isBlocked: false
   }).limit(40);
 
-  // Also query by filters (legacy way)
+  // Also query by filters
   const f = curated.filters || {};
-  const filterQuery = { isBlocked: false, isInStock: true };
+  const filterQuery = { isBlocked: false };
   if (f.categoryIds?.length) filterQuery.categoryId = { $in: f.categoryIds };
   if (f.subcategoryIds?.length) filterQuery.subcategoryId = { $in: f.subcategoryIds };
   if (f.relationIds?.length) filterQuery.relationIds = { $in: f.relationIds };
@@ -193,13 +206,13 @@ const getCuratedCollectionProducts = async (req, res) => {
     if (f.priceRange.max) filterQuery.discountedPrice.$lte = f.priceRange.max;
   }
 
-  const filteredProducts = Object.keys(filterQuery).length > 2
+  const filteredProducts = Object.keys(filterQuery).length > 1
     ? await Product.find(filterQuery).limit(40)
     : [];
 
   // Merge and deduplicate
   const seen = new Set();
-  const products = [...directProducts, ...filteredProducts].filter(p => {
+  const products = [...explicitProducts, ...reverseProducts, ...filteredProducts].filter(p => {
     const id = p._id.toString();
     if (seen.has(id)) return false;
     seen.add(id);

@@ -221,99 +221,73 @@ const deleteKittyPlan = async (req, res) => {
 
 const enrollInKittyPlan = async (req, res) => {
   try {
-    console.log("👉 [STEP 1] API HIT");
-
     const { planId } = req.body;
     const userId = req.user?._id;
 
-    console.log("👉 [STEP 2] Data Extracted", { planId, userId });
-
-    if (!userId) {
-      console.log("❌ [FAIL] No userId");
-      return errorResponse(res, 401, "Unauthorized: missing user");
+    if (!userId || !planId) {
+      return errorResponse(res, 400, "User ID and Plan ID are required");
     }
-
-    if (!planId) {
-      console.log("❌ [FAIL] No planId");
-      return errorResponse(res, 400, "planId is required");
-    }
-
-    if (!ObjectId.isValid(planId)) {
-      console.log("❌ [FAIL] Invalid planId");
-      return errorResponse(res, 400, messages.INVALID_ID);
-    }
-
-    console.log("👉 [STEP 3] Fetching Plan");
 
     const plan = await KittyPlan.findById(planId);
+    if (!plan) return errorResponse(res, 404, 'Kitty plan not found');
+    if (!plan.isActive) return errorResponse(res, 400, 'Plan is not available for enrollment');
 
-    console.log("👉 [STEP 4] Plan Fetched", plan?._id);
-
-    if (!plan) {
-      console.log("❌ [FAIL] Plan not found");
-      return errorResponse(res, 404, 'Kitty plan not found');
-    }
-
-    if (!plan.isAvailableForEnrollment()) {
-      console.log("❌ [FAIL] Plan not available");
-      return errorResponse(res, 400, 'Plan is not available for enrollment');
-    }
-
-    console.log("👉 [STEP 5] Checking Existing Enrollment");
-
-    const existingEnrollment = await UserKitty.findOne({
+    // Business Rule: One active plan per category
+    const userKitties = await UserKitty.find({
       userId,
-      planId,
-      status: { $in: ['active', 'paused'] }
+      status: { $in: ['active', 'paused', 'pending'] }
+    }).populate('planId');
+
+    const hasSameCategory = userKitties.some(k => k.planId && k.planId.category === plan.category);
+    if (hasSameCategory) {
+      return errorResponse(res, 400, `You already have an active ${plan.category} plan. Complete or cancel it before enrolling again.`);
+    }
+
+    // Generate Full Installment Schedule
+    const payments = [];
+    const startDate = new Date();
+    
+    // First installment is due immediately (Day 0)
+    payments.push({
+      amount: plan.monthlyAmount,
+      dueDate: new Date(startDate),
+      status: 'pending'
     });
 
-    if (existingEnrollment) {
-      console.log("❌ [FAIL] Already enrolled");
-      return errorResponse(res, 400, 'You are already enrolled in this plan');
+    // Subsequent installments
+    for (let i = 1; i < plan.duration; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      payments.push({
+        amount: plan.monthlyAmount,
+        dueDate: dueDate,
+        status: 'pending'
+      });
     }
 
-    console.log("👉 [STEP 6] Calculating Dates");
-
-    const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + plan.duration);
-
-    const nextPaymentDate = new Date(startDate);
-    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-
-    console.log("👉 [STEP 7] Creating UserKitty");
 
     const userKitty = await UserKitty.create({
       planId,
       userId,
       startDate,
       endDate,
-      nextPaymentDate,
+      nextPaymentDate: startDate, // First payment is due now
       monthlyAmount: plan.monthlyAmount,
       totalAmount: plan.totalAmount,
       maturityAmount: plan.maturityAmount,
       remainingAmount: plan.totalAmount,
-      payments: [{
-        amount: plan.monthlyAmount,
-        dueDate: nextPaymentDate,
-        status: 'pending'
-      }]
+      status: 'pending', // Starts in pending until first payment
+      payments
     });
 
-    console.log("👉 [STEP 8] Created", userKitty._id);
-
     await userKitty.populate('planId');
-
-    console.log("👉 [STEP 9] Populated Plan");
-
     await cacheUtils.clearPattern(`user:${userId}:kitties:*`);
 
-    console.log("👉 [STEP 10] Cache Cleared");
-
-    return successResponse(res, 201, 'Successfully enrolled in kitty plan', userKitty);
-
+    return successResponse(res, 201, 'Enrollment created. Please proceed to payment.', userKitty);
   } catch (error) {
-    console.error("💥 [CRASH]", error);
+    console.error("💥 [ENROLL_FAIL]", error);
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };
@@ -451,7 +425,7 @@ const initiateKittyPayment = async (req, res) => {
     const userKitty = await UserKitty.findOne({
       userId,
       'payments._id': paymentId,
-      status: 'active'
+      status: { $in: ['active', 'pending'] }
     }).populate('planId');
 
     console.log("👉 [STEP 3] UserKitty Result:", userKitty?._id);

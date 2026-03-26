@@ -1,4 +1,4 @@
-const { Product, Category, SubCategory, Festival, Gift, Relation } = require("../models/index");
+const { Product, Category, SubCategory, Festival, Gift, Relation, CuratedCollection } = require("../models/index");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
@@ -38,21 +38,40 @@ const getProductBySlug = async (req, res) => {
         ]
       }];
     } else {
-      const [category, subcategory, festivals, relations, gift] = await Promise.all([
+      const [category, subcategory, festivals, relations, gift, curated] = await Promise.all([
         Category.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
         SubCategory.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
         Festival.find({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
         Relation.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
         Gift.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
+        CuratedCollection.findOne({ slug: { $regex: new RegExp(`^${slug}$`, "i") } }),
       ]);
 
       const festivalIds = festivals.map((f) => f._id);
+      
+      // Dynamic filters from curated collection
+      let curatedFilters = null;
+      if (curated && curated.filters) {
+        const f = curated.filters;
+        const subCond = [];
+        if (f.categoryIds?.length) subCond.push({ categoryId: { $in: f.categoryIds } });
+        if (f.subcategoryIds?.length) subCond.push({ subcategoryId: { $in: f.subcategoryIds } });
+        if (f.relationIds?.length) subCond.push({ relationIds: { $in: f.relationIds } });
+        if (f.festivalIds?.length) subCond.push({ festivalIds: { $in: f.festivalIds } });
+        
+        if (subCond.length > 0) {
+           curatedFilters = { $and: subCond };
+        }
+      }
+
       slugConditions = [
         category ? { categoryId: category._id } : null,
         subcategory ? { subcategoryId: subcategory._id } : null,
         festivalIds.length > 0 ? { festivalIds: { $in: festivalIds } } : null,
         relations ? { relationIds: relations._id } : null,
         gift ? { "attributes.giftIds": gift._id } : null,
+        curated ? { collectionIds: curated._id } : null, // Manual assignment
+        curatedFilters, // Dynamic filters from curated collection
       ].filter(Boolean);
     }
 

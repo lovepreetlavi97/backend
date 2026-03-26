@@ -651,10 +651,9 @@ const verifyOTP = async (req, res) => {
     //   return errorResponse(res, 401, messages.OTP_INVALID);
     // }
 
-    if (otp !== "111111") {
-      {
-        return errorResponse(res, 401, messages.OTP_INVALID);
-      }
+    // Development static OTP check
+    if (otp !== "1111") {
+      return errorResponse(res, 401, messages.OTP_INVALID);
     }
 
     // Generate new JWT token after OTP verification
@@ -768,39 +767,30 @@ const getAllFestivals = async (req, res) => {
     }
 
     const dateStr = targetDate.toISOString().split('T')[0];
-    const cacheKey = `festival_${dateStr}`;
+    const cacheKey = `festivals_list_${dateStr}`;
 
-    const cachedFestival = await cacheUtils.get(cacheKey);
-    if (cachedFestival) {
+    const cachedFestivals = await cacheUtils.get(cacheKey);
+    if (cachedFestivals) {
       return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, {
-        festival: cachedFestival
+        festivals: cachedFestivals
       });
     }
 
-    // Set up date range for precise matching
-    const startOfDayUTC = new Date(targetDate);
-    startOfDayUTC.setUTCHours(0, 0, 0, 0);
-
-    const endOfDayUTC = new Date(targetDate);
-    endOfDayUTC.setUTCHours(23, 59, 59, 999);
-
-    // Find most relevant festival for this date
-    const festival = await Festival.findOne({
+    // Find all active festivals
+    const festivals = await Festival.find({
       isDeleted: false,
       isActive: true,
-      startDate: { $lte: endOfDayUTC },  // Started before or on end of target day
-      endDate: { $gte: startOfDayUTC },  // Ends after or on start of target day
     }).sort({
       startDate: -1
     });
 
-    await cacheUtils.set(cacheKey, festival || null, 3600); // Cache for 1 hour
+    await cacheUtils.set(cacheKey, festivals || [], 3600); // Cache for 1 hour
 
     return successResponse(res, 200, messages.FESTIVALS_RETRIEVED, {
-      festival: festival || null
+      festivals: festivals || []
     });
   } catch (error) {
-    console.error("Get festival error:", error);
+    console.error("Get all festivals error:", error);
     return errorResponse(res, 500, messages.FESTIVALS_RETRIEVAL_FAILED, {
       error: error.message,
     });

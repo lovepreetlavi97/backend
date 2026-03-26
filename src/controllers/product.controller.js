@@ -96,9 +96,10 @@ const createProduct = async (req, res) => {
       priceRuleId,
       makingCharges,
       attributes,
+      collectionIds,
     } = req.body;
     console.log("Request Body: ", req.body);
-    // return
+   // return
     // Basic validation
     if (!name || !description) {
       return errorResponse(
@@ -249,7 +250,7 @@ const createProduct = async (req, res) => {
       festivalIds: parseObjectIdArray(festivalIds),
       relationIds: parseObjectIdArray(relationIds),
       relatedProductIds : parseObjectIdArray(req.body.relatedProductIds),
-
+      collectionIds: parseObjectIdArray(collectionIds),
       specifications: processedSpecs,
       attributes: processedAttributes,
       tags: productTag,
@@ -299,6 +300,7 @@ const getAllProducts = async (req, res) => {
       maxPrice,
       search,
       style,
+      collectionId,
     } = req.query;
 
     // STEP 1: BUILD FILTER QUERY
@@ -312,7 +314,8 @@ const getAllProducts = async (req, res) => {
       ...(subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId) && { subcategoryId: new mongoose.Types.ObjectId(subcategoryId) }),
       ...(minPrice && { actualPrice: { $gte: parseFloat(minPrice) } }),
       ...(maxPrice && { actualPrice: { $lte: parseFloat(maxPrice) } }),
-      ...(style && { "attributes.style": style })
+      ...(style && { "attributes.style": style }),
+      ...(collectionId && mongoose.Types.ObjectId.isValid(collectionId) && { collectionIds: new mongoose.Types.ObjectId(collectionId) })
     };
 
     if (search) {
@@ -524,6 +527,7 @@ const updateProductById = async (req, res) => {
     updatedData.festivalIds = parseObjectIdArray(updatedData.festivalIds);
     updatedData.relationIds = parseObjectIdArray(updatedData.relationIds);
     updatedData.relatedProductIds = parseObjectIdArray(updatedData.relatedProductIds);
+    updatedData.collectionIds = parseObjectIdArray(updatedData.collectionIds);
     // Process specifications
     if (updatedData.specifications) {
       if (typeof updatedData.specifications === "string") {

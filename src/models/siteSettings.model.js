@@ -29,7 +29,13 @@ const siteSettingsSchema = new mongoose.Schema(
     },
 
     social: {
-      instagram: { type: String, trim: true, default: "" },
+      instagramAccounts: [
+        {
+          handle: { type: String, default: "@guru.jewellers" },
+          url: { type: String, default: "https://www.instagram.com/gurujewellers/" },
+        },
+      ],
+      instagramHashtag: { type: String, trim: true, default: "#GURUJEWELLERS" },
       facebook: { type: String, trim: true, default: "" },
       youtube: { type: String, trim: true, default: "" },
       twitter: { type: String, trim: true, default: "" },

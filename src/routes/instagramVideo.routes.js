@@ -1,10 +1,8 @@
 const express = require("express");
 const router = express.Router();
-
 const instagramVideoController = require("../controllers/instagramVideo.controller");
-const { userAuth } = require("../middlewares/auth/auth.middleware");
+const { adminOrSuperAdminAuth } = require("../middlewares/auth/auth.middleware");
 const { uploadInstagramVideo } = require("../middlewares/instagramUpload");
-
 
 /**
  * @swagger
@@ -28,13 +26,16 @@ const { uploadInstagramVideo } = require("../middlewares/instagramUpload");
  *           schema:
  *             type: object
  *             required:
- *               - image
  *               - instagramLink
  *             properties:
- *               image:
+ *               video:
  *                 type: string
  *                 format: binary
  *                 description: MP4 video file
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional thumbnail Image
  *               instagramLink:
  *                 type: string
  *                 example: https://www.instagram.com/reel/ABC123/
@@ -47,14 +48,10 @@ const { uploadInstagramVideo } = require("../middlewares/instagramUpload");
  *     responses:
  *       201:
  *         description: Instagram video uploaded successfully
- *       400:
- *         description: Validation error
- *       500:
- *         description: Internal server error
  */
 router.post(
   "/",
-
+  adminOrSuperAdminAuth,
   uploadInstagramVideo,
   instagramVideoController.createVideo
 );
@@ -63,13 +60,17 @@ router.post(
  * @swagger
  * /instagram-videos:
  *   get:
- *     summary: Get all active Instagram videos (Public / Homepage)
+ *     summary: Get Instagram videos (Public / Admin)
  *     tags: [Instagram Videos]
+ *     parameters:
+ *       - in: query
+ *         name: all
+ *         schema:
+ *           type: boolean
+ *         description: If true, returns all videos including inactive ones (Admin)
  *     responses:
  *       200:
  *         description: Instagram videos fetched successfully
- *       500:
- *         description: Internal server error
  */
 router.get("/", instagramVideoController.getAllVideos);
 
@@ -94,10 +95,12 @@ router.get("/", instagramVideoController.getAllVideos);
  *           schema:
  *             type: object
  *             properties:
- *               image:
+ *               video:
  *                 type: string
  *                 format: binary
- *                 description: Optional new MP4 video file
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
  *               instagramLink:
  *                 type: string
  *                 example: https://www.instagram.com/reel/XYZ789/
@@ -110,17 +113,10 @@ router.get("/", instagramVideoController.getAllVideos);
  *               isActive:
  *                 type: boolean
  *                 example: true
- *     responses:
- *       200:
- *         description: Instagram video updated successfully
- *       404:
- *         description: Video not found
- *       500:
- *         description: Internal server error
  */
 router.put(
   "/:id",
-  
+  adminOrSuperAdminAuth,
   uploadInstagramVideo,
   instagramVideoController.updateVideo
 );
@@ -130,26 +126,10 @@ router.put(
  * /instagram-videos/{id}:
  *   delete:
  *     summary: Delete Instagram video (Admin)
- *     tags: [Instagram Videos]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Instagram video deleted successfully
- *       404:
- *         description: Video not found
- *       500:
- *         description: Internal server error
  */
 router.delete(
   "/:id",
-
+  adminOrSuperAdminAuth,
   instagramVideoController.deleteVideo
 );
 
