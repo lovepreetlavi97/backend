@@ -18,7 +18,7 @@ async function markPaymentAsPaid({
   const userKitty = await UserKitty.findOne({
     "payments._id": paymentId,
     status: { $in: ["active", "paused", "pending"] },
-  }).populate("planId");
+  }).populate("planId").populate("userId", "name email");
 
   if (!userKitty) {
     console.log("❌ [markPaymentAsPaid] UserKitty NOT FOUND for paymentId:", paymentId);
@@ -77,9 +77,39 @@ async function markPaymentAsPaid({
 
   await userKitty.save();
   
+  // Send Confirmation Email
+  try {
+    const { sendEmail } = require("./notifications/email.service");
+    const { getKittyPaymentSuccessTemplate } = require("../utils/kittyEmailTemplates");
+
+    const paymentIndex = userKitty.payments.findIndex(p => p._id.toString() === paymentId.toString());
+    const installmentNo = paymentIndex + 1;
+    const nextPayment = userKitty.payments.find(p => p.status === 'pending' || p.status === 'overdue');
+
+    const emailHtml = getKittyPaymentSuccessTemplate({
+      userName: userKitty.userId.name || 'Valued Customer',
+      planName: userKitty.planId.name,
+      amount: payment.amount,
+      installmentNo,
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      nextDueDate: nextPayment ? new Date(nextPayment.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
+      totalPaid: totalPaid,
+      totalAmount: userKitty.totalAmount
+    });
+
+    await sendEmail(
+      userKitty.userId.email,
+      `Payment Received: ${userKitty.planId.name} (Inst. #${installmentNo})`,
+      emailHtml
+    );
+    console.log("📧 [markPaymentAsPaid] Confirmation email sent to:", userKitty.userId.email);
+  } catch (emailErr) {
+    console.error("❌ [markPaymentAsPaid] Failed to send confirmation email:", emailErr.message);
+  }
+
   try {
     await cacheUtils.clearPattern(`route_/kitty/my-kitties/${userKitty._id}*`);
-    await cacheUtils.clearPattern(`user:${userKitty.userId}:kitties:*`);
+    await cacheUtils.clearPattern(`user:${userKitty.userId._id || userKitty.userId}:kitties:*`);
   } catch (cacheErr) {}
 
   return userKitty;
