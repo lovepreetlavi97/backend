@@ -197,6 +197,7 @@ router.get("/my-kitties", userAuth, cacheRoute(60), kittyController.getMyKitties
  *         description: Server error
  */
 router.get("/my-kitties/:kittyId", userAuth, cacheRoute(60), kittyController.getKittyDetails);
+router.post("/my-kitties/:kittyId/cancel", userAuth, clearRouteCache(), kittyController.cancelKittyByUser);
 
 /**
  * @swagger

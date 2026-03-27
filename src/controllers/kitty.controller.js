@@ -865,6 +865,49 @@ const getAllKittyTransactions = async (req, res) => {
   }
 };
 
+// Cancel user's own kitty enrollment
+const cancelKittyByUser = async (req, res) => {
+  try {
+    const { kittyId } = req.params;
+    const userId = req.user?._id;
+
+    if (!ObjectId.isValid(kittyId)) {
+      return errorResponse(res, 400, messages.INVALID_ID);
+    }
+
+    const kitty = await UserKitty.findOne({ _id: kittyId, userId });
+
+    if (!kitty) {
+      return errorResponse(res, 404, 'Kitty enrollment not found');
+    }
+
+    if (kitty.status === 'cancelled' || kitty.status === 'completed') {
+      return errorResponse(res, 400, `Cannot cancel a ${kitty.status} enrollment`);
+    }
+
+    // Process cancellation using model's method
+    await kitty.cancelKitty("Cancelled by user via dashboard");
+
+    // Optional: Cancel all future pending installments
+    kitty.payments.forEach(p => {
+      if (['pending', 'overdue', 'failed'].includes(p.status)) {
+        p.status = 'cancelled';
+      }
+    });
+    
+    await kitty.save();
+
+    // Clear cache
+    await cacheUtils.clearPattern(`user:${userId}:kitties:*`);
+    await cacheUtils.clearPattern(`kitty:*`);
+
+    return successResponse(res, 200, 'Kitty enrollment cancelled successfully', kitty);
+  } catch (error) {
+    console.error('Error cancelling kitty enrollment:', error);
+    return errorResponse(res, 500, messages.SERVER_ERROR);
+  }
+};
+
 module.exports = {
   getAllKittyPlans,
   getActiveKittyPlans,
@@ -881,5 +924,6 @@ module.exports = {
   getKittyDetailsForAdmin,
   seedDummyKittyData,
   recordManualPayment,
-  getAllKittyTransactions
+  getAllKittyTransactions,
+  cancelKittyByUser
 };

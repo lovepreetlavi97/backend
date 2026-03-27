@@ -16,7 +16,7 @@ const kittyPaymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['paid', 'pending', 'overdue', 'failed'],
+    enum: ['paid', 'pending', 'overdue', 'failed', 'cancelled'],
     default: 'pending'
   },
   paymentMethod: {
