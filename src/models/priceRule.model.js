@@ -8,6 +8,10 @@ const priceRuleSchema = new mongoose.Schema(
       trim: true,
       unique: true // so no duplicate rules for "Gold"
     },
+    metalIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Metal',
+    }],
 
     price: {
       type: Number,
@@ -29,6 +33,7 @@ const priceRuleSchema = new mongoose.Schema(
 );
 
 priceRuleSchema.index({ name: 1, isActive: 1 });
+priceRuleSchema.index({ metalIds: 1 });
 
 const PriceRule = mongoose.model("PriceRule", priceRuleSchema);
 

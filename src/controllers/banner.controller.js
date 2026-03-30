@@ -12,6 +12,7 @@ const { cacheUtils } = require("../config/redis");
 const path = require('path');
 const fs = require('fs');
 const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); 
+const mongoose = require('mongoose');
 /**
  * Create a new banner
  * @param {Object} req - Express request object
@@ -27,7 +28,8 @@ const createBanner = async (req, res) => {
       startDate,
       endDate,
       status = 'active',
-      position
+      position,
+      metalIds
     } = req.body;
 
     // Validate required fields
@@ -43,7 +45,8 @@ const createBanner = async (req, res) => {
       link,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
-      status
+      status,
+      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
     };
 
     // Handle position
@@ -96,11 +99,12 @@ const getAllBanners = async (req, res) => {
       type,
       status,
       sortBy = 'position',
-      sortOrder = 'asc'
+      sortOrder = 'asc',
+      metalId
     } = req.query;
 
     // Create cache key
-    const cacheKey = `banners_${page}_${limit}_${search || ''}_${type || ''}_${status || ''}`;
+    const cacheKey = `banners_${page}_${limit}_${search || ''}_${type || ''}_${status || ''}_${metalId || ''}`;
 
     // Try to get from cache
     const cachedData = await cacheUtils.get(cacheKey);
@@ -124,6 +128,10 @@ const getAllBanners = async (req, res) => {
 
     if (status) {
       query.status = status;
+    }
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
     }
 
     // Calculate pagination

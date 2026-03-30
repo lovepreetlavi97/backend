@@ -9,6 +9,11 @@ const subcategorySchema = new mongoose.Schema({
     required: true,
     trim: true, // Trim whitespace from the name
   },
+  metalIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Metal',
+    required: true,
+  }],
   // Backward-compatible category reference (legacy)
   category: {
     type: mongoose.Schema.Types.ObjectId,
@@ -69,5 +74,6 @@ subcategorySchema.pre('save', function (next) {
 });
 
 subcategorySchema.index({ categoryId: 1, parentId: 1, name: 1, slug: 1 });
+subcategorySchema.index({ metalIds: 1 });
 
 module.exports = mongoose.model('Subcategory', subcategorySchema);

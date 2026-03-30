@@ -754,7 +754,7 @@ const checkCartStock = async (req, res) => {
 // Get all festivals for user
 const getAllFestivals = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, metalId } = req.query;
 
     let targetDate;
     if (date) {
@@ -767,7 +767,7 @@ const getAllFestivals = async (req, res) => {
     }
 
     const dateStr = targetDate.toISOString().split('T')[0];
-    const cacheKey = `festivals_list_${dateStr}`;
+    const cacheKey = `festivals_list_${dateStr}_${metalId || 'all'}`;
 
     const cachedFestivals = await cacheUtils.get(cacheKey);
     if (cachedFestivals) {
@@ -776,11 +776,16 @@ const getAllFestivals = async (req, res) => {
       });
     }
 
-    // Find all active festivals
-    const festivals = await Festival.find({
+    const query = {
       isDeleted: false,
       isActive: true,
-    }).sort({
+    };
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
+    // Find all active festivals
+    const festivals = await Festival.find(query).sort({
       startDate: -1
     });
 
@@ -870,23 +875,31 @@ const homeSearch = async (req, res) => {
 // Get all subcategories for user
 const getAllSubCategories = async (req, res) => {
   try {
+    const { metalId } = req.query;
+    const cacheKey = `subcategories_user_${metalId || 'all'}`;
+
     // Try to get from cache first
-    const cachedSubcategories = await cacheUtils.get("subcategories_user");
+    const cachedSubcategories = await cacheUtils.get(cacheKey);
     if (cachedSubcategories) {
       return successResponse(res, 200, messages.SUBCATEGORIES_RETRIEVED, {
         subcategories: cachedSubcategories,
       });
     }
 
-    const subcategories = await SubCategory.find({
+    const query = {
       isDeleted: false,
       isBlocked: false,
-    })
-      .select("_id name image category categoryId parentId")
+    };
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
+    const subcategories = await SubCategory.find(query)
+      .select("_id name image category categoryId parentId metalIds")
       .lean();
 
     // Cache the result
-    await cacheUtils.set("subcategories_user", subcategories || []);
+    await cacheUtils.set(cacheKey, subcategories || []);
 
     return successResponse(res, 200, messages.SUBCATEGORIES_RETRIEVED, {
       subcategories: subcategories || [],
@@ -902,8 +915,8 @@ const getAllSubCategories = async (req, res) => {
 // Get all categories for user
 const getAllCategories = async (req, res) => {
   try {
-    const { limit } = req.query;
-    const cacheKey = `categories_user_${limit || "all"}`;
+    const { limit, metalId } = req.query;
+    const cacheKey = `categories_user_${limit || "all"}_${metalId || 'all'}`;
 
     // Try to get from cache first
     const cachedCategories = await cacheUtils.get(cacheKey);
@@ -914,12 +927,17 @@ const getAllCategories = async (req, res) => {
     }
 
     const queryLimit = parseInt(limit) || 1000;
-    console.log(`🚀 DEBUG: Fetching categories with limit ${queryLimit}`);
+    console.log(`🚀 DEBUG: Fetching categories with limit ${queryLimit}, metalId ${metalId}`);
+
+    const query = { isDeleted: false, isBlocked: false };
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
 
     const [categories, subcategories] = await Promise.all([
-      Category.find({ isDeleted: false, isBlocked: false }).select("_id name slug image").limit(queryLimit).lean(),
-      SubCategory.find({ isDeleted: false, isBlocked: false })
-        .select("_id name slug image category categoryId parentId")
+      Category.find(query).select("_id name slug image metalIds").limit(queryLimit).lean(),
+      SubCategory.find(query)
+        .select("_id name slug image category categoryId parentId metalIds")
         .limit(queryLimit * 5) // fetch more subcategories to cover the tree
         .lean(),
     ]);
@@ -1533,7 +1551,8 @@ const getAllRelations = async (req, res) => {
 };
 const getAllBanners = async (req, res) => {
   try {
-    const cacheKey = "banners_user";
+    const { metalId } = req.query;
+    const cacheKey = `banners_user_${metalId || 'all'}`;
     const cachedBanners = await cacheUtils.get(cacheKey);
     if (cachedBanners) {
       return successResponse(res, 200, "Banners retrieved from cache", {
@@ -1542,13 +1561,18 @@ const getAllBanners = async (req, res) => {
     }
 
     const today = new Date();
-
-    const banners = await Banner.find({
+    const query = {
       isDeleted: false,
       status: "active",
       startDate: { $lte: today },
       endDate: { $gte: today },
-    }).sort({ position: 1 });
+    };
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
+    const banners = await Banner.find(query).sort({ position: 1 });
 
     await cacheUtils.set(cacheKey, banners || []);
 
@@ -1722,22 +1746,28 @@ const resendOTP = async (req, res) => {
 
 const getTrendingProducts = async (req, res) => {
   try {
-    const { limit = 4 } = req.query;
+    const { limit = 4, metalId } = req.query;
     const parsedLimit = parseInt(limit) > 0 ? parseInt(limit) : 4;
 
-    const cacheKey = `trending_products_${parsedLimit}`;
+    const cacheKey = `trending_products_${parsedLimit}_${metalId || 'all'}`;
     const cached = await cacheUtils.get(cacheKey);
 
     if (cached) {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cached);
     }
 
+    const matchQuery = {
+      isDeleted: false,
+      isBlocked: false,
+    };
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      matchQuery.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
     const products = await Product.aggregate([
       {
-        $match: {
-          isDeleted: false,
-          isBlocked: false,
-        },
+        $match: matchQuery,
       },
 
       // Join reviews
@@ -2137,7 +2167,8 @@ const getPriceFilters = async (req, res) => {
 const getAllCuratedCollections = async (req, res) => {
 
   try {
-    const cacheKey = "curated_collections_user";
+    const { metalId } = req.query;
+    const cacheKey = `curated_collections_user_${metalId || 'all'}`;
 
     // 1️⃣ Check cache
     const cachedCurated = await cacheUtils.get(cacheKey);
@@ -2150,13 +2181,19 @@ const getAllCuratedCollections = async (req, res) => {
       );
     }
 
-    // 2️⃣ Fetch from DB
-    const curatedCollections = await CuratedCollection.find({
+    const query = {
       isDeleted: false,
       isActive: true
-    })
+    };
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
+    // 2️⃣ Fetch from DB
+    const curatedCollections = await CuratedCollection.find(query)
       .sort({ position: 1 })
-      .select("name slug image position") // keep response light
+      .select("name slug image position metalIds") // keep response light
       .lean();
 
     // 3️⃣ Cache result

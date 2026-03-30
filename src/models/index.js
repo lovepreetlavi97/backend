@@ -1,6 +1,7 @@
 // models/index.js
 
 const Admin = require('./admin.model');
+const Metal = require('./metal.model');
 const User = require('./user.model');
 const Product = require('./product.model');
 const Festival = require('./festival.model');
@@ -56,6 +57,7 @@ module.exports = {
   UserKitty,
   SiteSettings,
   Gift,
-  PriceFilter
+  PriceFilter,
+  Metal
 };
 

@@ -15,7 +15,7 @@ const mongoose = require("mongoose");
 // Create a new festival
 const createFestival = async (req, res) => {
   try {
-    const { name, description, startDate, endDate, isActive = true } = req.body;
+    const { name, description, startDate, endDate, isActive = true, metalIds } = req.body;
 
     // Validate required fields
     if (!name || !description || !startDate || !endDate) {
@@ -76,6 +76,7 @@ const createFestival = async (req, res) => {
       isActive: isActive === "true" || isActive === true,
       mainImage,
       cards,
+      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
     };
 
     // Create the festival
@@ -103,12 +104,13 @@ const getAllFestivals = async (req, res) => {
       isActive,
       sortBy = "createdAt",
       sortOrder = "desc",
+      metalId,
     } = req.query;
 
     // Create cache key
     const cacheKey = `festivals_${page}_${limit}_${search || ""}_${
       isActive || ""
-    }`;
+    }_${metalId || ""}`;
 
     // Try to get from cache
     const cachedData = await cacheUtils.get(cacheKey);
@@ -133,6 +135,10 @@ const getAllFestivals = async (req, res) => {
 
     if (isActive !== undefined) {
       query.isActive = isActive === "true";
+    }
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
     }
 
     // Calculate pagination
@@ -370,6 +376,7 @@ const getProductsByFestival = async (req, res) => {
       inStock,
       search,
       isFeatured,
+      metalId,
     } = req.query;
 
     const { id: festivalId } = req.params;
@@ -384,7 +391,7 @@ const getProductsByFestival = async (req, res) => {
       categoryId || ""
     }_${subcategoryId || ""}_${minPrice || ""}_${maxPrice || ""}_${
       inStock || ""
-    }_${search || ""}_${isFeatured || ""}`;
+    }_${search || ""}_${isFeatured || ""}_${metalId || ""}`;
 
     // Try to get from cache
     const cachedData = await cacheUtils.get(cacheKey);
@@ -397,6 +404,10 @@ const getProductsByFestival = async (req, res) => {
       isDeleted: false,
       festivalIds: festivalId,
     };
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
 
     if (categoryId) {
       query.categoryId = mongoose.Types.ObjectId.isValid(categoryId)

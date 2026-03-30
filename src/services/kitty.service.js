@@ -8,6 +8,7 @@ async function markPaymentAsPaid({
   razorpayOrderId,
   razorpaySignature,
   paymentMethod = "razorpay",
+  transactionId,
 }) {
   console.log("💳 [markPaymentAsPaid] START — paymentId:", paymentId);
 
@@ -45,6 +46,7 @@ async function markPaymentAsPaid({
   if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
   if (razorpayOrderId) payment.razorpayOrderId = razorpayOrderId;
   if (razorpaySignature) payment.razorpaySignature = razorpaySignature;
+  if (transactionId) payment.transactionId = transactionId;
 
   // Business Rule: Activate pending plan on first payment
   if (userKitty.status === 'pending') {

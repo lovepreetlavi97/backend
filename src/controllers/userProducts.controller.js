@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { Product, Category, SubCategory, Festival, Gift, Relation, CuratedCollection } = require("../models/index");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
@@ -6,7 +7,7 @@ const { cacheUtils } = require("../config/redis");
 const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    let { page = 1, limit = 20, color, material, purity, style, gender, relation, ...filters } = req.query;
+    let { page = 1, limit = 20, color, material, purity, style, gender, relation, metalId, ...filters } = req.query;
     page = parseInt(page, 10) > 0 ? parseInt(page, 10) : 1;
     limit = parseInt(limit, 10) > 0 ? parseInt(limit, 10) : 20;
     const skip = (page - 1) * limit;
@@ -17,7 +18,7 @@ const getProductBySlug = async (req, res) => {
 
     console.log(`🔍 [getProductBySlug] Processing slug: ${slug}`);
 
-    const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}_${color || ''}_${material || ''}_${purity || ''}_${style || ''}_${gender || ''}_${relation || ''}_${page}_${limit}`;
+    const cacheKey = `product_slug_${slug}_${JSON.stringify(filters)}_${color || ''}_${material || ''}_${purity || ''}_${style || ''}_${gender || ''}_${relation || ''}_${metalId || ''}_${page}_${limit}`;
     const cached = await cacheUtils.get(cacheKey);
 
     if (cached) {
@@ -122,6 +123,9 @@ const getProductBySlug = async (req, res) => {
     }
     if (relation) {
       query.$and.push({ relationIds: { $in: Array.isArray(relation) ? relation : [relation] } });
+    }
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.$and.push({ metalIds: { $in: [new mongoose.Types.ObjectId(metalId)] } });
     }
 
     if (filters.price) {

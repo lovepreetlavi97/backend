@@ -432,6 +432,7 @@ router.get("/admin/enrollments/:kittyId", adminOrSuperAdminAuth, kittyController
 router.get("/admin/statistics", adminOrSuperAdminAuth, cacheRoute(300), kittyController.getKittyStatistics);
 router.get("/admin/transactions", adminOrSuperAdminAuth, kittyController.getAllKittyTransactions);
 router.post("/admin/payment/manual", adminOrSuperAdminAuth, clearRouteCache(), kittyController.recordManualPayment);
+router.patch("/admin/enrollments/:kittyId/status", adminOrSuperAdminAuth, clearRouteCache(), kittyController.updateKittyEnrollmentStatus);
 
 // Dev / QA helper: seed dummy kitty plans & enrollments
 router.post("/admin/dummy-seed", adminOrSuperAdminAuth, clearRouteCache(), kittyController.seedDummyKittyData);

@@ -16,7 +16,7 @@ const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add th
 // Create a new category
 const createCategory = async (req, res) => {
   try {
-    const { name, description, isFeatured } = req.body;
+    const { name, description, isFeatured, metalIds } = req.body;
 
     // Basic validation
     if (!name) {
@@ -50,6 +50,7 @@ const createCategory = async (req, res) => {
       description,
       image: imageKey, // save only the image key
       isFeatured: isFeatured,
+      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
       isBlocked: false,
       productCount: 0
     };
@@ -77,7 +78,8 @@ const getAllCategories = async (req, res) => {
       sortBy = 'name', 
       sortOrder = 'asc',
       isBlocked,
-      search
+      search,
+      metalId
     } = req.query;
     
     // Create cache key based on query parameters
@@ -98,6 +100,10 @@ const getAllCategories = async (req, res) => {
     
     if (search) {
       query.name = { $regex: search, $options: 'i' };
+    }
+    
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
     }
     
     // Calculate pagination
@@ -137,8 +143,9 @@ const getAllCategories = async (req, res) => {
 // Get active categories (user endpoint)
 const getActiveCategories = async (req, res) => {
   try {
+    const { metalId } = req.query;
     // Try to get from cache first
-    const cacheKey = 'categories_active';
+    const cacheKey = `categories_active_${metalId || 'all'}`;
     const cachedData = await cacheUtils.get(cacheKey);
     
     if (cachedData) {
@@ -146,10 +153,16 @@ const getActiveCategories = async (req, res) => {
     }
     
     // Get only non-blocked and non-deleted categories
-    const categories = await Category.find({ 
+    const query = { 
       isBlocked: false,
       isDeleted: false
-    })
+    };
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
+    const categories = await Category.find(query)
     .select('name slug description images')
     .lean();
     
@@ -182,7 +195,7 @@ const getCategoryById = async (req, res) => {
     }
     
     // If not in cache, get from database
-    const category = await Category.findById(id).lean();
+    const category = await Category.findById(id).populate('metalIds', 'name colorCode gradient').lean();
     
     if (!category) {
       return errorResponse(res, 404, messages.CATEGORY_NOT_FOUND);
@@ -203,7 +216,7 @@ const getCategoryById = async (req, res) => {
 const updateCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, isBlocked, isFeatured,image } = req.body;
+    const { name, description, isBlocked, isFeatured, image, metalIds } = req.body;
         const { buffer, originalname, mimetype } = req.file;
     const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
     // Validate ObjectId
@@ -237,6 +250,7 @@ const updateCategoryById = async (req, res) => {
     if (description !== undefined) category.description = description;
     if (isBlocked !== undefined) category.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) category.isFeatured = isFeatured === 'true' || isFeatured === true;
+    if (metalIds) category.metalIds = typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds;
     // Handle image update
     
     if (imageKey) {
@@ -332,7 +346,8 @@ const deleteCategoryById = async (req, res) => {
 // Get category menu structure (Nested Category → Subcategory → Child Subcategory)
 const getCategoryMenu = async (req, res) => {
   try {
-    const cacheKey = 'category_menu_structure';
+    const { metalId } = req.query;
+    const cacheKey = `category_menu_structure_${metalId || 'all'}`;
     const cachedMenu = await cacheUtils.get(cacheKey);
 
     if (cachedMenu) {
@@ -340,9 +355,14 @@ const getCategoryMenu = async (req, res) => {
     }
 
     // Fetch all active categories and subcategories
+    const query = { isBlocked: false, isDeleted: false };
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
+
     const [categories, subcategories] = await Promise.all([
-      Category.find({ isBlocked: false, isDeleted: false }).lean(),
-      require('../models/subCategory.model').find({ isBlocked: false, isDeleted: false }).lean()
+      Category.find(query).lean(),
+      require('../models/subCategory.model').find(query).lean()
     ]);
 
     // Create a map of subcategories by ID for easy lookup

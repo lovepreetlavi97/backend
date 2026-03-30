@@ -138,6 +138,11 @@ const productSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Relation',
   }],
+  metalIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Metal',
+    required: [true, 'At least one metal must be selected'],
+  }],
   specifications: [{
     name: {
       type: String,
@@ -284,6 +289,7 @@ productSchema.index({ categoryId: 1, subcategoryId: 1 });
 productSchema.index({ subcategoryId: 1 }); // Individual index for faster subcategory filtering
 productSchema.index({ actualPrice: 1 }); // Individual index for faster price filtering
 productSchema.index({ isFeatured: 1 });
+productSchema.index({ metalIds: 1 });
 
 // Dynamic Attribute Single Field Indexes
 productSchema.index({ 'attributes.color': 1 });

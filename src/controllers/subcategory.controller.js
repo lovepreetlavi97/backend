@@ -14,7 +14,7 @@ const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add th
 // Create a new subcategory
 const createSubcategory = async (req, res) => {
   try {
-    const { name, category, categoryId, parentId, isFeatured } = req.body;
+    const { name, category, categoryId, parentId, isFeatured, metalIds } = req.body;
     console.log(name, category, isFeatured ,"name, category, isFeatured ")
     // Basic validation
     if (!name) {
@@ -55,7 +55,8 @@ const createSubcategory = async (req, res) => {
       parentId: parentId ? new mongoose.Types.ObjectId(parentId) : null,
       image: imageKey,
       isFeatured: isFeatured,
-      isBlocked: false
+      isBlocked: false,
+      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
     };
 
     const subcategory = await create(SubCategory, subcategoryData);
@@ -77,7 +78,8 @@ const getAllSubcategories = async (req, res) => {
       search,
       category,
       categoryId,
-      parentId
+      parentId,
+      metalId
     } = req.query;
 
     // Build query
@@ -105,6 +107,10 @@ const getAllSubcategories = async (req, res) => {
       } else {
         query.parentId = parentId;
       }
+    }
+
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
     }
 
     // Calculate pagination

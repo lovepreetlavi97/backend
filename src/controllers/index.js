@@ -11,6 +11,9 @@ const socialIntegrationController = require('./socialIntegration.controller');
 const priceRuleController = require('./priceRule.controller');
 const grievanceController = require('./grievance.controller');
 const curatedCollectionController = require('./curatedCollection.controller');
+const metalController = require('./metal.controller');
+const homeController = require('./home.controller');
+const addressController = require('./address.controller');
 module.exports = {
   adminController,
   userController,
@@ -24,5 +27,8 @@ module.exports = {
   socialIntegrationController,
   priceRuleController,
   grievanceController,
-  curatedCollectionController
+  curatedCollectionController,
+  metalController,
+  homeController,
+  addressController
 };

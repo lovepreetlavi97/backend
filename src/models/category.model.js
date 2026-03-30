@@ -18,6 +18,11 @@ const categorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
   }],
+  metalIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Metal',
+    required: true,
+  }],
   image: {
     type: String,
     default: "",
@@ -58,6 +63,7 @@ const categorySchema = new mongoose.Schema({
 categorySchema.index({ name: 1 });
 categorySchema.index({ slug: 1 });
 categorySchema.index({ isDeleted: 1, isBlocked: 1 });
+categorySchema.index({ metalIds: 1 });
 
 // Generate slug from name
 categorySchema.pre('save', function (next) {

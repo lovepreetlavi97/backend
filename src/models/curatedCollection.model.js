@@ -7,6 +7,11 @@ const curatedCollectionSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    metalIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Metal',
+      required: true,
+    }],
 
     slug: {
       type: String,
@@ -78,5 +83,7 @@ const curatedCollectionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+curatedCollectionSchema.index({ metalIds: 1 });
 
 module.exports = mongoose.model("CuratedCollection", curatedCollectionSchema);

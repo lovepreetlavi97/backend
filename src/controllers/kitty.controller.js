@@ -865,6 +865,59 @@ const getAllKittyTransactions = async (req, res) => {
   }
 };
 
+// Update kitty enrollment status (Admin only)
+const updateKittyEnrollmentStatus = async (req, res) => {
+  try {
+    const { kittyId } = req.params;
+    const { status, remarks } = req.body;
+
+    if (!ObjectId.isValid(kittyId)) {
+      return errorResponse(res, 400, messages.INVALID_ID);
+    }
+
+    const kitty = await UserKitty.findById(kittyId);
+    if (!kitty) {
+      return errorResponse(res, 404, 'Kitty enrollment not found');
+    }
+
+    if (!['completed', 'cancelled', 'active', 'paused'].includes(status)) {
+      return errorResponse(res, 400, 'Invalid status update');
+    }
+
+    // Use model methods for business logic
+    if (status === 'completed') {
+      await kitty.markAsCompleted();
+    } else if (status === 'cancelled') {
+      await kitty.cancelKitty(remarks || "Cancelled by Admin");
+      // Also cancel any pending payments
+      kitty.payments.forEach(p => {
+        if (['pending', 'overdue'].includes(p.status)) {
+          p.status = 'cancelled';
+        }
+      });
+      await kitty.save();
+    } else if (status === 'paused') {
+      await kitty.pauseKitty(remarks || "Paused by Admin");
+    } else if (status === 'active') {
+      if (kitty.status === 'paused') {
+        await kitty.resumeKitty();
+      } else {
+        kitty.status = 'active';
+        await kitty.save();
+      }
+    }
+
+    // Clear cache
+    await cacheUtils.clearPattern(`user:${kitty.userId}:kitties:*`);
+    await cacheUtils.clearPattern(`kitty:*`);
+
+    return successResponse(res, 200, `Kitty enrollment marked as ${status} successfully`, kitty);
+  } catch (error) {
+    console.error('Error updating kitty status:', error);
+    return errorResponse(res, 500, error.message || messages.SERVER_ERROR);
+  }
+};
+
 // Cancel user's own kitty enrollment
 const cancelKittyByUser = async (req, res) => {
   try {
@@ -925,5 +978,6 @@ module.exports = {
   seedDummyKittyData,
   recordManualPayment,
   getAllKittyTransactions,
-  cancelKittyByUser
+  cancelKittyByUser,
+  updateKittyEnrollmentStatus
 };

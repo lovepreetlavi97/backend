@@ -9,6 +9,11 @@ const bannerSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  metalIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Metal',
+    required: true,
+  }],
   slug: {
     type: String,
     unique: true
@@ -95,5 +100,6 @@ bannerSchema.index({ type: 1 });
 bannerSchema.index({ status: 1 });
 bannerSchema.index({ position: 1 });
 bannerSchema.index({ isDeleted: 1 });
+bannerSchema.index({ metalIds: 1 });
 
 module.exports = mongoose.model('Banner', bannerSchema);

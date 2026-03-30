@@ -97,6 +97,7 @@ const createProduct = async (req, res) => {
       makingCharges,
       attributes,
       collectionIds,
+      metalIds,
     } = req.body;
     console.log("Request Body: ", req.body);
    // return
@@ -251,6 +252,7 @@ const createProduct = async (req, res) => {
       relationIds: parseObjectIdArray(relationIds),
       relatedProductIds : parseObjectIdArray(req.body.relatedProductIds),
       collectionIds: parseObjectIdArray(collectionIds),
+      metalIds: parseObjectIdArray(metalIds),
       specifications: processedSpecs,
       attributes: processedAttributes,
       tags: productTag,
@@ -301,6 +303,7 @@ const getAllProducts = async (req, res) => {
       search,
       style,
       collectionId,
+      metalId,
     } = req.query;
 
     // STEP 1: BUILD FILTER QUERY
@@ -315,7 +318,8 @@ const getAllProducts = async (req, res) => {
       ...(minPrice && { actualPrice: { $gte: parseFloat(minPrice) } }),
       ...(maxPrice && { actualPrice: { $lte: parseFloat(maxPrice) } }),
       ...(style && { "attributes.style": style }),
-      ...(collectionId && mongoose.Types.ObjectId.isValid(collectionId) && { collectionIds: new mongoose.Types.ObjectId(collectionId) })
+      ...(collectionId && mongoose.Types.ObjectId.isValid(collectionId) && { collectionIds: new mongoose.Types.ObjectId(collectionId) }),
+      ...(metalId && mongoose.Types.ObjectId.isValid(metalId) && { metalIds: { $in: [new mongoose.Types.ObjectId(metalId)] } })
     };
 
     if (search) {
@@ -405,6 +409,7 @@ const getProductById = async (req, res) => {
       .populate({ path: "relationIds", select: "name" })
       .populate({ path: "relatedProductIds", select: "name" })
       .populate({ path: "priceRuleId", select: "name price" })
+      .populate({ path: "metalIds", select: "name colorCode gradient" })
       .lean();
 
     if (!product) {
@@ -528,6 +533,7 @@ const updateProductById = async (req, res) => {
     updatedData.relationIds = parseObjectIdArray(updatedData.relationIds);
     updatedData.relatedProductIds = parseObjectIdArray(updatedData.relatedProductIds);
     updatedData.collectionIds = parseObjectIdArray(updatedData.collectionIds);
+    updatedData.metalIds = parseObjectIdArray(updatedData.metalIds);
     // Process specifications
     if (updatedData.specifications) {
       if (typeof updatedData.specifications === "string") {

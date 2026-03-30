@@ -16,6 +16,11 @@ const festivalSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  metalIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Metal',
+    required: true,
+  }],
   description: {
     type: String,
     required: true
@@ -68,5 +73,6 @@ festivalSchema.index({ name: 1 });
 festivalSchema.index({ slug: 1 });
 festivalSchema.index({ isActive: 1 });
 festivalSchema.index({ startDate: 1, endDate: 1 });
+festivalSchema.index({ metalIds: 1 });
 
 module.exports = mongoose.model('Festival', festivalSchema);

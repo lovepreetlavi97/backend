@@ -33,6 +33,8 @@ const siteSettingsRoutes = require("./siteSettings.route");
 const adminSiteSettingsRoutes = require("./adminSiteSettings.route");
 const returnRequestRoute = require("./returnRequest.route");
 const giftRoute = require("./gift.route");
+const metalRoute = require("./metal.route");
+const homeRoute = require("./home.route");
 const router = express.Router();
 
 // Register your routes
@@ -72,4 +74,6 @@ router.use("/admin/site-settings", adminSiteSettingsRoutes);
 router.use("/returns", returnRequestRoute);
 router.use("/user/gift", giftRoute);
 router.use("/admin/gift", giftRoute);
+router.use("/metals", metalRoute);
+router.use("/homepage", homeRoute);
 module.exports = router;
