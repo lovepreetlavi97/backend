@@ -19,7 +19,10 @@ const WebhookRoutes = require('./routes/webhook.route'); // Import the index.js 
 
 // Use the versioned routes
 app.use('/api/v1/webhook', WebhookRoutes); // Mounting the routes under /api/v1
+const { globalLimiter } = require('./middlewares/rateLimiter');
+
 // Middleware for parsing JSON and handling CORS
+app.use(globalLimiter); // Apply global rate limiter
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(

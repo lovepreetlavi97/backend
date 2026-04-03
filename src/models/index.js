@@ -29,6 +29,11 @@ const SiteSettings = require('./siteSettings.model');
 const Gift = require('./gift.model');
 const PriceFilter = require('./priceFilter.model');
 
+const UserSession = require('./session.model');
+const DesignRequest = require('./designRequest.model');
+
+const SuspiciousActivity = require('./suspiciousActivity.model');
+
 module.exports = {
 
   Cart,
@@ -58,6 +63,9 @@ module.exports = {
   SiteSettings,
   Gift,
   PriceFilter,
-  Metal
+  Metal,
+  UserSession,
+  DesignRequest,
+  SuspiciousActivity
 };
 

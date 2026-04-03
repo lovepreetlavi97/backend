@@ -35,10 +35,16 @@ const returnRequestRoute = require("./returnRequest.route");
 const giftRoute = require("./gift.route");
 const metalRoute = require("./metal.route");
 const homeRoute = require("./home.route");
+const authRoute = require("./auth.route"); // Added Auth Route
+const designRequestRoutes = require("./designRequest.routes"); // Added Design Request Route
+const activityLogsRoute = require("./activity.routes"); // Added Security Audit Route
 const router = express.Router();
 
 // Register your routes
 router.use("/", welcomeRoute);
+router.use("/auth", authRoute); // Plug Auth Router
+router.use("/design-request", designRequestRoutes); // Plug Design Requests
+router.use("/admin/security-alerts", activityLogsRoute); // Plug Security Alerts
 router.use("/admin/dashboard", dashboardRoute);
 router.use("/admin/notifications", notificationRoute);
 router.use("/admin", adminRoute);

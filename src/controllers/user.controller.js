@@ -25,9 +25,14 @@ const {
   InstagramVideo,
   CuratedCollection,
   Gift,
-  PriceFilter
+  PriceFilter,
+  UserSession // Added UserSession for device tracking
 } = require("../models/index");
 
+// --- NEW Auth Integrations ---
+const otpService = require("../services/otp.service");
+const sessionService = require("../services/session.service");
+const jwtUtils = require("../utils/jwt");
 
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -516,6 +521,10 @@ const loginUser = async (req, res) => {
       user.otp = otp;
       user.otpExpiry = otpExpiry;
       await user.save();
+      
+      // Save to Redis-based OTP Service as well
+      await otpService.saveOTP(phoneNumber, otp);
+
       userRegistered = true;
     } else {
       // User not registered, do not create user, just return
@@ -647,34 +656,41 @@ const verifyOTP = async (req, res) => {
 
     console.log(otp, user, user.otp);
 
-    // if (user.otp !== otp) {
-    //   return errorResponse(res, 401, messages.OTP_INVALID);
-    // }
-
-    // Development static OTP check
-    if (otp !== "1111") {
+    // 2. Verify OTP from Redis-based service (supports Static mode)
+    const isOTPValid = await otpService.verifyOTP(phoneNumber, otp);
+    if (!isOTPValid) {
       return errorResponse(res, 401, messages.OTP_INVALID);
     }
 
-    // Generate new JWT token after OTP verification
-    const token = generateJWT(user._id);
+    // Generate dual tokens after OTP verification
+    const accessToken = jwtUtils.generateAccessToken(user._id);
+    const refreshToken = jwtUtils.generateRefreshToken(user._id);
 
-    // Update user with token, phone verification status, and last login time
-    user.token = token;
+    // Update user with Access token (for legacy support)
+    user.token = accessToken;
     user.isPhoneVerified = true;
     user.lastLoginAt = new Date();
-    user.otp = null; // Clear the OTP after successful verification
+    user.otp = null; 
     await user.save();
 
-    // Cache the user for authentication
+    // Track Session/Device
+    await sessionService.trackSession(
+      user._id, 
+      refreshToken, 
+      req.ip, 
+      req.headers['user-agent']
+    );
+
+    // Cache the user for authentication (Access Token)
     await cacheUtils.set(
-      `auth_${token}`,
+      `auth_${accessToken}`,
       user,
       parseInt(process.env.REDIS_TTL || 3600)
     );
 
     return successResponse(res, 200, messages.OTP_VERIFIED, {
-      token,
+      token: accessToken,
+      refreshToken,
       user: {
         id: user._id,
         name: user.name,
@@ -2215,6 +2231,59 @@ const getAllCuratedCollections = async (req, res) => {
     );
   }
 };
+/**
+ * Refresh Token Flow
+ */
+const refreshAuthToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return errorResponse(res, 400, "Refresh token required");
+
+    // 1. Verify token
+    const decoded = jwtUtils.verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh_secret_key');
+    if (!decoded) return errorResponse(res, 401, "Invalid refresh token");
+
+    // 2. Check session store
+    const session = await UserSession.findOne({ refreshToken, userId: decoded.id });
+    if (!session) return errorResponse(res, 401, "Session expired, please login again");
+
+    // 3. Issue new Access Token
+    const accessToken = jwtUtils.generateAccessToken(decoded.id);
+
+    return successResponse(res, 200, "Token refreshed", { token: accessToken });
+  } catch (error) {
+    return errorResponse(res, 500, "Internal Server Error");
+  }
+};
+
+/**
+ * Logout single session
+ */
+const logoutSessionController = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return errorResponse(res, 400, "Refresh token required");
+
+    await sessionService.logoutSession(refreshToken);
+    return successResponse(res, 200, messages.LOGOUT_SUCCESSFUL);
+  } catch (error) {
+    return errorResponse(res, 500, "Logout failed");
+  }
+};
+
+/**
+ * Logout all devices
+ */
+const logoutAllSessionsController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await sessionService.logoutAllSessions(userId);
+    return successResponse(res, 200, "Logged out from all devices");
+  } catch (error) {
+    return errorResponse(res, 500, "Logout failed");
+  }
+};
+
 module.exports = {
   getAllVideos,
   checkCartStock,
@@ -2246,5 +2315,9 @@ module.exports = {
   getAllCuratedCollections,
   getProductsBySlug,
   getGiftFilters,
-  getPriceFilters
+  getPriceFilters,
+  // NEW EXPORTS
+  refreshAuthToken,
+  logoutSessionController,
+  logoutAllSessionsController
 };

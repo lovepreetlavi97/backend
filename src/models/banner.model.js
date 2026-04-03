@@ -35,7 +35,7 @@ const bannerSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['home', 'category', 'popup', 'slider', 'gift'],
+    enum: ['home', 'category', 'popup', 'slider', 'gift', 'bespoke'],
     default: 'home'
   },
   imageUrl: {

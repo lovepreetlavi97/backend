@@ -513,7 +513,9 @@ router.post("/", userController.createUser);
  *       500:
  *         description: Internal Server Error
  */
-router.post("/login/phone", userController.loginUser);
+const { authLimiter } = require("../middlewares/rateLimiter");
+
+router.post("/login/phone", authLimiter, userController.loginUser);
 
 /**
  * @swagger
@@ -628,7 +630,7 @@ router.post("/login/google", userController.googleLogin);
  *       404:
  *         description: User not found
  */
-router.post("/verify-otp", userController.verifyOTP);
+router.post("/verify-otp", authLimiter, userController.verifyOTP);
 
 /**
  * @swagger
