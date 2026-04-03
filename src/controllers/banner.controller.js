@@ -31,10 +31,26 @@ const createBanner = async (req, res) => {
       position,
       metalIds
     } = req.body;
+    console.log(`Creating banner with metalIds: "${metalIds}" (type: ${typeof metalIds})`);
 
     // Validate required fields
     if (!title || !description || !startDate || !endDate) {
       return errorResponse(res, 400, "Missing required fields");
+    }
+
+    let parsedMetalIds = [];
+    if (Array.isArray(metalIds)) {
+      parsedMetalIds = metalIds;
+    } else if (typeof metalIds === 'string' && metalIds.trim() !== '') {
+      if (metalIds.startsWith('[') && metalIds.endsWith(']')) {
+        try {
+          parsedMetalIds = JSON.parse(metalIds);
+        } catch (e) {
+          parsedMetalIds = [metalIds];
+        }
+      } else {
+        parsedMetalIds = [metalIds];
+      }
     }
 
     // Create banner data object
@@ -46,7 +62,7 @@ const createBanner = async (req, res) => {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       status,
-      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
+      metalIds: parsedMetalIds,
     };
 
     // Handle position
@@ -224,12 +240,19 @@ const updateBannerById = async (req, res) => {
       updateData.endDate = new Date(updateData.endDate);
     }
 
-    // Handle position if provided
-    if (updateData.position) {
-      updateData.position = parseInt(updateData.position);
+    if (updateData.metalIds) {
+      if (typeof updateData.metalIds === 'string' && updateData.metalIds.startsWith('[') && updateData.metalIds.endsWith(']')) {
+        try {
+          updateData.metalIds = JSON.parse(updateData.metalIds);
+        } catch (e) {
+          updateData.metalIds = [updateData.metalIds];
+        }
+      } else if (typeof updateData.metalIds === 'string' && updateData.metalIds.trim() !== '') {
+        updateData.metalIds = [updateData.metalIds];
+      }
     }
 
-if (req.file) {
+    if (req.file) {
   const { buffer, originalname, mimetype } = req.file;
   const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
   updateData.imageUrl = imageKey;
@@ -244,6 +267,7 @@ if (req.file) {
 
     // Clear cache
     await cacheUtils.delPattern('banners_*');
+    await cacheUtils.delPattern('banners_user_*');
 
     return successResponse(res, 200, "Banner updated successfully", { banner });
   } catch (error) {
@@ -280,6 +304,7 @@ const deleteBannerById = async (req, res) => {
 
     // Clear cache
     await cacheUtils.delPattern('banners_*');
+    await cacheUtils.delPattern('banners_user_*');
 
     return successResponse(res, 200, "Banner deleted successfully");
   } catch (error) {
@@ -319,6 +344,7 @@ const toggleBannerStatus = async (req, res) => {
 
     // Clear cache
     await cacheUtils.delPattern('banners_*');
+    await cacheUtils.delPattern('banners_user_*');
 
     return successResponse(
       res, 
@@ -383,6 +409,7 @@ const updateBannerPosition = async (req, res) => {
 
     // Clear cache
     await cacheUtils.delPattern('banners_*');
+    await cacheUtils.delPattern('banners_user_*');
 
     return successResponse(res, 200, "Banner position updated successfully");
   } catch (error) {

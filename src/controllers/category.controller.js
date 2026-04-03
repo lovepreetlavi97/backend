@@ -50,7 +50,17 @@ const createCategory = async (req, res) => {
       description,
       image: imageKey, // save only the image key
       isFeatured: isFeatured,
-      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
+      metalIds: (function(ids) {
+        if (!ids) return [];
+        if (Array.isArray(ids)) return ids;
+        if (typeof ids === 'string') {
+          if (ids.startsWith('[') && ids.endsWith(']')) {
+            try { return JSON.parse(ids); } catch (e) { return [ids]; }
+          }
+          return ids.split(',').map(s => s.trim()).filter(s => s !== '');
+        }
+        return ids;
+      })(metalIds),
       isBlocked: false,
       productCount: 0
     };
@@ -112,6 +122,7 @@ const getAllCategories = async (req, res) => {
     
     // Execute query with pagination
     const categories = await Category.find(query)
+      .populate('metalIds', 'name')
       .skip(skip)
       .limit(parseInt(limit))
       .sort(sortOptions)
@@ -217,8 +228,11 @@ const updateCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, isBlocked, isFeatured, image, metalIds } = req.body;
-        const { buffer, originalname, mimetype } = req.file;
-    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+    let imageKey = null;
+    if (req.file) {
+      const { buffer, originalname, mimetype } = req.file;
+      imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+    }
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, "Invalid category ID format");
@@ -250,7 +264,19 @@ const updateCategoryById = async (req, res) => {
     if (description !== undefined) category.description = description;
     if (isBlocked !== undefined) category.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) category.isFeatured = isFeatured === 'true' || isFeatured === true;
-    if (metalIds) category.metalIds = typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds;
+    if (metalIds) {
+      category.metalIds = (function(ids) {
+        if (!ids) return [];
+        if (Array.isArray(ids)) return ids;
+        if (typeof ids === 'string') {
+          if (ids.startsWith('[') && ids.endsWith(']')) {
+            try { return JSON.parse(ids); } catch (e) { return [ids]; }
+          }
+          return ids.split(',').map(s => s.trim()).filter(s => s !== '');
+        }
+        return ids;
+      })(metalIds);
+    }
     // Handle image update
     
     if (imageKey) {

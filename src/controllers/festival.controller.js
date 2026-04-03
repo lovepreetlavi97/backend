@@ -68,6 +68,22 @@ const createFestival = async (req, res) => {
     }
 
     // Create festival data object
+    let parsedMetalIds = [];
+    if (Array.isArray(metalIds)) {
+      parsedMetalIds = metalIds;
+    } else if (typeof metalIds === 'string' && metalIds.trim() !== '') {
+      if (metalIds.startsWith('[') && metalIds.endsWith(']')) {
+        try {
+          parsedMetalIds = JSON.parse(metalIds);
+        } catch (e) {
+          parsedMetalIds = [metalIds];
+        }
+      } else {
+        parsedMetalIds = [metalIds];
+      }
+    }
+
+    // Create festival data object
     const festivalData = {
       name,
       description,
@@ -76,7 +92,7 @@ const createFestival = async (req, res) => {
       isActive: isActive === "true" || isActive === true,
       mainImage,
       cards,
-      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
+      metalIds: parsedMetalIds,
     };
 
     // Create the festival

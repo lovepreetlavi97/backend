@@ -48,6 +48,17 @@ const createSubcategory = async (req, res) => {
     const { buffer, originalname, mimetype } = req.file;
     const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
 
+    let parsedMetalIds = [];
+    if (typeof metalIds === 'string' && metalIds.trim() !== '') {
+      try {
+        parsedMetalIds = JSON.parse(metalIds);
+      } catch (e) {
+        parsedMetalIds = [];
+      }
+    } else if (Array.isArray(metalIds)) {
+      parsedMetalIds = metalIds;
+    }
+
     const subcategoryData = {
       name,
       category: resolvedCategoryId,
@@ -56,7 +67,17 @@ const createSubcategory = async (req, res) => {
       image: imageKey,
       isFeatured: isFeatured,
       isBlocked: false,
-      metalIds: typeof metalIds === 'string' ? JSON.parse(metalIds) : metalIds,
+      metalIds: (function(ids) {
+        if (!ids) return [];
+        if (Array.isArray(ids)) return ids;
+        if (typeof ids === 'string') {
+          if (ids.startsWith('[') && ids.endsWith(']')) {
+            try { return JSON.parse(ids); } catch (e) { return [ids]; }
+          }
+          return ids.split(',').map(s => s.trim()).filter(s => s !== '');
+        }
+        return ids;
+      })(metalIds),
     };
 
     const subcategory = await create(SubCategory, subcategoryData);
@@ -122,6 +143,7 @@ const getAllSubcategories = async (req, res) => {
       { path: 'category', select: 'name' },
       { path: 'categoryId', select: 'name' },
       { path: 'parentId', select: 'name' },
+      { path: 'metalIds', select: 'name' },
     ];
     const subcategories = await SubCategory.find(query)
       .skip(skip)
@@ -175,7 +197,7 @@ const getSubcategoryById = async (req, res) => {
 const updateSubcategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, categoryId, isBlocked, isFeatured, parentId } = req.body;
+    const { name, category, categoryId, isBlocked, isFeatured, parentId, metalIds } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return errorResponse(res, 400, "Invalid subcategory ID format");
@@ -207,6 +229,17 @@ const updateSubcategoryById = async (req, res) => {
     }
     if (isBlocked !== undefined) updateData.isBlocked = isBlocked === 'true' || isBlocked === true;
     if (isFeatured !== undefined) updateData.isFeatured = isFeatured === 'true' || isFeatured === true;
+    if (metalIds) updateData.metalIds = (function(ids) {
+      if (!ids) return [];
+      if (Array.isArray(ids)) return ids;
+      if (typeof ids === 'string') {
+        if (ids.startsWith('[') && ids.endsWith(']')) {
+          try { return JSON.parse(ids); } catch (e) { return [ids]; }
+        }
+        return ids.split(',').map(s => s.trim()).filter(s => s !== '');
+      }
+      return ids;
+    })(metalIds);
     if (req.file) {
       const { buffer, originalname, mimetype } = req.file;
       const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
@@ -219,7 +252,8 @@ const updateSubcategoryById = async (req, res) => {
     ).populate([
       { path: 'category', select: 'name' },
       { path: 'categoryId', select: 'name' },
-      { path: 'parentId', select: 'name' }
+      { path: 'parentId', select: 'name' },
+      { path: 'metalIds', select: 'name' }
     ]);
 
     if (!subcategory) {

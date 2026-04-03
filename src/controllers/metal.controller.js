@@ -3,6 +3,7 @@ const { successResponse, errorResponse } = require('../utils/responseUtil');
 
 exports.createMetal = async (req, res) => {
   try {
+    console.log('Creating metal with body:', typeof req.body, req.body);
     const metal = await Metal.create(req.body);
     return successResponse(res, 201, 'Metal created successfully', { metal });
   } catch (error) {
@@ -12,9 +13,7 @@ exports.createMetal = async (req, res) => {
 
 exports.getAllMetals = async (req, res) => {
   try {
-    console.log('Fetching all metals...');
-    const metals = await Metal.find({ isActive: true });
-    console.log(`Found ${metals.length} active metals`);
+    const metals = await Metal.find();
     return successResponse(res, 200, 'Metals retrieved successfully', { metals });
   } catch (error) {
     console.error('Error in getAllMetals:', error);
@@ -51,7 +50,7 @@ exports.updateMetal = async (req, res) => {
 
 exports.deleteMetal = async (req, res) => {
   try {
-    const metal = await Metal.findByIdAndUpdate(req.params.id, { isActive: false });
+    const metal = await Metal.findByIdAndDelete(req.params.id);
     if (!metal) {
       return errorResponse(res, 404, 'Metal not found');
     }
