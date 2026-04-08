@@ -10,8 +10,10 @@ const {
   deleteMultipleImagesFromSpaces,
 } = require('../middlewares/uploadMiddleware');
 
+const { adminAuth } = require('../middlewares/auth/auth.middleware');
+
 // 🔹 Upload single image (expects `image` field + optional `folder`)
-router.post("/image", uploadSingleImage, async (req, res) => {
+router.post("/image", adminAuth, uploadSingleImage, async (req, res) => {
   try {
     const file = req.file;
     const folder = req.body.folder || 'misc';
@@ -31,7 +33,7 @@ router.post("/image", uploadSingleImage, async (req, res) => {
 });
 
 // 🔹 Upload multiple images (expects `images` field + optional `folder`)
-router.post("/images", uploadMultipleImagesMulter, async (req, res) => {
+router.post("/images", adminAuth, uploadMultipleImagesMulter, async (req, res) => {
   try {
     const files = req.files;
     const folder = req.body.folder || 'misc';
@@ -52,9 +54,9 @@ router.post("/images", uploadMultipleImagesMulter, async (req, res) => {
 });
 
 // 🔻 Delete single image by key
-router.delete("/deleteImage", async (req, res) => {
+router.delete("/deleteImage", adminAuth, async (req, res) => {
   try {
-const { key } = req.query;
+    const { key } = req.query;
     if (!key) return res.status(400).json({ error: "Image key is required" });
 
     const deleted = await deleteImageFromSpaces(key);
@@ -68,7 +70,7 @@ const { key } = req.query;
 });
 
 // 🔻 Delete multiple images by keys
-router.delete("/deleteImages", async (req, res) => {
+router.delete("/deleteImages", adminAuth, async (req, res) => {
   try {
     const { keys } = req.query;
     if (!Array.isArray(keys) || keys.length === 0) {

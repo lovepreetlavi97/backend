@@ -8,39 +8,66 @@ const swaggerJsDoc = require('swagger-jsdoc');
 const cors = require('cors');
 const messages = require('./utils/messages');
 const path = require("path")
+const helmet = require('helmet');
+const hpp = require('hpp');
+const xss = require('xss-clean');
+const logger = require('./utils/logger');
+const compression = require('compression');
+
 // Load environment variables
 dotenv.config();
 
 // Create express app
 const app = express();
-const WebhookRoutes = require('./routes/webhook.route'); // Import the index.js in routes
-
-
-
-// Use the versioned routes
-app.use('/api/v1/webhook', WebhookRoutes); // Mounting the routes under /api/v1
+app.use(compression());
 const { globalLimiter } = require('./middlewares/rateLimiter');
 
+// Security Hardening
+app.use(helmet()); 
+app.use(xss());    
+app.use(hpp());    
+
+// Request Logging
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.originalUrl}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    userId: req.user?._id
+  });
+  next();
+});
+
+// Health check endpoint (for load balancers & monitoring)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'up', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+const WebhookRoutes = require('./routes/webhook.route'); 
+
 // Middleware for parsing JSON and handling CORS
-app.use(globalLimiter); // Apply global rate limiter
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(globalLimiter); 
+app.use(express.json({ limit: '10kb' })); // Limit body size to 10kb
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
 app.use(
   cors({
-    origin: "*",
+    origin: process.env.WEB_BASE_URL || "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.options("*", cors());
-// Import versioned routes
-const v1Routes = require('./routes'); // Import the index.js in routes
 
-// Import error handling middleware
+// Import versioned routes
+const v1Routes = require('./routes'); 
 const { errorConverter, errorHandler } = require('./middlewares/error.middleware');
 
 // Use the versioned routes
-app.use('/api/v1', v1Routes); // Mounting the routes under /api/v1
+app.use('/api/v1', v1Routes); 
+app.use('/api/v1/webhook', WebhookRoutes);
 
 // Swagger setup
 const swaggerOptions = {

@@ -1,12 +1,12 @@
 const bcrypt = require('bcrypt');
 
-const create = async (model, data) => {
-  console.log("create something",model, data)
-  return model.create(data);
+const create = async (model, data, options = {}) => {
+  console.log("create something", model.modelName, data);
+  return model.create([data], options).then(res => res[0]);
 };
 
-const findOne = async (model, query, projection = {}) => {
-  return model.findOne(query, projection);
+const findOne = async (model, query, projection = {}, options = {}) => {
+  return model.findOne(query, projection, options);
 };
 
 // const findMany = async (model, query = {}, projection = {}, options = {}, populate = '') => {
@@ -30,6 +30,10 @@ const findMany = async (model, query = {}, projection = {}, options = {}, popula
 
 const findAndUpdate = async (model, query, data, options = { new: true }) => {
   return model.findOneAndUpdate(query, data, options);
+};
+
+const updateOne = async (model, query, data, options = {}) => {
+  return model.updateOne(query, data, options);
 };
 
 const deleteOne = async (model, query) => {
@@ -61,6 +65,7 @@ module.exports = {
   findOne,
   findMany,
   findAndUpdate,
+  updateOne,
   deleteOne,
   softDelete,
   findByEmail,

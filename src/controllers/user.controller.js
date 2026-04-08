@@ -1782,21 +1782,26 @@ const getTrendingProducts = async (req, res) => {
     }
 
     const products = await Product.aggregate([
+      // STAGE 1: Filter early
       {
         $match: matchQuery,
       },
 
-      // Join reviews
+      // STAGE 2: Sort based on indexed fields (viewCount, purchaseCount)
       {
-        $lookup: {
-          from: "reviews",
-          localField: "_id",
-          foreignField: "productId",
-          as: "reviews",
+        $sort: {
+          viewCount: -1,
+          purchaseCount: -1,
+          createdAt: -1,
         },
       },
 
-      // Join price rules
+      // STAGE 3: Limit early for performance
+      {
+        $limit: parsedLimit,
+      },
+
+      // STAGE 4: Join only required data for the limited set
       {
         $lookup: {
           from: "pricerules",
@@ -1813,7 +1818,7 @@ const getTrendingProducts = async (req, res) => {
         },
       },
 
-      // Calculate everything in ONE stage
+      // STAGE 5: Perform calculations on limited set
       {
         $addFields: {
           actualPrice: {
@@ -1836,7 +1841,6 @@ const getTrendingProducts = async (req, res) => {
         }
       },
 
-      // If dynamic + discountPercent present, compute discountedPrice from the updated actualPrice
       {
         $addFields: {
           discountedPrice: {
@@ -1865,7 +1869,6 @@ const getTrendingProducts = async (req, res) => {
         }
       },
 
-      // Discount calculation AFTER actual price updated
       {
         $addFields: {
           discountPercentage: {
@@ -1899,22 +1902,9 @@ const getTrendingProducts = async (req, res) => {
 
       {
         $project: {
-          reviews: 0,
           priceRule: 0
         }
-      },
-
-      {
-        $sort: {
-          viewCount: -1,
-          purchaseCount: -1,
-          createdAt: -1,
-        },
-      },
-
-      {
-        $limit: parsedLimit,
-      },
+      }
     ]);
 
     const responseData = { products };
@@ -1952,6 +1942,7 @@ const getShopEssentials = async (req, res) => {
     }
 
     const products = await Product.aggregate([
+      // STAGE 1: Filter early
       {
         $match: {
           isDeleted: false,
@@ -1959,17 +1950,18 @@ const getShopEssentials = async (req, res) => {
         },
       },
 
-      // Join reviews
+      // STAGE 2: Sort (uses purchaseCount index if available)
       {
-        $lookup: {
-          from: "reviews",
-          localField: "_id",
-          foreignField: "productId",
-          as: "reviews",
+        $sort: {
+          purchaseCount: -1,
+          averageRating: -1,
         },
       },
 
-      // Join price rules
+      // STAGE 3: Limit early
+      { $limit: LIMIT },
+
+      // STAGE 4: Join price rules for only 4 products
       {
         $lookup: {
           from: "pricerules",
@@ -1986,7 +1978,7 @@ const getShopEssentials = async (req, res) => {
         },
       },
 
-      // Dynamic price calculation
+      // STAGE 5: Calculations on 4 products
       {
         $addFields: {
           actualPrice: {
@@ -2006,20 +1998,10 @@ const getShopEssentials = async (req, res) => {
               "$actualPrice",
             ],
           },
-
-          totalReviews: { $size: "$reviews" },
-
-          averageRating: {
-            $cond: [
-              { $gt: [{ $size: "$reviews" }, 0] },
-              { $round: [{ $avg: "$reviews.rating" }, 1] },
-              0,
-            ],
-          },
         },
       },
 
-      // If dynamic + discountPercent present, compute discountedPrice from the updated actualPrice
+      // Compute discountedPrice if needed
       {
         $addFields: {
           discountedPrice: {
@@ -2048,7 +2030,7 @@ const getShopEssentials = async (req, res) => {
         }
       },
 
-      // Discount calculation
+      // Discount percentage
       {
         $addFields: {
           discountPercentage: {
@@ -2082,19 +2064,9 @@ const getShopEssentials = async (req, res) => {
 
       {
         $project: {
-          reviews: 0,
           priceRule: 0,
         },
       },
-
-      {
-        $sort: {
-          purchaseCount: -1,
-          averageRating: -1,
-        },
-      },
-
-      { $limit: LIMIT },
     ]);
 
     const responseData = {

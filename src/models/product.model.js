@@ -290,6 +290,8 @@ productSchema.index({ subcategoryId: 1 }); // Individual index for faster subcat
 productSchema.index({ actualPrice: 1 }); // Individual index for faster price filtering
 productSchema.index({ isFeatured: 1 });
 productSchema.index({ metalIds: 1 });
+productSchema.index({ viewCount: -1, purchaseCount: -1, createdAt: -1 });
+productSchema.index({ purchaseCount: -1, averageRating: -1 });
 
 // Dynamic Attribute Single Field Indexes
 productSchema.index({ 'attributes.color': 1 });

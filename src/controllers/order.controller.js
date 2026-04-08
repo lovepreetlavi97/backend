@@ -15,9 +15,11 @@ const razorpayInstance = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
+const logger = require('../utils/logger');
+
 const createOrder = async (req, res) => {
-    const expectedDeliveryDate = new Date();
-    expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + 7);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
         const {
@@ -28,282 +30,168 @@ const createOrder = async (req, res) => {
             promoCode,
             deliveryNotes,
             giftWrap = false,
-            giftMessage
+            giftMessage,
+            idempotencyKey // Client-provided unique key
         } = req.body;
+
+        logger.info('Creating order attempt', { 
+            userId: req.user?._id, 
+            paymentMethod, 
+            productCount: products?.length,
+            idempotencyKey 
+        });
+
+        // 1. Idempotency Check
+        if (idempotencyKey) {
+            const existingOrder = await Order.findOne({ idempotencyKey }).session(session);
+            if (existingOrder) {
+                logger.warn('Duplicate order detected via idempotencyKey', { idempotencyKey });
+                await session.abortTransaction();
+                return successResponse(res, 200, "Order already processed", { order: existingOrder });
+            }
+        }
 
         // Basic validation
         if (!products || !Array.isArray(products) || products.length === 0) {
             return errorResponse(res, 400, "Products array is required and cannot be empty");
         }
 
-        if (!paymentMethod) {
-            return errorResponse(res, 400, "Payment method is required");
-        }
-
-        // Check valid payment methods
         const validPaymentMethods = ['COD', "ONLINE", 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'];
         if (!validPaymentMethods.includes(paymentMethod)) {
-            return errorResponse(res, 400, `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`);
+            return errorResponse(res, 400, "Invalid payment method");
         }
 
-        // Validate shipping address
-        if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city ||
-            !shippingAddress.state || !shippingAddress.postalCode ||
-            !shippingAddress.contactName || !shippingAddress.contactPhone) {
-            return errorResponse(res, 400, "Complete shipping address with contact information is required");
-        }
-
-        // User authentication is now optional for guest checkout
         const userId = req.user ? req.user._id : null;
         const guestEmail = req.body.guestEmail || null;
         const guestPhone = req.body.guestPhone || shippingAddress?.contactPhone || null;
 
-        if (!userId) {
-            if (!guestEmail) {
-                return errorResponse(res, 400, "Email is required to place an order");
-            }
-            if (!guestPhone) {
-                return errorResponse(res, 400, "Phone number is required to place an order");
-            }
+        if (!userId && (!guestEmail || !guestPhone)) {
+            return errorResponse(res, 400, "Guest contact info required");
         }
 
-        // Fetch and validate product details from DB
+        // 2. Fetch/Validate and Atomic Stock Reservation
         let productDetails = [];
-        let outOfStockProducts = [];
-        let unavailableProducts = [];
-
         for (const p of products) {
-            if (!p.productId || !p.quantity || p.quantity <= 0) {
-                return errorResponse(res, 400, "Each product must have a valid productId and positive quantity");
-            }
-
-            if (!mongoose.Types.ObjectId.isValid(p.productId)) {
-                return errorResponse(res, 400, `Invalid product ID format: ${p.productId}`);
-            }
-
-            const product = await Product.findOne({
-                _id: p.productId,
-                isDeleted: { $ne: true },
-                isBlocked: { $ne: true }
-            }).populate("priceRuleId", "price");
+            const product = await Product.findOne({ 
+                _id: p.productId, 
+                isDeleted: { $ne: true }, 
+                isBlocked: { $ne: true } 
+            }).session(session).populate("priceRuleId", "price");
 
             if (!product) {
-                unavailableProducts.push(p.productId);
-                continue;
+                throw new Error(`Product ${p.productId} not found or unavailable`);
             }
 
-            // Check if product is in stock
-            if ((product.isInStock === false) || (product.stock !== undefined && product.stock < p.quantity)) {
-                outOfStockProducts.push({
-                    id: product._id,
-                    name: product.name,
-                    available: product.stock || 0,
-                    requested: p.quantity
-                });
-                continue;
+            // Atomic Stock Check & Decr
+            const stockUpdate = await Product.updateOne(
+                { _id: p.productId, stock: { $gte: p.quantity }, isDeleted: { $ne: true } },
+                { $inc: { stock: -p.quantity } },
+                { session }
+            );
+
+            if (stockUpdate.modifiedCount === 0) {
+                throw new Error(`Insufficient stock for product: ${product.name}`);
             }
 
-            // Dynamic Price Calculation
+            // Price Calculation (Consistent with DB)
             let actualPrice = product.actualPrice;
-            if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
-                const liveRate = product.priceRuleId.price;
-                const weight = product.weight || 0;
-                const making = product.makingCharges || 0;
-                actualPrice = (liveRate * weight) + making;
+            if (!product.isPriceFixed && product.priceRuleId?.price) {
+                actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
             }
 
-            // Calculate active price based on dynamic actualPrice
             let price = actualPrice;
-            let discountedPrice = product.discountedPrice;
-            
-            // If there's a discountedPrice stored in DB AND it's less than actual price, we honor it.
-            // A more robust system would re-apply the discount percentage to the dynamic price.
-            if (discountedPrice && discountedPrice < actualPrice) {
-                 price = discountedPrice;
-            } else {
-                 discountedPrice = null; // reset if invalid
+            if (product.discountedPrice && product.discountedPrice < actualPrice) {
+                price = product.discountedPrice;
             }
 
             productDetails.push({
                 productId: product._id,
                 name: product.name,
-                slug: product.slug,
-                price: price,
-                actualPrice: actualPrice,
-                discountedPrice: discountedPrice,
+                price,
                 quantity: p.quantity,
                 subtotal: parseFloat((price * p.quantity).toFixed(2)),
-                image: product.images && product.images.length > 0 ? product.images[0] : null,
                 sku: product.sku,
-                weight: product.weight || 0,
-                unit: product.unit || 'kg',
-                expectedDeliveryDate: expectedDeliveryDate
+                weight: product.weight || 0
             });
         }
 
-        // Report any issues with products
-        if (unavailableProducts.length > 0) {
-            return errorResponse(res, 404, "Some products are unavailable or have been removed", { unavailableProducts });
-        }
-
-        if (outOfStockProducts.length > 0) {
-            return errorResponse(res, 400, "Some products are out of stock or have insufficient quantity", { outOfStockProducts });
-        }
-
-        if (productDetails.length === 0) {
-            return errorResponse(res, 400, "No valid products in order");
-        }
-
         const subtotal = parseFloat(productDetails.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2));
-
         const totalWeight = productDetails.reduce((sum, p) => sum + (p.weight || 0) * p.quantity, 0);
         const shippingCharge = calculateShippingCharge(subtotal, totalWeight);
+        const taxAmount = parseFloat((subtotal * 0.18).toFixed(2)); // 18% GST
 
-        const taxRate = 0.18; // 18% GST (should be configurable)
-        const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
-
+        // 3. Promo Code Application (within transaction)
         let discountAmount = 0;
-        let promoCodeDetails = null;
         let promoDoc = null;
-
-        // Apply promo code discount if valid (accept either code string or Mongo _id)
         if (promoCode) {
-            const isObjectId = mongoose.Types.ObjectId.isValid(promoCode) && String(new mongoose.Types.ObjectId(promoCode)) === promoCode;
-            const query = isObjectId
-                ? { _id: promoCode, status: 'active', endDate: { $gt: new Date() }, isDeleted: { $ne: true } }
-                : { code: String(promoCode).toUpperCase(), status: 'active', endDate: { $gt: new Date() }, isDeleted: { $ne: true } };
-            promoDoc = await PromoCode.findOne(query);
+            promoDoc = await PromoCode.findOne({
+                $or: [{ _id: mongoose.isValidObjectId(promoCode) ? promoCode : null }, { code: String(promoCode).toUpperCase() }],
+                status: 'active',
+                endDate: { $gt: new Date() }
+            }).session(session);
 
-            if (promoDoc) {
-                if (promoDoc.minPurchase && subtotal < promoDoc.minPurchase) {
-                    return errorResponse(res, 400, `Minimum order value for this promo is ₹${promoDoc.minPurchase}`);
-                }
-                if (promoDoc.usageLimit != null && (promoDoc.usedCount || 0) >= promoDoc.usageLimit) {
-                    return errorResponse(res, 400, "This promo code has reached its usage limit");
-                }
-                if (userId && promoDoc.usedBy && promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
-                    return errorResponse(res, 400, "You have already used this promo code");
-                }
+            if (!promoDoc) throw new Error("Invalid or expired promo code");
+            
+            // Check limits
+            if (promoDoc.usageLimit && promoDoc.usedCount >= promoDoc.usageLimit) throw new Error("Promo limit reached");
+            if (userId && promoDoc.usedBy?.includes(userId)) throw new Error("Promo already used by you");
 
-                const typeLower = (promoDoc.type || '').toLowerCase();
-                if (typeLower === 'percentage') {
-                    discountAmount = parseFloat(((subtotal * promoDoc.value) / 100).toFixed(2));
-                    if (promoDoc.maxDiscount != null && discountAmount > promoDoc.maxDiscount) {
-                        discountAmount = parseFloat(Number(promoDoc.maxDiscount).toFixed(2));
-                    }
-                } else {
-                    discountAmount = Math.min(parseFloat(Number(promoDoc.value).toFixed(2)), subtotal);
-                }
-
-                promoCodeDetails = {
-                    code: promoDoc.code,
-                    discountType: typeLower === 'percentage' ? 'PERCENTAGE' : 'FIXED',
-                    discountValue: promoDoc.value
-                };
+            // Calculate discount
+            if (promoDoc.type === 'percentage') {
+                discountAmount = Math.min(parseFloat(((subtotal * promoDoc.value) / 100).toFixed(2)), promoDoc.maxDiscount || Infinity);
             } else {
-                return errorResponse(res, 400, "Invalid or expired promo code");
+                discountAmount = Math.min(promoDoc.value, subtotal);
             }
+
+            // Update promo usage
+            await PromoCode.updateOne(
+                { _id: promoDoc._id },
+                { $inc: { usedCount: 1, usageCount: 1 }, $addToSet: { usedBy: userId } },
+                { session }
+            );
         }
 
-        const totalAmount = parseFloat((subtotal + taxAmount + shippingCharge).toFixed(2));
-        const finalAmount = parseFloat((totalAmount - discountAmount).toFixed(2));
-
-        let advanceAmount = 0;
-        let pendingAmount = 0;
-        if (paymentMethod === 'COD') {
-            // COD: collect 20% advance online, rest on delivery
-            advanceAmount = parseFloat((finalAmount * 0.20).toFixed(2));
-            pendingAmount = parseFloat((finalAmount - advanceAmount).toFixed(2));
-        } else {
-            advanceAmount = finalAmount;
-        }
-
-        const finalBillingAddress = billingAddress || shippingAddress;
-
+        const finalAmount = parseFloat((subtotal + taxAmount + shippingCharge - discountAmount).toFixed(2));
         const orderNumber = await generateOrderNumber();
 
         const orderData = {
             orderNumber,
             userId,
-            guestEmail,
-            guestPhone,
             products: productDetails,
             subtotal,
-            totalAmount,
             shippingCharge,
-            tax: taxRate * 100, // Storing tax rate as percentage
             taxAmount,
             discountAmount,
             finalAmount,
-            advanceAmount,
-            pendingAmount,
-            promoCode: promoDoc ? promoDoc._id : null,
-            promoCodeDetails,
             status: "Pending",
-            shippingAddress,
-            billingAddress: finalBillingAddress,
+            idempotencyKey,
             paymentMethod,
-            paymentStatus: "Pending",
-            deliveryNotes,
-            giftWrap,
-            giftMessage,
-            estimatedDelivery: calculateEstimatedDelivery(),
-            paymentDetails: {
-                method: paymentMethod,
-                status: "Pending",
-            },
-            statusHistory: [{
-                status: "Pending",
-                timestamp: new Date(),
-                notes: "Order created"
-            }]
+            shippingAddress,
+            billingAddress: billingAddress || shippingAddress
         };
 
-        const order = await create(Order, orderData);
+        const [order] = await Order.create([orderData], { session });
 
-        // Update promo code usage so it reflects in admin panel
-        if (promoDoc && order._id) {
-            try {
-                promoDoc.usedCount = (promoDoc.usedCount || 0) + 1;
-                promoDoc.usageCount = (promoDoc.usageCount || 0) + 1;
-                if (userId && promoDoc.usedBy) {
-                    if (!promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
-                        promoDoc.usedBy.push(userId);
-                    }
-                } else if (userId) {
-                    promoDoc.usedBy = promoDoc.usedBy || [];
-                    if (!promoDoc.usedBy.some(id => id && id.toString() === userId.toString())) {
-                        promoDoc.usedBy.push(userId);
-                    }
-                }
-                await promoDoc.save();
-            } catch (e) {
-                console.error("Failed to update promo usage:", e);
-            }
-        }
-
-        /* --------------------------------------------------
-           🚀 ADDED RAZORPAY ORDER CREATION (ONLY THIS PART)
-        -------------------------------------------------- */
-        if (paymentMethod === "ONLINE" || paymentMethod === "UPI" || paymentMethod === "COD") {
+        // 4. External Integrations (Outside transaction if possible, or handle failures)
+        if (paymentMethod !== 'COD') {
             const razorpayOrder = await razorpayInstance.orders.create({
-                amount: Math.round(order.advanceAmount * 100),
+                amount: Math.round(finalAmount * 100),
                 currency: "INR",
-                receipt: `order_${order._id}`,
-                notes: {
-                    orderId: order._id.toString(),
-                    userId: userId ? userId.toString() : 'guest'
-                }
+                receipt: `order_${order._id}`
             });
-
             order.razorpayOrderId = razorpayOrder.id;
-            await order.save();
+            await order.save({ session });
         }
-        /* -------------------------------------------------- */
 
-        // Send order confirmation email with magic link / tracking link
+        await session.commitTransaction();
+        logger.info('Order created successfully', { orderId: order._id, orderNumber });
+
+        // Fire-and-forget notifications
+        createAdminOrderNotifications('NEW_ORDER', order).catch(e => logger.error('Notification error', e));
+
+
+        // 5. Send order confirmation email
         try {
-            // Determine customer email & phone (supporting both guest and logged-in user)
             let customerEmail = guestEmail;
             let customerPhone = guestPhone;
 
@@ -311,85 +199,44 @@ const createOrder = async (req, res) => {
                 const user = await User.findById(userId).select("email phone name");
                 if (user) {
                     customerEmail = user.email;
-                    if (!customerPhone && user.phone) {
-                        customerPhone = user.phone;
-                    }
+                    customerPhone = customerPhone || user.phone;
                 }
             }
 
             if (customerEmail) {
                 const webBaseUrl = process.env.WEB_BASE_URL || "https://yourwebsite.com";
-
-                // Create a magic JWT token so user can open order directly from email
                 const magicToken = jwt.sign(
-                    {
-                        type: "ORDER_MAGIC",
-                        orderId: order._id.toString(),
-                        orderNumber: order.orderNumber,
-                        phone: customerPhone || guestPhone || shippingAddress?.contactPhone || null,
-                    },
+                    { type: "ORDER_MAGIC", orderId: order._id.toString(), orderNumber: order.orderNumber },
                     process.env.JWT_SECRET_KEY,
                     { expiresIn: "30d" }
                 );
 
                 const trackUrl = `${webBaseUrl}/order/${order.orderNumber}?token=${magicToken}`;
-                const trackPageUrl = `${webBaseUrl}/track-order`;
-
-                const discountLine = order.discountAmount > 0 && order.promoCodeDetails
-                    ? `<p>Discount applied: <strong>${order.promoCodeDetails.code}</strong> (−₹${order.discountAmount.toFixed(2)})</p>`
-                    : '';
-                const html = `
-                  <p>Hi ${shippingAddress?.contactName || "Customer"},</p>
-                  <p>Your order <strong>${order.orderNumber}</strong> has been placed successfully.</p>
-                  ${discountLine}
-                  <p>Track your order directly here:</p>
-                  <p><a href="${trackUrl}">${trackUrl}</a></p>
-                  <p>Or visit the Track Order page and enter your Order ID <strong>${order.orderNumber}</strong> and your phone number:</p>
-                  <p><a href="${trackPageUrl}">${trackPageUrl}</a></p>
-                  <p>Thank you for shopping with us.</p>
-                `;
-
+                const html = `<p>Hi,</p><p>Your order <strong>${order.orderNumber}</strong> has been placed.</p><p><a href="${trackUrl}">Track here</a></p>`;
                 await sendEmail(customerEmail, "Order Confirmed", html);
             }
         } catch (emailError) {
-            console.error("Order confirmation email failed:", emailError);
+            logger.error("Order email failed", { emailError });
         }
 
+        // 6. Cache Invalidation
         try {
-            if (userId) {
-                await cacheUtils.del(`user_orders_${userId}`);
-            }
+            if (userId) await cacheUtils.del(`user_orders_${userId}`);
             await cacheUtils.delPattern('admin_orders_*');
         } catch (cacheError) {
-            console.error("Error clearing cache:", cacheError);
+            logger.error("Cache invalidation failed", { cacheError });
         }
 
-        // Fire-and-forget admin notification for new order
-        createAdminOrderNotifications('NEW_ORDER', order).catch(e => console.error('NEW_ORDER notification error:', e));
-
-        return successResponse(res, 201, "Order created successfully", {
-            order: {
-                _id: order._id,
-                orderNumber: order.orderNumber,
-                subtotal: order.subtotal,
-                shippingCharge: order.shippingCharge,
-                taxAmount: order.taxAmount,
-                discountAmount: order.discountAmount,
-                finalAmount: order.finalAmount,
-                advanceAmount: order.advanceAmount,
-                pendingAmount: order.pendingAmount,
-                status: order.status,
-                paymentStatus: order.paymentStatus,
-                estimatedDelivery: order.estimatedDelivery,
-                paymentMethod: order.paymentMethod,
-                createdAt: order.createdAt,
-                razorpayOrderId: order.razorpayOrderId || null
-            }
-        });
+        return successResponse(res, 201, "Order created successfully", { order });
 
     } catch (error) {
-        console.error("Create Order Error: ", error);
-        return errorResponse(res, 500, error.message || "Failed to create order");
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
+        logger.error('Order creation failed', { error: error.message, stack: error.stack });
+        return errorResponse(res, error.statusCode || 500, error.message || "Failed to create order");
+    } finally {
+        session.endSession();
     }
 };
 

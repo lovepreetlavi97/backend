@@ -2,246 +2,13 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/order.controller');
 const { userAuth, adminAuth, optionalUserAuth } = require('../middlewares/auth/auth.middleware');
-const { check } = require('express-validator');
+const validate = require('../middlewares/validate.middleware');
+const { createOrderSchema, updateOrderStatusSchema, updatePaymentStatusSchema } = require('../validations/order.validation');
 
-/**
- * @swagger
- * tags:
- *   name: Order
- *   description: Order management
- */
-
-/**
- * @swagger
- * /orders:
- *   post:
- *     summary: Create a new order
- *     tags: [Order]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [products, shippingAddress, paymentMethod]
- *             properties:
- *               products:
- *                 type: array
- *                 description: Array of products to order
- *                 items:
- *                   type: object
- *                   required: [productId, quantity]
- *                   properties:
- *                     productId:
- *                       type: string
- *                       description: MongoDB ID of the product
- *                     quantity:
- *                       type: integer
- *                       description: Quantity to order
- *                       minimum: 1
- *               shippingAddress:
- *                 type: object
- *                 required: [addressLine1, city, state, postalCode, contactName, contactPhone]
- *                 properties:
- *                   addressLine1:
- *                     type: string
- *                     description: Street address
- *                   addressLine2:
- *                     type: string
- *                     description: Additional address details
- *                   city:
- *                     type: string
- *                     description: City name
- *                   state:
- *                     type: string
- *                     description: State name
- *                   postalCode:
- *                     type: string
- *                     description: Zip/postal code
- *                   country:
- *                     type: string
- *                     description: Country (defaults to India)
- *                   contactName:
- *                     type: string
- *                     description: Name of the recipient
- *                   contactPhone:
- *                     type: string
- *                     description: Phone number of the recipient
- *                   label:
- *                     type: string
- *                     enum: [Home, Work, Other]
- *                     default: Home
- *               billingAddress:
- *                 type: object
- *                 description: Billing address (if different from shipping address)
- *                 properties:
- *                   addressLine1:
- *                     type: string
- *                   addressLine2:
- *                     type: string
- *                   city:
- *                     type: string
- *                   state:
- *                     type: string
- *                   postalCode:
- *                     type: string
- *                   country:
- *                     type: string
- *                   contactName:
- *                     type: string
- *                   contactPhone:
- *                     type: string
- *                   label:
- *                     type: string
- *               promoCode:
- *                 type: string
- *                 description: MongoDB ID of the promo code
- *               paymentMethod:
- *                 type: string
- *                 description: Payment method for the order
- *                 enum: [COD, CREDIT_CARD, DEBIT_CARD, UPI, NET_BANKING, WALLET, PAYPAL]
- *               deliveryNotes:
- *                 type: string
- *                 description: Special instructions for delivery
- *               giftWrap:
- *                 type: boolean
- *                 description: Whether gift wrapping is requested
- *                 default: false
- *               giftMessage:
- *                 type: string
- *                 description: Message for gift wrap
- *     responses:
- *       201:
- *         description: Order created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: number
- *                   example: 201
- *                 message:
- *                   type: string
- *                   example: "Order created successfully"
- *                 data:
- *                   type: object
- *                   properties:
- *                     order:
- *                       type: object
- *                       properties:
- *                         _id:
- *                           type: string
- *                           example: "60d21b4667d0d8992e610c85"
- *                         orderNumber:
- *                           type: string
- *                           example: "ORD-20230818-1234"
- *                         subtotal:
- *                           type: number
- *                           example: 1299.99
- *                         shippingCharge:
- *                           type: number
- *                           example: 50
- *                         taxAmount:
- *                           type: number
- *                           example: 234
- *                         discountAmount:
- *                           type: number
- *                           example: 100
- *                         finalAmount:
- *                           type: number
- *                           example: 1483.99
- *                         status:
- *                           type: string
- *                           example: "Pending"
- *                         paymentStatus:
- *                           type: string
- *                           example: "Pending"
- *                         estimatedDelivery:
- *                           type: string
- *                           format: date-time
- *                         paymentMethod:
- *                           type: string
- *                           example: "COD"
- *                         createdAt:
- *                           type: string
- *                           format: date-time
- *       400:
- *         description: Bad request - Missing or invalid parameters
- *       401:
- *         description: Unauthorized - User not authenticated
- *       404:
- *         description: Not found - Products not found or unavailable
- *       500:
- *         description: Internal server error
- */
 router.post(
   '/',
   optionalUserAuth,
-  [
-    // Product validation
-    check('products')
-      .isArray({ min: 1 })
-      .withMessage('At least one product is required'),
-    check('products.*.productId')
-      .isMongoId()
-      .withMessage('Invalid product ID'),
-    check('products.*.quantity')
-      .isInt({ min: 1 })
-      .withMessage('Quantity must be at least 1'),
-      
-    // Shipping address validation  
-    check('shippingAddress')
-      .isObject()
-      .withMessage('Shipping address is required'),
-    check('shippingAddress.addressLine1')
-      .notEmpty()
-      .withMessage('Street address is required'),
-    check('shippingAddress.city')
-      .notEmpty()
-      .withMessage('City is required'),
-    check('shippingAddress.state')
-      .notEmpty()
-      .withMessage('State is required'),
-    check('shippingAddress.postalCode')
-      .notEmpty()
-      .withMessage('Postal/ZIP code is required'),
-    check('shippingAddress.contactName')
-      .notEmpty()
-      .withMessage('Recipient name is required'),
-    check('shippingAddress.contactPhone')
-      .notEmpty()
-      .withMessage('Recipient phone number is required'),
-    check('shippingAddress.label')
-      .optional()
-      .isIn(['Home', 'Work', 'Other'])
-      .withMessage('Label must be Home, Work, or Other'),
-      
-    // Payment validation
-    check('paymentMethod')
-      .isIn(['COD', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'NET_BANKING', 'WALLET', 'PAYPAL'])
-      .withMessage('Invalid payment method'),
-      
-    // Optional fields validation (promoCode can be Mongo ID or code string e.g. WELCOME20)
-    check('promoCode')
-      .optional()
-      .custom((val) => !val || typeof val === 'string')
-      .withMessage('Invalid promo code'),
-    check('giftWrap')
-      .optional()
-      .isBoolean()
-      .withMessage('Gift wrap must be a boolean'),
-    check('deliveryNotes')
-      .optional()
-      .isString()
-      .withMessage('Delivery notes must be a string'),
-    check('giftMessage')
-      .optional()
-      .isString()
-      .withMessage('Gift message must be a string')
-  ],
+  validate(createOrderSchema),
   orderController.createOrder
 );
 
@@ -412,19 +179,7 @@ router.get('/refunds', adminAuth, orderController.getRefundRequests);
 router.put(
   '/:id',
   adminAuth,
-  [
-    check('status')
-      .isIn([  'Pending',
-  'Processing',
-  'Confirmed',
-  'Shipped',
-  'Out for Delivery',
-  'Delivered',
-  'Cancelled',
-  'Returned',
-  'Refunded'])
-      .withMessage('Invalid order status'),
-  ],
+  validate(updateOrderStatusSchema),
   orderController.updateOrderStatus
 );
 
@@ -466,11 +221,7 @@ router.put(
 router.put(
   '/:id/payment-status',
   adminAuth,
-  [
-    check('paymentStatus')
-      .isIn(['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'])
-      .withMessage('Invalid payment status'),
-  ],
+  validate(updatePaymentStatusSchema),
   orderController.updatePaymentStatus
 );
 /**
