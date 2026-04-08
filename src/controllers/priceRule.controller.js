@@ -6,6 +6,7 @@ const {
 } = require('../services/mongodb/mongoService');
 
 const PriceRule = require('../models/priceRule.model');
+const Product = require('../models/product.model');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { cacheUtils } = require("../config/redis");
 
@@ -145,6 +146,12 @@ const deletePriceRuleById = async (req, res) => {
     const priceRule = await PriceRule.findOne({ _id: id, isDeleted: false });
     if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
+    }
+
+    // Dependency check: check if any active products are using this price rule
+    const inUse = await Product.exists({ priceRuleId: id, isDeleted: false });
+    if (inUse) {
+      return errorResponse(res, 400, "Cannot delete price rule. It is currently being used by one or more active products.");
     }
 
     await findAndUpdate(PriceRule, { _id: id }, { isDeleted: true });

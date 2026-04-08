@@ -79,10 +79,10 @@ async function markPaymentAsPaid({
 
   await userKitty.save();
   
-  // Send Confirmation Email
   try {
+    // Send Confirmation Email
     const { sendEmail } = require("./notifications/email.service");
-    const { getKittyPaymentSuccessTemplate } = require("../utils/kittyEmailTemplates");
+    const { getKittyPaymentSuccessTemplate, getKittyCompletionTemplate } = require("../utils/kittyEmailTemplates");
 
     const paymentIndex = userKitty.payments.findIndex(p => p._id.toString() === paymentId.toString());
     const installmentNo = paymentIndex + 1;
@@ -105,8 +105,27 @@ async function markPaymentAsPaid({
       emailHtml
     );
     console.log("📧 [markPaymentAsPaid] Confirmation email sent to:", userKitty.userId.email);
+
+    // If fully paid, also send completion email
+    if (unpaidPayments.length === 0) {
+      const completionEmailHtml = getKittyCompletionTemplate({
+        userName: userKitty.userId.name || 'Valued Customer',
+        planName: userKitty.planId.name,
+        totalPaid: totalPaid,
+        totalAmount: userKitty.totalAmount,
+        maturityAmount: userKitty.maturityAmount,
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+      });
+
+      await sendEmail(
+        userKitty.userId.email,
+        `Congratulations! Your Kitty Plan is Completed: ${userKitty.planId.name}`,
+        completionEmailHtml
+      );
+      console.log("📧 [markPaymentAsPaid] Completion email sent to:", userKitty.userId.email);
+    }
   } catch (emailErr) {
-    console.error("❌ [markPaymentAsPaid] Failed to send confirmation email:", emailErr.message);
+    console.error("❌ [markPaymentAsPaid] Failed to send email notifications:", emailErr.message);
   }
 
   try {

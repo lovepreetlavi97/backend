@@ -46,6 +46,13 @@ const siteSettingsSchema = new mongoose.Schema(
       footerLinks: { type: [linkSchema], default: [] },
     },
 
+    featureBadges: { 
+      type: [String], 
+      default: ['Hallmarked Jewellery', '15-Day Returns', 'Free Delivery', 'Certified Diamonds'] 
+    },
+
+    footerAbout: { type: String, default: "" },
+
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true },

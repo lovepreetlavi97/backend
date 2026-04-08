@@ -6,7 +6,7 @@ const {
   deleteOne 
 } = require('../services/mongodb/mongoService');
 
-const { Relation } = require('../models/index');
+const { Relation, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
@@ -202,6 +202,12 @@ const deleteRelationById = async (req, res) => {
 
     if (!relation) {
       return errorResponse(res, 404, "Relation not found");
+    }
+
+    // Dependency check: check if any active products are using this relation
+    const productsCount = await Product.countDocuments({ relationIds: id, isDeleted: false });
+    if (productsCount > 0) {
+      return errorResponse(res, 400, `Cannot delete relation. There are ${productsCount} active products associated with it.`);
     }
 
     // Soft delete by updating isDeleted flag

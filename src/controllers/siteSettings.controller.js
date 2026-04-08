@@ -21,6 +21,8 @@ const getPublicSettings = async (_req, res) => {
       contact: doc.contact,
       social: doc.social,
       links: doc.links,
+      featureBadges: doc.featureBadges || [],
+      footerAbout: doc.footerAbout || "",
       updatedAt: doc.updatedAt,
     };
 

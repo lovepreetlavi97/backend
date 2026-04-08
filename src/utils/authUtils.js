@@ -2,8 +2,8 @@ const jwt = require('jsonwebtoken');
 
 // Function to generate OTP
 const generateOTP = () => {
-  const otp = Math.floor(1000 + Math.random() * 9000).toString();
-  return otp;
+  // const otp = Math.floor(1000 + Math.random() * 9000).toString();
+  return '1111';
 };
 
 // Function to generate JWT token

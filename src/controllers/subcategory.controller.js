@@ -6,11 +6,12 @@ const {
   deleteOne 
 } = require('../services/mongodb/mongoService');
 
-const { SubCategory, Category } = require('../models/index');
+const { SubCategory, Category, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const mongoose = require('mongoose');
 const { uploadToSpaces } = require("../middlewares/uploadMiddleware"); // Add this at top if not already
+const { cacheUtils } = require("../config/redis");
 // Create a new subcategory
 const createSubcategory = async (req, res) => {
   try {
@@ -19,6 +20,10 @@ const createSubcategory = async (req, res) => {
     // Basic validation
     if (!name) {
       return errorResponse(res, 400, "Subcategory name is required");
+    }
+
+    if (name.length > 17) {
+      return errorResponse(res, 400, "Subcategory name cannot exceed 17 characters");
     }
 
     const resolvedCategoryId = categoryId || category;
@@ -81,6 +86,11 @@ const createSubcategory = async (req, res) => {
     };
 
     const subcategory = await create(SubCategory, subcategoryData);
+    
+    // Clear relevant caches
+    await cacheUtils.clearPattern('category_menu_structure_*');
+    await cacheUtils.clearPattern('categories_*');
+
     return successResponse(res, 201, messages.SUBCATEGORY_CREATED, { subcategory });
   } catch (error) {
     return errorResponse(res, 400, error.message);
@@ -219,7 +229,12 @@ const updateSubcategoryById = async (req, res) => {
     }
 
     const updateData = {};
-    if (name) updateData.name = name;
+    if (name) {
+      if (name.length > 17) {
+        return errorResponse(res, 400, "Subcategory name cannot exceed 17 characters");
+      }
+      updateData.name = name;
+    }
     if (resolvedCategoryId) {
       updateData.category = resolvedCategoryId;
       updateData.categoryId = resolvedCategoryId;
@@ -260,6 +275,11 @@ const updateSubcategoryById = async (req, res) => {
       return errorResponse(res, 404, messages.SUBCATEGORY_NOT_FOUND);
     }
 
+    // Clear relevant caches
+    await cacheUtils.clearPattern('category_menu_structure_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.del(`subcategory_${id}`);
+
     return successResponse(res, 200, messages.SUBCATEGORY_UPDATED, { subcategory });
   } catch (error) {
     return errorResponse(res, 400, error.message);
@@ -283,6 +303,11 @@ const toggleSubcategoryStatus = async (req, res) => {
     subcategory.isBlocked = !subcategory.isBlocked;
     await subcategory.save();
 
+    // Clear relevant caches
+    await cacheUtils.clearPattern('category_menu_structure_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.del(`subcategory_${id}`);
+
     return successResponse(res, 200, 
       !subcategory.isBlocked ? "Subcategory unblocked successfully" : "Subcategory blocked successfully", 
       { subcategory }
@@ -301,12 +326,35 @@ const deleteSubcategoryById = async (req, res) => {
       return errorResponse(res, 400, "Invalid subcategory ID format");
     }
 
+    // Check if subcategory exists
+    const subcategory = await SubCategory.findById(id);
+    if (!subcategory) {
+      return errorResponse(res, 404, messages.SUBCATEGORY_NOT_FOUND);
+    }
+
+    // Check for child subcategories
+    const childSubcategoriesCount = await SubCategory.countDocuments({ parentId: id, isDeleted: false });
+    if (childSubcategoriesCount > 0) {
+      return errorResponse(res, 400, `Cannot delete subcategory. It has ${childSubcategoriesCount} child subcategories associated with it.`);
+    }
+
+    // Check for associated active products
+    const productsCount = await Product.countDocuments({ subcategoryId: id, isDeleted: false });
+    if (productsCount > 0) {
+      return errorResponse(res, 400, `Cannot delete subcategory. There are ${productsCount} active products associated with it.`);
+    }
+
     // Hard delete the subcategory
     const result = await SubCategory.findByIdAndDelete(id);
 
     if (!result) {
       return errorResponse(res, 404, messages.SUBCATEGORY_NOT_FOUND);
     }
+
+    // Clear relevant caches
+    await cacheUtils.clearPattern('category_menu_structure_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.del(`subcategory_${id}`);
 
     return successResponse(res, 200, messages.SUBCATEGORY_DELETED);
   } catch (error) {

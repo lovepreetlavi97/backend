@@ -67,8 +67,8 @@ const createCategory = async (req, res) => {
 
     const category = await create(Category, categoryData);
 
-    // Clear cache after creating new category
-    await cacheUtils.delPattern('categories_*');
+    await cacheUtils.clearPattern('category_menu_structure_*');
+    await cacheUtils.clearPattern('categories_*');
 
     return successResponse(res, 201, messages.CATEGORY_CREATED, { category });
 
@@ -290,7 +290,8 @@ const updateCategoryById = async (req, res) => {
     
     // Clear related cache
     await cacheUtils.del(`category_${id}`);
-    await cacheUtils.delPattern('categories_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.clearPattern('category_menu_structure_*');
     
     return successResponse(res, 200, messages.CATEGORY_UPDATED, { category });
   } catch (error) {
@@ -320,7 +321,8 @@ const toggleCategoryStatus = async (req, res) => {
     
     // Clear related cache
     await cacheUtils.del(`category_${id}`);
-    await cacheUtils.delPattern('categories_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.clearPattern('category_menu_structure_*');
     
     return successResponse(res, 200, 
       !category.isBlocked ? "Category unblocked successfully" : "Category blocked successfully", 
@@ -359,7 +361,8 @@ const deleteCategoryById = async (req, res) => {
     
     // Clear related cache
     await cacheUtils.del(`category_${id}`);
-    await cacheUtils.delPattern('categories_*');
+    await cacheUtils.clearPattern('categories_*');
+    await cacheUtils.clearPattern('category_menu_structure_*');
     
     return successResponse(res, 200, messages.CATEGORY_DELETED);
 
@@ -372,61 +375,102 @@ const deleteCategoryById = async (req, res) => {
 // Get category menu structure (Nested Category → Subcategory → Child Subcategory)
 const getCategoryMenu = async (req, res) => {
   try {
-    const { metalId } = req.query;
+    const { metalId, _refresh } = req.query;
     const cacheKey = `category_menu_structure_${metalId || 'all'}`;
-    const cachedMenu = await cacheUtils.get(cacheKey);
-
-    if (cachedMenu) {
-      return successResponse(res, 200, "Category menu retrieved", cachedMenu);
+    
+    // Allow manual refresh via query param
+    if (_refresh !== 'true') {
+      const cachedMenu = await cacheUtils.get(cacheKey);
+      if (cachedMenu) {
+        return successResponse(res, 200, "Category menu retrieved", cachedMenu);
+      }
     }
 
-    // Fetch all active categories and subcategories
-    const query = { isBlocked: false, isDeleted: false };
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
-    }
-
-    const [categories, subcategories] = await Promise.all([
-      Category.find(query).lean(),
-      require('../models/subCategory.model').find(query).lean()
+    const isActiveQuery = { isBlocked: false, isDeleted: false };
+    
+    // 1. Fetch EVERYTHING active
+    const [allCategories, allSubcategories] = await Promise.all([
+      Category.find(isActiveQuery).lean(),
+      require('../models/subCategory.model').find(isActiveQuery).lean()
     ]);
 
-    // Create a map of subcategories by ID for easy lookup
+    let filteredSubcategories = allSubcategories;
+    let filteredCategories = allCategories;
+
+    // 2. If metalId is specified, filter subcategories first
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      const targetMetalId = new mongoose.Types.ObjectId(metalId);
+      
+      // Keep subcategories that match the metal
+      filteredSubcategories = allSubcategories.filter(sub => 
+        sub.metalIds && sub.metalIds.some(id => id.toString() === metalId)
+      );
+
+      // Keep categories that either match the metal themselves 
+      // OR have at least one subcategory that matches the metal (recursively)
+      const matchingCategoryIds = new Set();
+      
+      // a. Categories directly matching metal
+      allCategories.forEach(cat => {
+        if (cat.metalIds && cat.metalIds.some(id => id.toString() === metalId)) {
+          matchingCategoryIds.add(cat._id.toString());
+        }
+      });
+
+      // b. Categories matching via subcategories
+      filteredSubcategories.forEach(sub => {
+        const catId = sub.categoryId || sub.category;
+        if (catId) matchingCategoryIds.add(catId.toString());
+      });
+
+      filteredCategories = allCategories.filter(cat => matchingCategoryIds.has(cat._id.toString()));
+    }
+
+    // 3. Build subcategory mapping for hierarchy (only from filtered ones)
     const subcategoryMap = {};
-    subcategories.forEach(sub => {
+    filteredSubcategories.forEach(sub => {
       subcategoryMap[sub._id.toString()] = { ...sub, subcategories: [] };
     });
 
-    // Build subcategory hierarchy (Child Subcategory → Parent Subcategory)
+    // 4. Multi-level hierarchy building
     const rootSubcategories = [];
-    subcategories.forEach(sub => {
+    filteredSubcategories.forEach(sub => {
       const subObj = subcategoryMap[sub._id.toString()];
-      if (sub.parentId) {
-        const parent = subcategoryMap[sub.parentId.toString()];
-        if (parent) {
-          parent.subcategories.push(subObj);
-        }
+      if (sub.parentId && subcategoryMap[sub.parentId.toString()]) {
+        subcategoryMap[sub.parentId.toString()].subcategories.push(subObj);
       } else {
         rootSubcategories.push(subObj);
       }
     });
 
-    // Attach root subcategories to their respective categories
-    const menu = categories.map(cat => {
-      const catSubcategories = rootSubcategories.filter(sub => 
-        sub.categoryId && sub.categoryId.toString() === cat._id.toString()
-      );
+    // 5. Final Tree: Category → rootSubcategory → [Nested Subcategories]
+    const menu = filteredCategories.map(cat => {
+      const catIdStr = cat._id.toString();
+      const catSubcategories = rootSubcategories.filter(sub => {
+        const subCatId = sub.categoryId || sub.category;
+        return subCatId && subCatId.toString() === catIdStr;
+      });
+
       return {
         ...cat,
         subcategories: catSubcategories
       };
     });
 
-    await cacheUtils.set(cacheKey, menu, 3600); // Cache for 1 hour
+    // Filter out categories that ended up with no children IF it didn't match the metal itself
+    // (Optional: depending on luxury expectations, we might want to hide empty parent categories)
+    const finalMenu = menu.filter(m => 
+      m.subcategories.length > 0 || 
+      (metalId && m.metalIds && m.metalIds.some(id => id.toString() === metalId)) ||
+      !metalId
+    );
 
-    return successResponse(res, 200, "Category menu retrieved", menu);
+    // Cache the result for better performance
+    await cacheUtils.set(cacheKey, finalMenu, 3600); 
+
+    return successResponse(res, 200, "Category menu structure retrieved", finalMenu);
   } catch (error) {
-    console.error("Get category menu error:", error);
+    console.error("Get category menu structure error:", error);
     return errorResponse(res, 500, error.message || "Failed to retrieve category menu");
   }
 };

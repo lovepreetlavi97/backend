@@ -33,19 +33,37 @@ const uploadMultipleImagesMulter = multer({
 // Upload a single file buffer to S3/Spaces
 const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') => {
   const uniqueName = `${uuidv4()}_${fileName}`;
-  const key = `${folder}/${uniqueName}`;
+  let key = `${folder}/${uniqueName}`;
+  let finalBuffer = fileBuffer;
+  let finalMimeType = mimeType;
+
+  // Auto-compress and convert images to webp to make the website super fast and clean
+  try {
+    if (mimeType.startsWith('image/') && !mimeType.includes('gif')) {
+      const sharp = require('sharp');
+      finalBuffer = await sharp(fileBuffer)
+        .resize({ width: 1920, withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+        
+      finalMimeType = 'image/webp';
+      key = key.replace(/\.[^/.]+$/, "") + ".webp"; 
+    }
+  } catch (error) {
+    console.warn("Image compression failed, uploading original:", error.message);
+  }
 
   const upload = new Upload({
     client: s3Client,
     params: {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: key,
-      Body: fileBuffer,
-      ContentType: mimeType,
+      Body: finalBuffer,
+      ContentType: finalMimeType,
       // ACL: "public-read",
     },
   });
-console.log("Uploading to Spaces with key:", key,upload);
+console.log("Uploading to Spaces with key:", key);
 // return
   await upload.done();
   return key;

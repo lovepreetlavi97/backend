@@ -29,7 +29,9 @@ const createBanner = async (req, res) => {
       endDate,
       status = 'active',
       position,
-      metalIds
+      metalIds,
+      buttonText,
+      subtitle
     } = req.body;
     console.log(`Creating banner with metalIds: "${metalIds}" (type: ${typeof metalIds})`);
 
@@ -63,6 +65,8 @@ const createBanner = async (req, res) => {
       endDate: new Date(endDate),
       status,
       metalIds: parsedMetalIds,
+      buttonText,
+      subtitle
     };
 
     // Handle position
@@ -159,6 +163,7 @@ const getAllBanners = async (req, res) => {
 
     // Execute query
     const banners = await Banner.find(query)
+      .populate('metalIds', 'name slug colorCode')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit))
@@ -277,7 +282,7 @@ const updateBannerById = async (req, res) => {
 };
 
 /**
- * Delete a banner by ID (soft delete)
+ * Delete a banner by ID (Hard delete to avoid unique slug collisions)
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -287,20 +292,15 @@ const deleteBannerById = async (req, res) => {
 
     // Check if banner exists
     const banner = await Banner.findOne({ 
-      _id: id,
-      isDeleted: false
+      _id: id
     });
 
     if (!banner) {
       return errorResponse(res, 404, "Banner not found");
     }
 
-    // Soft delete by updating isDeleted flag
-    await findAndUpdate(
-      Banner,
-      { _id: id },
-      { isDeleted: true }
-    );
+    // Hard delete completely from the database
+    await Banner.findByIdAndDelete(id);
 
     // Clear cache
     await cacheUtils.delPattern('banners_*');

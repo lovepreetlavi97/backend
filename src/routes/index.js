@@ -47,6 +47,7 @@ router.use("/design-request", designRequestRoutes); // Plug Design Requests
 router.use("/admin/security-alerts", activityLogsRoute); // Plug Security Alerts
 router.use("/admin/dashboard", dashboardRoute);
 router.use("/admin/notifications", notificationRoute);
+router.use("/admin/site-settings", adminSiteSettingsRoutes);
 router.use("/admin", adminRoute);
 router.use("/superadmin", superAdminRoute);
 router.use("/categories", categoryRoute);
@@ -75,7 +76,6 @@ router.use("/payment", paymentRoute);
 router.use("/curated-collections", curatedCollectionRoute);
 router.use("/kitty", kittyRoutes);
 router.use("/settings", siteSettingsRoutes);
-router.use("/admin/site-settings", adminSiteSettingsRoutes);
 // router.use("/webhook", webhookRoute);
 router.use("/returns", returnRequestRoute);
 router.use("/user/gift", giftRoute);

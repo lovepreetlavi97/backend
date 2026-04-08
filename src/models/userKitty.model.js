@@ -168,7 +168,7 @@ userKittySchema.virtual('overduePayments').get(function () {
 
 // Virtual for next payment amount
 userKittySchema.virtual('nextPaymentAmount').get(function () {
-  if (this.status !== 'active') return 0;
+  if (this.status !== 'active' && this.status !== 'pending') return 0;
   const nextPayment = this.payments.find(p => p.status === 'pending');
   return nextPayment ? nextPayment.amount : 0;
 });
@@ -269,6 +269,7 @@ userKittySchema.methods.markAsCompleted = function () {
   this.status = 'completed';
   this.completedDate = new Date();
   this.maturityPaidDate = new Date();
+  this.nextPaymentDate = null;
   return this.save();
 };
 

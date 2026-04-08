@@ -160,7 +160,18 @@ const updateKittyPlan = async (req, res) => {
       return errorResponse(res, 400, messages.INVALID_ID);
     }
 
-    const plan = await KittyPlan.findByIdAndUpdate(
+    const plan = await KittyPlan.findById(planId);
+    if (!plan) {
+      return errorResponse(res, 404, 'Kitty plan not found');
+    }
+
+    // Check if there are ANY enrollments (as requested by user)
+    const totalEnrollments = await UserKitty.countDocuments({ planId });
+    if (totalEnrollments > 0) {
+      return errorResponse(res, 400, 'Cannot update plan with enrolled users');
+    }
+
+    const updatedPlan = await KittyPlan.findByIdAndUpdate(
       planId,
       updateData,
       { new: true, runValidators: true }
@@ -197,14 +208,10 @@ const deleteKittyPlan = async (req, res) => {
       return errorResponse(res, 404, 'Kitty plan not found');
     }
 
-    // Check if there are active enrollments
-    const activeEnrollments = await UserKitty.countDocuments({
-      planId,
-      status: { $in: ['active', 'paused'] }
-    });
-
-    if (activeEnrollments > 0) {
-      return errorResponse(res, 400, 'Cannot delete plan with active enrollments');
+    // Check if there are ANY enrollments (as requested by user)
+    const totalEnrollments = await UserKitty.countDocuments({ planId });
+    if (totalEnrollments > 0) {
+      return errorResponse(res, 400, 'Cannot delete plan with enrolled users');
     }
 
     await KittyPlan.findByIdAndDelete(planId);
@@ -726,26 +733,31 @@ const seedDummyKittyData = async (req, res) => {
             const startDate = new Date();
             const endDate = new Date(startDate);
             endDate.setMonth(endDate.getMonth() + plan.duration);
-            const nextPaymentDate = new Date(startDate);
-            nextPaymentDate.setDate(nextPaymentDate.getDate() + 30);
+
+            // Generate Full Installment Schedule for Seeding
+            const payments = [];
+            for (let i = 0; i < plan.duration; i++) {
+              const dueDate = new Date(startDate);
+              dueDate.setMonth(dueDate.getMonth() + i);
+              payments.push({
+                amount: plan.monthlyAmount,
+                dueDate: dueDate,
+                status: "pending",
+              });
+            }
 
             await UserKitty.create({
               planId: plan._id,
               userId: u._id,
               startDate,
               endDate,
-              nextPaymentDate,
+              nextPaymentDate: startDate,
               monthlyAmount: plan.monthlyAmount,
               totalAmount: plan.totalAmount,
               maturityAmount: plan.maturityAmount,
               remainingAmount: plan.totalAmount,
-              payments: [
-                {
-                  amount: plan.monthlyAmount,
-                  dueDate: nextPaymentDate,
-                  status: "pending",
-                },
-              ],
+              status: "pending",
+              payments
             });
 
             createdEnrollments += 1;
@@ -848,8 +860,9 @@ const getAllKittyTransactions = async (req, res) => {
       }
     ]);
 
-    const data = transactions[0].data;
-    const total = transactions[0].totalCount[0]?.count || 0;
+    const result = transactions[0] || { data: [], totalCount: [] };
+    const data = result.data;
+    const total = result.totalCount[0]?.count || 0;
 
     return successResponse(res, 200, messages.DATA_FETCHED, {
       transactions: data,
@@ -887,6 +900,35 @@ const updateKittyEnrollmentStatus = async (req, res) => {
     // Use model methods for business logic
     if (status === 'completed') {
       await kitty.markAsCompleted();
+      // Send completion email
+      try {
+        const populatedKitty = await UserKitty.findById(kittyId)
+          .populate('userId', 'name email')
+          .populate('planId', 'name');
+
+        if (populatedKitty && populatedKitty.userId && populatedKitty.userId.email) {
+          const { sendEmail } = require("../services/notifications/email.service");
+          const { getKittyCompletionTemplate } = require("../utils/kittyEmailTemplates");
+
+          const emailHtml = getKittyCompletionTemplate({
+            userName: populatedKitty.userId.name || 'Valued Customer',
+            planName: populatedKitty.planId.name,
+            totalPaid: populatedKitty.totalPaid,
+            totalAmount: populatedKitty.totalAmount,
+            maturityAmount: populatedKitty.maturityAmount,
+            date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+          });
+
+          await sendEmail(
+            populatedKitty.userId.email,
+            `Congratulations! Your Kitty Plan is Completed: ${populatedKitty.planId.name}`,
+            emailHtml
+          );
+          console.log("📧 [Admin] Completion email sent to:", populatedKitty.userId.email);
+        }
+      } catch (emailErr) {
+        console.error("❌ [Admin] Failed to send completion email:", emailErr.message);
+      }
     } else if (status === 'cancelled') {
       await kitty.cancelKitty(remarks || "Cancelled by Admin");
       // Also cancel any pending payments

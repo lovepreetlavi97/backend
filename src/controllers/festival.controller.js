@@ -331,6 +331,12 @@ const deleteFestivalById = async (req, res) => {
       return errorResponse(res, 404, "Festival not found");
     }
 
+    // Dependency check: check if any active products are using this festival
+    const productsCount = await Product.countDocuments({ festivalIds: id, isDeleted: false });
+    if (productsCount > 0) {
+      return errorResponse(res, 400, `Cannot delete festival. There are ${productsCount} active products associated with it.`);
+    }
+
     // Soft delete by setting isDeleted to true
     await findAndUpdate(Festival, { _id: id }, { isDeleted: true });
 

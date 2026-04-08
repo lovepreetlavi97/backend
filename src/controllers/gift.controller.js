@@ -106,8 +106,18 @@ const updateGift = async (req, res) => {
 const deleteGift = async (req, res) => {
   try {
     const { id } = req.params;
-    const gift = await Gift.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+
+    // Check if gift exists
+    const gift = await Gift.findOne({ _id: id, isDeleted: false });
     if (!gift) return errorResponse(res, 404, "Gift not found");
+
+    // Dependency check: check if any active products are using this gift in attributes.giftIds
+    const productsCount = await Product.countDocuments({ "attributes.giftIds": id, isDeleted: false });
+    if (productsCount > 0) {
+      return errorResponse(res, 400, `Cannot delete gift. There are ${productsCount} active products associated with it.`);
+    }
+
+    await Gift.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     return successResponse(res, 200, "Gift deleted successfully");
   } catch (error) {
     return errorResponse(res, 500, "Error deleting gift");
