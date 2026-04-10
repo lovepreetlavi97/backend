@@ -287,40 +287,62 @@ const createProduct = async (req, res) => {
   }
 };
 
-// Get all products (Cursor-based Pagination for High Performance)
+// Get all products (Supports both Cursor-based and Page-based Pagination)
 const getAllProducts = async (req, res) => {
   try {
     const {
       limit = 12,
+      page = 1,
       lastId, // Cursor
       occasion,
       color,
       material,
       gender,
       subcategoryId,
+      categoryId,
       minPrice,
       maxPrice,
       search,
       style,
       collectionId,
       metalId,
+      includeBlocked = "true" // Default to true for admin
     } = req.query;
 
     // STEP 1: BUILD FILTER QUERY
     const filter = {
       isDeleted: false,
-      isBlocked: false,
-      ...(occasion && { "attributes.occasions": occasion }),
-      ...(color && { "attributes.color": color }),
-      ...(material && { "attributes.material": material }),
-      ...(gender && { "attributes.gender": gender }),
-      ...(subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId) && { subcategoryId: new mongoose.Types.ObjectId(subcategoryId) }),
-      ...(minPrice && { actualPrice: { $gte: parseFloat(minPrice) } }),
-      ...(maxPrice && { actualPrice: { $lte: parseFloat(maxPrice) } }),
-      ...(style && { "attributes.style": style }),
-      ...(collectionId && mongoose.Types.ObjectId.isValid(collectionId) && { collectionIds: new mongoose.Types.ObjectId(collectionId) }),
-      ...(metalId && mongoose.Types.ObjectId.isValid(metalId) && { metalIds: { $in: [new mongoose.Types.ObjectId(metalId)] } })
     };
+
+    if (includeBlocked !== "true") {
+      filter.isBlocked = false;
+    }
+
+    if (occasion) filter["attributes.occasions"] = occasion;
+    if (color) filter["attributes.color"] = color;
+    if (material) filter["attributes.material"] = material;
+    if (gender) filter["attributes.gender"] = gender;
+    
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      filter.categoryId = new mongoose.Types.ObjectId(categoryId);
+    }
+    
+    if (subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId)) {
+      filter.subcategoryId = new mongoose.Types.ObjectId(subcategoryId);
+    }
+    
+    if (minPrice) filter.actualPrice = { ...filter.actualPrice, $gte: parseFloat(minPrice) };
+    if (maxPrice) filter.actualPrice = { ...filter.actualPrice, $lte: parseFloat(maxPrice) };
+    
+    if (style) filter["attributes.style"] = style;
+    
+    if (collectionId && mongoose.Types.ObjectId.isValid(collectionId)) {
+      filter.collectionIds = new mongoose.Types.ObjectId(collectionId);
+    }
+    
+    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
+      filter.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    }
 
     if (search) {
       filter.$or = [
@@ -329,52 +351,55 @@ const getAllProducts = async (req, res) => {
       ];
     }
 
-    // STEP 2: APPLY CURSOR (using _id for constant time pagination)
+    // STEP 2: APPLY PAGINATION (Page-based or Cursor-based)
+    let products;
+    let total;
+
     if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
+      // Cursor-based (for frontend storefront)
       filter._id = { $lt: new mongoose.Types.ObjectId(lastId) };
+      products = await Product.find(filter)
+        .sort({ _id: -1 })
+        .limit(parseInt(limit))
+        .select("name slug image actualPrice discountedPrice averageRating isPriceFixed priceRuleId weight makingCharges categoryId metalIds stock isBlocked")
+        .populate("categoryId", "name")
+        .populate("metalIds", "name")
+        .lean();
+      
+      total = await Product.countDocuments(filter);
+    } else {
+      // Page-based (for admin panel)
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      total = await Product.countDocuments(filter);
+      
+      products = await Product.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .select("name slug image actualPrice discountedPrice averageRating isPriceFixed priceRuleId weight makingCharges categoryId metalIds stock isBlocked")
+        .populate("categoryId", "name")
+        .populate("metalIds", "name")
+        .lean();
     }
 
-    // Try to get from cache first (optional, but good for speed)
-    const cacheKey = `products_cursor_${lastId || "initial"}_${limit}_${JSON.stringify(filter)}`;
-    const cachedData = await cacheUtils.get(cacheKey);
-    if (cachedData) {
-      return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, cachedData);
-    }
-
-    // STEP 3: QUERY
-    const products = await Product.find(filter)
-      .sort({ _id: -1 }) // Important for consistent cursor
-      .limit(parseInt(limit))
-      .select("name slug image actualPrice discount averageRating isPriceFixed priceRuleId weight makingCharges") // Added weight/charges for potential read-time compute
-      .lean();
-
-    // Optional: Dynamic Price Calculation for those without fixed prices
-    // This ensures consistency even if select is limited.
-    for (let product of products) {
-      if (!product.isPriceFixed && product.priceRuleId) {
-        // Note: priceRuleId isn't populated here as per "no heavy populate" rule.
-        // If frontend needs it, they should fetch it or we should store pre-calculated price.
-      }
-    }
-
-    // STEP 4: NEXT CURSOR
-    const nextCursor = products.length === parseInt(limit)
-      ? products[products.length - 1]._id
-      : null;
-
+    // Step 4: Result structure
+    const totalPages = Math.ceil(total / parseInt(limit));
     const result = {
-      data: products,
-      nextCursor: nextCursor,
+      products,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: totalPages
+      },
+      nextCursor: products.length === parseInt(limit) ? products[products.length - 1]._id : null,
       hasMore: products.length === parseInt(limit)
     };
-
-    // Cache the result for 5 minutes
-    await cacheUtils.set(cacheKey, result, 300);
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
 
   } catch (error) {
-    console.error("Error fetching products (cursor):", error);
+    console.error("Error fetching products:", error);
     return errorResponse(res, 500, messages.PRODUCT_FETCH_ERROR, {
       error: error.message,
     });
