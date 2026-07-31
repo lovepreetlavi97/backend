@@ -4,15 +4,6 @@ const { DeleteObjectCommand, DeleteObjectsCommand } = require("@aws-sdk/client-s
 const { s3Client } = require("../config/s3Client");
 const { v4: uuidv4 } = require("uuid");
 
-// Accept images & videos only
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.match(/(image|video)\/(jpeg|jpg|png|gif|mp4|webp)/)) {
-    cb(null, true);
-  } else {
-    cb(new Error("❌ Invalid file type."), false);
-  }
-};
-
 // Multer memory storage with file limits
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -24,6 +15,14 @@ const upload = multer({
   fileFilter
 });
 
+// Accept images & videos only
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.match(/(image|video)\/(jpeg|jpg|png|gif|mp4|webp)/)) {
+    cb(null, true);
+  } else {
+    cb(new Error("❌ Invalid file type."), false);
+  }
+};
 
 // Middleware: upload single image under field name `image`
 const uploadSingleImage = upload.single("image");
@@ -53,9 +52,9 @@ const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') =
         .resize({ width: 1920, withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
-        
+
       finalMimeType = 'image/webp';
-      key = key.replace(/\.[^/.]+$/, "") + ".webp"; 
+      key = key.replace(/\.[^/.]+$/, "") + ".webp";
     }
   } catch (error) {
 
@@ -72,7 +71,7 @@ const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') =
     },
   });
 
-// return
+  // return
   await upload.done();
   return key;
 };
