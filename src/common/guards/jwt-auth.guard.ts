@@ -1,30 +1,46 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
-import { getEnvConfig } from '../../config/env.config';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { AuthService } from '../../modules/auth/auth.service';
+import { RedisService } from '../../shared/redis/redis.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly jwtSecret: string;
+  constructor(
+    private readonly authService: AuthService,
+    private readonly redisService: RedisService,
+  ) {}
 
-  constructor() {
-    const config = getEnvConfig();
-    this.jwtSecret = config.jwtSecret;
-  }
-
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or malformed Authorization header.');
+    let token: string | null = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (request.cookies && request.cookies.accessToken) {
+      token = request.cookies.accessToken;
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!token) {
+      throw new UnauthorizedException('Authentication token missing or invalid.');
+    }
+
+    // Hardened Security: Check Redis Token Blacklist
+    const isBlacklisted = await this.redisService.get(`blacklist_${token}`);
+    if (isBlacklisted) {
+      throw new UnauthorizedException('Token has been revoked or logged out.');
+    }
+
     try {
-      const decoded = jwt.verify(token, this.jwtSecret);
+      const decoded = this.authService.verifyToken(token);
       request.user = decoded;
       return true;
-    } catch (err) {
+    } catch (e) {
       throw new UnauthorizedException('Invalid or expired authentication token.');
     }
   }

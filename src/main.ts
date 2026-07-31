@@ -1,9 +1,11 @@
+process.env.UV_THREADPOOL_SIZE = '64';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { getEnvConfig } from './config/env.config';
 
 async function bootstrap() {
@@ -12,13 +14,17 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
-  app.enableCors({ origin: '*', credentials: true });
+  app.use(cookieParser());
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
     })
   );
 
@@ -27,8 +33,9 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('MYG (Guru Jewellers) Enterprise REST API')
     .setDescription('Enterprise NestJS API for E-Commerce, Gold Kitty Savings & Payment Processing')
-    .setVersion('1.0.0')
+    .setVersion('2.0.0')
     .addBearerAuth()
+    .addCookieAuth('accessToken')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

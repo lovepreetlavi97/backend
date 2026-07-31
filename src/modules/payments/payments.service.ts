@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { getEnvConfig } from '../../config/env.config';
@@ -34,12 +34,31 @@ export class PaymentsService {
       throw new BadRequestException('Invalid payment signature verification failed.');
     }
 
+    const existingOrder = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { transactions: true },
+    });
+
+    if (!existingOrder) {
+      throw new NotFoundException(`Order '${orderId}' not found.`);
+    }
+
+    // Payment Idempotency Check
+    if (existingOrder.paymentStatus === 'PAID') {
+      return {
+        message: 'Payment already processed successfully (Idempotent call).',
+        order: existingOrder,
+        transaction: existingOrder.transactions[0] || null,
+      };
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.update({
         where: { id: orderId },
         data: {
           paymentStatus: 'PAID',
           orderStatus: 'PROCESSING',
+          razorpayOrderId,
         },
       });
 

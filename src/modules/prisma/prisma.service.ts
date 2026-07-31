@@ -4,10 +4,17 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+      console.log('🐘 PostgreSQL Database connected successfully via Prisma.');
+    } catch (err: any) {
+      console.warn('⚠️ PostgreSQL connection notice:', err.message);
+    }
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    try {
+      await this.$disconnect();
+    } catch (err) {}
   }
 }

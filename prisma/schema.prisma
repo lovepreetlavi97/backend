@@ -53,10 +53,28 @@ model User {
   reviews         Review[]
   sessions        Session[]
   designRequests  DesignRequest[]
+  notifications   Notification[]
+  grievances      Grievance[]
 
   @@index([email])
   @@index([phone])
   @@map("users")
+}
+
+model Admin {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  email       String    @unique
+  password    String
+  role        Role      @default(ADMIN)
+  permissions Json?     @default("[]")
+  isActive    Boolean   @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([email])
+  @@map("admins")
 }
 
 model Session {
@@ -103,8 +121,9 @@ model SubCategory {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   products    Product[]
+
 
   @@index([categoryId])
   @@index([slug])
@@ -170,6 +189,8 @@ model Product {
   @@index([categoryId])
   @@index([subcategoryId])
   @@index([isPublished, isDeleted])
+  @@index([categoryId, isPublished, isDeleted])
+  @@index([subcategoryId, isPublished, isDeleted])
   @@map("products")
 }
 
@@ -302,4 +323,64 @@ model DesignRequest {
 
   @@index([userId])
   @@map("design_requests")
+}
+
+model Banner {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  image       String
+  link        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("banners")
+}
+
+model Contact {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  email       String
+  subject     String
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@map("contacts")
+}
+
+model Grievance {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  subject     String
+  description String
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("grievances")
+}
+
+model Notification {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  title       String
+  message     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model PromoCode {
+  id              String   @id @default(uuid()) @db.Uuid
+  code            String   @unique
+  discountPercent Decimal  @db.Decimal(5, 2)
+  maxDiscount     Decimal? @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  validUntil      DateTime
+  createdAt       DateTime @default(now())
+
+  @@map("promo_codes")
 }
