@@ -279,7 +279,7 @@ router.post('/logout', adminOrSuperAdminAuth, adminController.logoutAdmin);
  *       404:
  *         description: No orders found
  */
-router.get('/orders/export', adminOrSuperAdminAuth, orderExportController.exportOrdersToExcel);
+router.get('/orders/export', adminOrSuperAdminAuth, checkPermission('manageOrders'), orderExportController.exportOrdersToExcel);
 
 /**
 * @swagger
@@ -334,7 +334,7 @@ router.get('/orders/export', adminOrSuperAdminAuth, orderExportController.export
  *       404:
  *         description: No products found
  */
-router.get('/products/export', adminOrSuperAdminAuth, productExportController.exportProductsToExcel);
+router.get('/products/export', adminOrSuperAdminAuth, checkPermission('manageProducts'), productExportController.exportProductsToExcel);
 
 /**
 * @swagger
@@ -392,7 +392,7 @@ router.get('/products/export', adminOrSuperAdminAuth, productExportController.ex
  *       404:
  *         description: No users found
  */
-router.get('/users/export', adminOrSuperAdminAuth, userExportController.exportUsersToExcel);
+router.get('/users/export', adminOrSuperAdminAuth, checkPermission('manageUsers'), userExportController.exportUsersToExcel);
 
 /**
 * @swagger

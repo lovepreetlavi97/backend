@@ -1,105 +1,74 @@
-const mongoose = require('mongoose');
 const { successResponse, errorResponse } = require('../utils/responseUtil');
 const { Notification } = require('../models');
+const { isValidId } = require('../utils/idUtils');
+const { Op } = require('sequelize');
 
-// GET /admin/notifications
-// Query params: page, limit, type, isRead, startDate, endDate, search
 const getAdminNotifications = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      type,
-      isRead,
-      startDate,
-      endDate,
-      search
-    } = req.query;
+    const { page = 1, limit = 10, type, isRead, search } = req.query;
+    const adminId = req.user.id || req.user._id;
 
-    const query = { adminId: new mongoose.Types.ObjectId(req.user._id) };
-
-    if (type) query.type = type;
-    if (isRead === 'true') query.isRead = true;
-    if (isRead === 'false') query.isRead = false;
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) {
-        const endDateObj = new Date(endDate);
-        endDateObj.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = endDateObj;
-      }
-    }
-
+    const where = {};
+    if (type) where.type = type;
+    if (isRead === 'true') where.isRead = true;
+    if (isRead === 'false') where.isRead = false;
     if (search) {
-      query.$or = [
-        { message: { $regex: search, $options: 'i' } },
-        { orderNumber: { $regex: search, $options: 'i' } }
-      ];
+      where.message = { [Op.like]: `%${search}%` };
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const parsedLimit = parseInt(limit);
+    const parsedPage = parseInt(page);
+    const offset = (parsedPage - 1) * parsedLimit;
 
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    const total = await Notification.countDocuments(query);
+    const { count, rows: notifications } = await Notification.findAndCountAll({
+      where,
+      limit: parsedLimit,
+      offset,
+      order: [['id', 'DESC']]
+    });
 
     return successResponse(res, 200, 'Notifications retrieved successfully', {
       notifications,
       pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
+        total: count,
+        page: parsedPage,
+        limit: parsedLimit,
+        pages: Math.ceil(count / parsedLimit)
       }
     });
   } catch (e) {
-    console.error('Get Admin Notifications Error:', e);
     return errorResponse(res, 500, e.message || 'Failed to retrieve notifications');
   }
 };
 
-// PATCH /admin/notifications/:id/read
 const markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, 'Invalid notification ID');
     }
 
-    const notification = await Notification.findOneAndUpdate(
-      { _id: id, adminId: req.user._id },
-      { $set: { isRead: true, readAt: new Date() } },
-      { new: true }
-    );
-
+    const notification = await Notification.findByPk(id);
     if (!notification) {
       return errorResponse(res, 404, 'Notification not found');
     }
 
+    await notification.update({ isRead: true, readAt: new Date() });
     return successResponse(res, 200, 'Notification marked as read', { notification });
   } catch (e) {
-    console.error('Mark Notification Read Error:', e);
     return errorResponse(res, 500, e.message || 'Failed to mark notification as read');
   }
 };
 
-// PATCH /admin/notifications/read-all
 const markAllNotificationsRead = async (req, res) => {
   try {
-    const result = await Notification.updateMany(
-      { adminId: req.user._id, isRead: false },
-      { $set: { isRead: true, readAt: new Date() } }
+    const [updated] = await Notification.update(
+      { isRead: true, readAt: new Date() },
+      { where: { isRead: false } }
     );
 
-    return successResponse(res, 200, 'All notifications marked as read', { updated: result.modifiedCount });
+    return successResponse(res, 200, 'All notifications marked as read', { updated });
   } catch (e) {
-    console.error('Mark All Notifications Read Error:', e);
     return errorResponse(res, 500, e.message || 'Failed to mark notifications as read');
   }
 };

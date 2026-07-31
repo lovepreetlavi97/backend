@@ -4,7 +4,7 @@ const {
   findMany,
   findAndUpdate,
   deleteOne
-} = require('../services/mongodb/mongoService');
+} = require('../services/mysql/mysqlService');
 
 const { Blog } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
@@ -14,7 +14,7 @@ const messages = require("../utils/messages");
 const createBlog = async (req, res) => {
   try {
     const { title, content } = req.body;
-    const authorId = req.user._id;
+    const authorId = req.user ? (req.user.id || req.user._id) : null;
     const image = req.file ? req.file.location : null;
 
     if (!title || !content) {
@@ -51,7 +51,7 @@ const getAllBlogs = async (req, res) => {
 const getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    const blog = await findOne(Blog, { _id: id });
+    const blog = await findOne(Blog, { id });
 
     if (!blog) {
       return errorResponse(res, 404, messages.BLOG_NOT_FOUND);
@@ -74,7 +74,7 @@ const updateBlogById = async (req, res) => {
     const updateData = { title, content };
     if (image) updateData.image = image;
 
-    const blog = await findAndUpdate(Blog, { _id: id }, updateData);
+    const blog = await findAndUpdate(Blog, { id }, updateData);
 
     if (!blog) {
       return errorResponse(res, 404, messages.BLOG_NOT_FOUND);
@@ -91,9 +91,9 @@ const updateBlogById = async (req, res) => {
 const deleteBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await deleteOne(Blog, { _id: id });
+    const result = await deleteOne(Blog, { id });
 
-    if (result.deletedCount === 0) {
+    if (!result) {
       return errorResponse(res, 404, messages.BLOG_NOT_FOUND);
     }
 

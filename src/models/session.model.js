@@ -1,31 +1,26 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const sessionSchema = new mongoose.Schema({
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    ip: {
-        type: String,
-        default: null
-    },
-    userAgent: {
-        type: String,
-        default: null
-    },
-    refreshToken: {
-        type: String,
-        required: true
-    },
-    lastActivity: {
-        type: Date,
-        default: Date.now
-    }
-}, { timestamps: true });
+const Session = sequelize.define('Session', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  token: { type: DataTypes.TEXT, allowNull: false },
+  device: { type: DataTypes.STRING, allowNull: true },
+  ip: { type: DataTypes.STRING, allowNull: true },
+  userAgent: { type: DataTypes.TEXT, allowNull: true },
+  expiresAt: { type: DataTypes.DATE, allowNull: false }
+}, {
+  tableName: 'sessions',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
+});
 
-// Indexing for performance and automatic expiration if needed
-sessionSchema.index({ userId: 1 });
-sessionSchema.index({ refreshToken: 1 });
+Session.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
-module.exports = mongoose.model('UserSession', sessionSchema);
+module.exports = Session;

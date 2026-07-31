@@ -7,7 +7,7 @@ const {
   findByEmail,
   updatePassword,
   verifyPassword,
-} = require("../services/mongodb/mongoService");
+} = require("../services/mysql/mysqlService");
 const jwt = require("jsonwebtoken");
 const { Admin, User } = require("../models/index");
 const { hashPassword } = require("../utils/bcrypt");
@@ -37,14 +37,16 @@ const loginAdmin = async (req, res) => {
       return errorResponse(res, 401, "Invalid password");
     }
 
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET_KEY, {
+    const adminId = admin.id || admin._id;
+    const token = jwt.sign({ id: adminId }, process.env.JWT_SECRET_KEY, {
       expiresIn: "7d",
     });
 
     // Update admin with token and last login time
-    admin.token = token;
-    admin.lastLoginAt = new Date();
-    await admin.save();
+    await findAndUpdate(Admin, { id: adminId }, {
+      token,
+      lastLoginAt: new Date()
+    });
 
     // Cache the admin for authentication
     await cacheUtils.set(
@@ -56,7 +58,8 @@ const loginAdmin = async (req, res) => {
     return successResponse(res, 200, "Login successful", {
       token,
       admin: {
-        id: admin._id,
+        id: adminId,
+        _id: adminId,
         name: admin.name,
         email: admin.email,
         role: admin.role,
@@ -64,7 +67,7 @@ const loginAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Admin login error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -75,15 +78,16 @@ const logoutAdmin = async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     // Clear token from the admin
-    admin.token = null;
-    await admin.save();
+    if (admin) {
+      await findAndUpdate(Admin, { id: admin.id || admin._id }, { token: null });
+    }
 
     // Clear from Redis cache
     await cacheUtils.del(`auth_${token}`);
 
     return successResponse(res, 200, "Logout successful");
   } catch (error) {
-    console.error("Admin logout error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -102,14 +106,15 @@ const createAdmin = async (req, res) => {
 
     return successResponse(res, 201, "Admin created successfully", {
       admin: {
-        id: createdAdmin._id,
+        id: createdAdmin.id || createdAdmin._id,
+        _id: createdAdmin.id || createdAdmin._id,
         name: createdAdmin.name,
         email: createdAdmin.email,
         role: createdAdmin.role,
       },
     });
   } catch (error) {
-    console.error("Create admin error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -121,7 +126,7 @@ const getAllAdmins = async (req, res) => {
       admins,
     });
   } catch (error) {
-    console.error("Get all admins error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -130,7 +135,7 @@ const getAdminById = async (req, res) => {
   try {
     const admin = await findOne(
       Admin,
-      { _id: req.params.id },
+      { id: req.params.id },
       { password: 0, token: 0 }
     );
     if (!admin) {
@@ -138,7 +143,7 @@ const getAdminById = async (req, res) => {
     }
     return successResponse(res, 200, "Admin retrieved successfully", { admin });
   } catch (error) {
-    console.error("Get admin by ID error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -156,7 +161,7 @@ const updateAdminById = async (req, res) => {
       updateData.password = await hashPassword(updateData.password);
     }
 
-    const updatedAdmin = await findAndUpdate(Admin, { _id: id }, updateData);
+    const updatedAdmin = await findAndUpdate(Admin, { id }, updateData);
     if (!updatedAdmin) {
       return errorResponse(res, 404, "Admin not found");
     }
@@ -169,7 +174,8 @@ const updateAdminById = async (req, res) => {
 
     return successResponse(res, 200, "Admin updated successfully", {
       admin: {
-        id: updatedAdmin._id,
+        id: updatedAdmin.id || updatedAdmin._id,
+        _id: updatedAdmin.id || updatedAdmin._id,
         name: updatedAdmin.name,
         email: updatedAdmin.email,
         role: updatedAdmin.role,
@@ -177,7 +183,7 @@ const updateAdminById = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Update admin error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -187,12 +193,12 @@ const deleteAdminById = async (req, res) => {
     const { id } = req.params;
 
     // Get admin before deletion
-    const admin = await findOne(Admin, { _id: id });
+    const admin = await findOne(Admin, { id });
     if (!admin) {
       return errorResponse(res, 404, "Admin not found");
     }
 
-    await softDelete(Admin, { _id: id });
+    await softDelete(Admin, { id });
 
     // Clear cache for this admin
     if (admin.token) {
@@ -202,7 +208,7 @@ const deleteAdminById = async (req, res) => {
 
     return successResponse(res, 200, "Admin deleted successfully");
   } catch (error) {
-    console.error("Delete admin error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -226,7 +232,7 @@ const updateAdminPassword = async (req, res) => {
 
     return successResponse(res, 200, "Password updated successfully");
   } catch (error) {
-    console.error("Update admin password error:", error);
+
     return errorResponse(res, 500, "Internal Server Error");
   }
 };
@@ -271,7 +277,8 @@ const createUser = async (req, res) => {
 
     return successResponse(res, 201, "User created successfully", {
       user: {
-        id: user._id,
+        id: user.id || user._id,
+        _id: user.id || user._id,
         name: user.name,
         email: user.email,
         phoneNumber: user.phoneNumber,
@@ -279,7 +286,7 @@ const createUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Create user error:", error);
+
     return errorResponse(res, 500, "Failed to create user");
   }
 };

@@ -3,16 +3,16 @@ const {
   findOne, 
   findMany, 
   findAndUpdate, 
-  deleteOne 
-} = require('../services/mongodb/mongoService');
+  deleteOne,
+  countDocuments
+} = require('../services/mysql/mysqlService');
 
 const { Relation, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { cacheUtils } = require("../config/redis");
-const path = require('path');
-const fs = require('fs');
 const { uploadToSpaces } = require("../middlewares/uploadMiddleware");
+
 // Create a new relation
 const createRelation = async (req, res) => {
   try {
@@ -34,12 +34,13 @@ const createRelation = async (req, res) => {
       isActive: isActive === 'true' || isActive === true
     };
 
-
-    const { buffer, originalname, mimetype } = req.file;
-    const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
-if (imageKey){
-  relationData.image = imageKey
-}
+    if (req.file) {
+      const { buffer, originalname, mimetype } = req.file;
+      const imageKey = await uploadToSpaces(buffer, originalname, mimetype);
+      if (imageKey){
+        relationData.image = imageKey;
+      }
+    }
 
     // Create the relation
     const relation = await create(Relation, relationData);
@@ -49,7 +50,7 @@ if (imageKey){
 
     return successResponse(res, 201, "Relation created successfully", { relation });
   } catch (error) {
-    console.error("Create relation error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -89,21 +90,15 @@ const getAllRelations = async (req, res) => {
       query.isActive = isActive === 'true';
     }
 
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // Sort configuration
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 }
+    };
 
     // Execute query
-    const relations = await Relation.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    const total = await Relation.countDocuments(query);
+    const relations = await findMany(Relation, query, null, options);
+    const total = await countDocuments(Relation, query);
 
     const result = {
       relations,
@@ -120,7 +115,7 @@ const getAllRelations = async (req, res) => {
 
     return successResponse(res, 200, "Relations retrieved successfully", result);
   } catch (error) {
-    console.error("Get all relations error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -131,7 +126,7 @@ const getRelationById = async (req, res) => {
     const { id } = req.params;
 
     const relation = await findOne(Relation, { 
-      _id: id,
+      id,
       isDeleted: false
     });
 
@@ -141,10 +136,11 @@ const getRelationById = async (req, res) => {
 
     return successResponse(res, 200, "Relation retrieved successfully", { relation });
   } catch (error) {
-    console.error("Get relation error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
+
 // Update a relation by ID
 const updateRelationById = async (req, res) => {
   try {
@@ -152,8 +148,8 @@ const updateRelationById = async (req, res) => {
     const updateData = { ...req.body };
 
     // Check if relation exists
-    const existingRelation = await Relation.findOne({ 
-      _id: id,
+    const existingRelation = await findOne(Relation, { 
+      id,
       isDeleted: false
     });
 
@@ -175,7 +171,7 @@ const updateRelationById = async (req, res) => {
     // Update relation
     const relation = await findAndUpdate(
       Relation,
-      { _id: id },
+      { id },
       updateData
     );
 
@@ -184,7 +180,7 @@ const updateRelationById = async (req, res) => {
 
     return successResponse(res, 200, "Relation updated successfully", { relation });
   } catch (error) {
-    console.error("Update relation error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -195,8 +191,8 @@ const deleteRelationById = async (req, res) => {
     const { id } = req.params;
 
     // Check if relation exists
-    const relation = await Relation.findOne({ 
-      _id: id,
+    const relation = await findOne(Relation, { 
+      id,
       isDeleted: false
     });
 
@@ -205,7 +201,7 @@ const deleteRelationById = async (req, res) => {
     }
 
     // Dependency check: check if any active products are using this relation
-    const productsCount = await Product.countDocuments({ relationIds: id, isDeleted: false });
+    const productsCount = await countDocuments(Product, { relationId: id, isDeleted: false });
     if (productsCount > 0) {
       return errorResponse(res, 400, `Cannot delete relation. There are ${productsCount} active products associated with it.`);
     }
@@ -213,7 +209,7 @@ const deleteRelationById = async (req, res) => {
     // Soft delete by updating isDeleted flag
     await findAndUpdate(
       Relation,
-      { _id: id },
+      { id },
       { isDeleted: true }
     );
 
@@ -222,7 +218,7 @@ const deleteRelationById = async (req, res) => {
 
     return successResponse(res, 200, "Relation deleted successfully");
   } catch (error) {
-    console.error("Delete relation error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -233,8 +229,8 @@ const toggleRelationStatus = async (req, res) => {
     const { id } = req.params;
 
     // Check if relation exists
-    const relation = await Relation.findOne({ 
-      _id: id,
+    const relation = await findOne(Relation, { 
+      id,
       isDeleted: false
     });
 
@@ -245,7 +241,7 @@ const toggleRelationStatus = async (req, res) => {
     // Toggle isActive status
     const updatedRelation = await findAndUpdate(
       Relation,
-      { _id: id },
+      { id },
       { isActive: !relation.isActive }
     );
 
@@ -259,7 +255,7 @@ const toggleRelationStatus = async (req, res) => {
       { relation: updatedRelation }
     );
   } catch (error) {
-    console.error("Toggle relation status error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };

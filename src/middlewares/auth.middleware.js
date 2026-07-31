@@ -30,7 +30,7 @@ const protect = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Auth check error:', error);
+
         return errorResponse(res, 401, 'Not authorized, session failed');
     }
 };

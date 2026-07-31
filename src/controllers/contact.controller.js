@@ -4,7 +4,7 @@ const {
   findMany,
   findAndUpdate,
   deleteOne
-} = require('../services/mongodb/mongoService');
+} = require('../services/mysql/mysqlService');
 
 const { Contact } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
@@ -19,7 +19,7 @@ const createContact = async (req, res) => {
       return errorResponse(res, 400, "All fields are required.");
     }
 
-    const contactData = { name, email, message };
+    const contactData = { name, email, message, status: 'Pending' };
     const contact = await create(Contact, contactData);
 
     return successResponse(res, 201, messages.CONTACT_SUBMITTED, { contact });
@@ -34,8 +34,8 @@ const getAllContacts = async (req, res) => {
   try {
     const contacts = await findMany(Contact);
 
-    if (!contacts.length) {
-      return successResponse(res, 200, messages.CONTACTS_NOT_FOUND, { contacts });
+    if (!contacts || !contacts.length) {
+      return successResponse(res, 200, messages.CONTACTS_NOT_FOUND, { contacts: [] });
     }
 
     return successResponse(res, 200, messages.CONTACTS_RETRIEVED, { contacts });
@@ -49,7 +49,7 @@ const getAllContacts = async (req, res) => {
 const getContactById = async (req, res) => {
   try {
     const { id } = req.params;
-    const contact = await findOne(Contact, { _id: id });
+    const contact = await findOne(Contact, { id });
 
     if (!contact) {
       return errorResponse(res, 404, messages.CONTACT_NOT_FOUND);
@@ -72,7 +72,7 @@ const updateContactStatus = async (req, res) => {
       return errorResponse(res, 400, "Invalid status value.");
     }
 
-    const contact = await findAndUpdate(Contact, { _id: id }, { status });
+    const contact = await findAndUpdate(Contact, { id }, { status });
 
     if (!contact) {
       return errorResponse(res, 404, messages.CONTACT_NOT_FOUND);
@@ -89,9 +89,9 @@ const updateContactStatus = async (req, res) => {
 const deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await deleteOne(Contact, { _id: id });
+    const result = await deleteOne(Contact, { id });
 
-    if (result.deletedCount === 0) {
+    if (!result) {
       return errorResponse(res, 404, messages.CONTACT_NOT_FOUND);
     }
 

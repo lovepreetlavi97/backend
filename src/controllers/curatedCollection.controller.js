@@ -1,5 +1,6 @@
 const slugify = require("slugify");
 const { CuratedCollection, Product } = require("../models");
+const { create, findOne, findMany, findAndUpdate, deleteOne } = require("../services/mysql/mysqlService");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { cacheUtils } = require("../config/redis");
 const { uploadToSpaces } = require("../middlewares/uploadMiddleware");
@@ -18,10 +19,10 @@ const createCuratedCollection = async (req, res) => {
     const curatedData = {
       name,
       slug: slugify(name, { lower: true, strict: true }),
-      filters: JSON.parse(filters),
-      position,
+      filters: typeof filters === 'string' ? JSON.parse(filters) : filters,
+      position: Number(position),
       isActive: isActive === "true" || isActive === true,
-      createdBy: req.user._id
+      createdBy: req.user ? (req.user.id || req.user._id) : null
     };
 
     if (req.file) {
@@ -30,10 +31,10 @@ const createCuratedCollection = async (req, res) => {
     }
     
     if (req.body.productIds) {
-      curatedData.productIds = JSON.parse(req.body.productIds);
+      curatedData.productIds = typeof req.body.productIds === 'string' ? JSON.parse(req.body.productIds) : req.body.productIds;
     }
 
-    const curated = await CuratedCollection.create(curatedData);
+    const curated = await create(CuratedCollection, curatedData);
 
     await cacheUtils.delPattern("curated_*");
 
@@ -48,9 +49,9 @@ const createCuratedCollection = async (req, res) => {
  */
 const getAllCuratedCollections = async (req, res) => {
   try {
-    const curated = await CuratedCollection.find({
+    const curated = await findMany(CuratedCollection, {
       isDeleted: false
-    }).sort({ position: 1 });
+    }, null, { sort: { position: 1 } });
 
     return successResponse(res, 200, "Curated collections fetched", { curated });
   } catch (error) {
@@ -62,16 +63,20 @@ const getAllCuratedCollections = async (req, res) => {
  * GET BY ID
  */
 const getCuratedCollectionById = async (req, res) => {
-  const curated = await CuratedCollection.findOne({
-    _id: req.params.id,
-    isDeleted: false
-  });
+  try {
+    const curated = await findOne(CuratedCollection, {
+      id: req.params.id,
+      isDeleted: false
+    });
 
-  if (!curated) {
-    return errorResponse(res, 404, "Curated collection not found");
+    if (!curated) {
+      return errorResponse(res, 404, "Curated collection not found");
+    }
+
+    return successResponse(res, 200, "Curated collection fetched", { curated });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
   }
-
-  return successResponse(res, 200, "Curated collection fetched", { curated });
 };
 
 /**
@@ -81,7 +86,7 @@ const updateCuratedCollectionById = async (req, res) => {
   try {
     const updateData = { ...req.body };
 
-    if (updateData.filters) {
+    if (updateData.filters && typeof updateData.filters === 'string') {
       updateData.filters = JSON.parse(updateData.filters);
     }
 
@@ -90,16 +95,18 @@ const updateCuratedCollectionById = async (req, res) => {
       updateData.image = await uploadToSpaces(buffer, originalname, mimetype);
     }
     
-    if (updateData.productIds) {
-       updateData.productIds = JSON.parse(req.body.productIds);
+    if (updateData.productIds && typeof updateData.productIds === 'string') {
+       updateData.productIds = JSON.parse(updateData.productIds);
     }
 
-    updateData.updatedBy = req.user._id;
+    if (req.user) {
+      updateData.updatedBy = req.user.id || req.user._id;
+    }
 
-    const curated = await CuratedCollection.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
+    const curated = await findAndUpdate(
+      CuratedCollection,
+      { id: req.params.id },
+      updateData
     );
 
     if (!curated) {
@@ -118,36 +125,47 @@ const updateCuratedCollectionById = async (req, res) => {
  * DELETE (SOFT)
  */
 const deleteCuratedCollectionById = async (req, res) => {
-  await CuratedCollection.findByIdAndUpdate(req.params.id, {
-    isDeleted: true
-  });
+  try {
+    await findAndUpdate(CuratedCollection, { id: req.params.id }, {
+      isDeleted: true
+    });
 
-  await cacheUtils.delPattern("curated_*");
+    await cacheUtils.delPattern("curated_*");
 
-  return successResponse(res, 200, "Curated collection deleted");
+    return successResponse(res, 200, "Curated collection deleted");
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
+  }
 };
 
 /**
  * TOGGLE STATUS
  */
 const toggleCuratedCollectionStatus = async (req, res) => {
-  const curated = await CuratedCollection.findById(req.params.id);
+  try {
+    const curated = await findOne(CuratedCollection, { id: req.params.id });
 
-  if (!curated) {
-    return errorResponse(res, 404, "Curated collection not found");
+    if (!curated) {
+      return errorResponse(res, 404, "Curated collection not found");
+    }
+
+    const updated = await findAndUpdate(
+      CuratedCollection, 
+      { id: req.params.id }, 
+      { isActive: !curated.isActive }
+    );
+
+    await cacheUtils.delPattern("curated_*");
+
+    return successResponse(
+      res,
+      200,
+      `Curated collection ${updated.isActive ? "activated" : "deactivated"}`,
+      { curated: updated }
+    );
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
   }
-
-  curated.isActive = !curated.isActive;
-  await curated.save();
-
-  await cacheUtils.delPattern("curated_*");
-
-  return successResponse(
-    res,
-    200,
-    `Curated collection ${curated.isActive ? "activated" : "deactivated"}`,
-    { curated }
-  );
 };
 
 /**
@@ -155,12 +173,10 @@ const toggleCuratedCollectionStatus = async (req, res) => {
  */
 const getPublicCollections = async (req, res) => {
   try {
-    const collections = await CuratedCollection.find({
+    const collections = await findMany(CuratedCollection, {
       isActive: true,
       isDeleted: false
-    })
-      .select("_id name slug")
-      .sort({ position: 1 });
+    }, null, { sort: { position: 1 } });
 
     return successResponse(res, 200, "Collections fetched", { collections });
   } catch (error) {
@@ -172,57 +188,53 @@ const getPublicCollections = async (req, res) => {
  * USER: GET PRODUCTS BY CURATED COLLECTION
  */
 const getCuratedCollectionProducts = async (req, res) => {
-  const curated = await CuratedCollection.findOne({
-    slug: req.params.slug,
-    isActive: true,
-    isDeleted: false
-  });
+  try {
+    const curated = await findOne(CuratedCollection, {
+      slug: req.params.slug,
+      isActive: true,
+      isDeleted: false
+    });
 
-  if (!curated) {
-    return errorResponse(res, 404, "Curated collection not found");
+    if (!curated) {
+      return errorResponse(res, 404, "Curated collection not found");
+    }
+
+    // Explicit product ids if present
+    const productIds = curated.productIds || [];
+    const explicitProducts = productIds.length
+      ? await findMany(Product, { id: { $in: productIds }, isBlocked: false }, null, { limit: 40 })
+      : [];
+
+    // Query by collectionId
+    const reverseProducts = await findMany(Product, {
+      collectionId: curated.id,
+      isBlocked: false
+    }, null, { limit: 40 });
+
+    // Filter query
+    const f = curated.filters || {};
+    const filterQuery = { isBlocked: false, isDeleted: false };
+    if (f.categoryIds?.length) filterQuery.categoryId = { $in: f.categoryIds };
+    if (f.subcategoryIds?.length) filterQuery.subcategoryId = { $in: f.subcategoryIds };
+
+    const filteredProducts = await findMany(Product, filterQuery, null, { limit: 40 });
+
+    // Merge and deduplicate
+    const seen = new Set();
+    const products = [...explicitProducts, ...reverseProducts, ...filteredProducts].filter(p => {
+      const id = (p.id || p._id).toString();
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    return successResponse(res, 200, "Curated products fetched", {
+      curated,
+      products
+    });
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
   }
-
-  // Manual assignment from productIds array in collection model
-  const explicitProducts = curated.productIds?.length
-    ? await Product.find({ _id: { $in: curated.productIds }, isBlocked: false }).limit(40)
-    : [];
-
-  // Query by reverse collectionIds assignment (legacy)
-  const reverseProducts = await Product.find({
-    collectionIds: curated._id,
-    isBlocked: false
-  }).limit(40);
-
-  // Also query by filters
-  const f = curated.filters || {};
-  const filterQuery = { isBlocked: false };
-  if (f.categoryIds?.length) filterQuery.categoryId = { $in: f.categoryIds };
-  if (f.subcategoryIds?.length) filterQuery.subcategoryId = { $in: f.subcategoryIds };
-  if (f.relationIds?.length) filterQuery.relationIds = { $in: f.relationIds };
-  if (f.festivalIds?.length) filterQuery.festivalIds = { $in: f.festivalIds };
-  if (f.priceRange?.min || f.priceRange?.max) {
-    filterQuery.discountedPrice = {};
-    if (f.priceRange.min) filterQuery.discountedPrice.$gte = f.priceRange.min;
-    if (f.priceRange.max) filterQuery.discountedPrice.$lte = f.priceRange.max;
-  }
-
-  const filteredProducts = Object.keys(filterQuery).length > 1
-    ? await Product.find(filterQuery).limit(40)
-    : [];
-
-  // Merge and deduplicate
-  const seen = new Set();
-  const products = [...explicitProducts, ...reverseProducts, ...filteredProducts].filter(p => {
-    const id = p._id.toString();
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-
-  return successResponse(res, 200, "Curated products fetched", {
-    curated,
-    products
-  });
 };
 
 module.exports = {

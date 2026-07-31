@@ -1,39 +1,53 @@
 const cron = require('node-cron');
 const { UserKitty } = require('../models');
+const { redisClient } = require('../config/redis');
+const logger = require('../utils/logger');
 
 const initKittyCron = () => {
     // Run daily at midnight
     cron.schedule('0 0 * * *', async () => {
+        let lockAcquired = false;
+        const lockKey = 'cron_lock_kitty_daily';
+        
         try {
-            console.log('Running daily kitty cron job...');
+            // Distributed lock: Only 1 cluster worker executes the cron job
+            if (redisClient && redisClient.isReady) {
+                const acquired = await redisClient.set(lockKey, String(process.pid), { NX: true, EX: 3600 });
+                if (!acquired) {
+                    logger.info(`Cron kitty job skipped on worker ${process.pid} (already locked by another worker)`);
+                    return;
+                }
+                lockAcquired = true;
+            }
+
+            logger.info('Starting daily Kitty plan status update cron job...');
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Mark embedded payments as overdue when dueDate has passed
-            const result = await UserKitty.updateMany(
-                {
-                    status: 'active',
-                    payments: {
-                        $elemMatch: {
-                            status: 'pending',
-                            dueDate: { $lt: today }
+            const activeKitties = await UserKitty.findAll({
+                where: { status: 'active' }
+            });
+
+            for (const kitty of activeKitties) {
+                try {
+                    let updated = false;
+                    const payments = Array.isArray(kitty.payments) ? [...kitty.payments] : [];
+                    payments.forEach(p => {
+                        if (p.status === 'pending' && new Date(p.dueDate) < today) {
+                            p.status = 'overdue';
+                            updated = true;
                         }
+                    });
+                    if (updated) {
+                        await kitty.update({ payments });
                     }
-                },
-                {
-                    $set: {
-                        'payments.$[p].status': 'overdue'
-                    }
-                },
-                {
-                    arrayFilters: [{ 'p.status': 'pending', 'p.dueDate': { $lt: today } }]
+                } catch (recordErr) {
+                    logger.error(`Error updating kitty record ${kitty.id}:`, recordErr.message);
                 }
-            );
-
-            console.log(`Updated ${result.modifiedCount || result.modifiedDocs || 0} kitty payments to overdue.`);
-
+            }
+            logger.info('Completed daily Kitty plan cron job.');
         } catch (error) {
-            console.error('Error running kitty cron:', error.message);
+            logger.error('Error in kitty cron job execution:', error);
         }
     });
 };

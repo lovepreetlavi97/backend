@@ -5,7 +5,7 @@ const {
   findAndUpdate,
   softDelete,
   findByEmail,
-} = require("../services/mongodb/mongoService");
+} = require("../services/mysql/mysqlService");
 const jwt = require("jsonwebtoken");
 const { Admin } = require("../models/index");
 const { hashPassword } = require("../utils/bcrypt");
@@ -33,7 +33,7 @@ const createAdmin = async (req, res) => {
       password: hashedPassword,
       role: 'admin', // Default role is admin (not superadmin)
       permissions: permissions || {}, // Default permissions or provided ones
-      createdBy: req.user._id // Track who created this admin
+      createdBy: req.user ? (req.user.id || req.user._id) : null
     });
 
     // Clear admin cache patterns
@@ -41,7 +41,8 @@ const createAdmin = async (req, res) => {
 
     return successResponse(res, 201, "Admin created successfully", {
       admin: {
-        id: admin._id,
+        id: admin.id || admin._id,
+        _id: admin.id || admin._id,
         name: admin.name,
         email: admin.email,
         role: admin.role,
@@ -49,7 +50,7 @@ const createAdmin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Create admin error:", error);
+
     return errorResponse(res, 500, "Failed to create admin");
   }
 };
@@ -62,7 +63,7 @@ const getAllAdmins = async (req, res) => {
 
     return successResponse(res, 200, "Admins retrieved successfully", { admins });
   } catch (error) {
-    console.error("Get all admins error:", error);
+
     return errorResponse(res, 500, "Failed to retrieve admins");
   }
 };
@@ -72,14 +73,14 @@ const getAdminById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const admin = await findOne(Admin, { _id: id, role: 'admin' }, { password: 0, token: 0 });
+    const admin = await findOne(Admin, { id, role: 'admin' }, { password: 0, token: 0 });
     if (!admin) {
       return errorResponse(res, 404, "Admin not found");
     }
 
     return successResponse(res, 200, "Admin retrieved successfully", { admin });
   } catch (error) {
-    console.error("Get admin by ID error:", error);
+
     return errorResponse(res, 500, "Failed to retrieve admin");
   }
 };
@@ -91,7 +92,7 @@ const updateAdmin = async (req, res) => {
     const { name, email, permissions, status } = req.body;
 
     // Check if admin exists
-    const admin = await findOne(Admin, { _id: id, role: 'admin' });
+    const admin = await findOne(Admin, { id, role: 'admin' });
     if (!admin) {
       return errorResponse(res, 404, "Admin not found");
     }
@@ -103,7 +104,7 @@ const updateAdmin = async (req, res) => {
       // Check if the new email is already in use by another admin
       if (email !== admin.email) {
         const existingAdmin = await findByEmail(Admin, email);
-        if (existingAdmin && existingAdmin._id.toString() !== id) {
+        if (existingAdmin && (existingAdmin.id || existingAdmin._id).toString() !== id.toString()) {
           return errorResponse(res, 409, "This email is already in use by another admin");
         }
         updateData.email = email;
@@ -115,17 +116,20 @@ const updateAdmin = async (req, res) => {
     // Update the admin
     const updatedAdmin = await findAndUpdate(
       Admin,
-      { _id: id },
+      { id },
       updateData
     );
 
     // Clear admin cache patterns
     await cacheUtils.delPattern('route_/api/v1/admin*');
-    await cacheUtils.delPattern(`auth_${admin.token}`);
+    if (admin.token) {
+      await cacheUtils.del(`auth_${admin.token}`);
+    }
 
     return successResponse(res, 200, "Admin updated successfully", {
       admin: {
-        id: updatedAdmin._id,
+        id: updatedAdmin.id || updatedAdmin._id,
+        _id: updatedAdmin.id || updatedAdmin._id,
         name: updatedAdmin.name,
         email: updatedAdmin.email,
         role: updatedAdmin.role,
@@ -134,7 +138,7 @@ const updateAdmin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Update admin error:", error);
+
     return errorResponse(res, 500, "Failed to update admin");
   }
 };
@@ -145,21 +149,23 @@ const deleteAdmin = async (req, res) => {
     const { id } = req.params;
 
     // Check if admin exists
-    const admin = await findOne(Admin, { _id: id, role: 'admin' });
+    const admin = await findOne(Admin, { id, role: 'admin' });
     if (!admin) {
       return errorResponse(res, 404, "Admin not found");
     }
 
     // Delete the admin
-    await softDelete(Admin, { _id: id });
+    await softDelete(Admin, { id });
 
     // Clear admin cache patterns
     await cacheUtils.delPattern('route_/api/v1/admin*');
-    await cacheUtils.delPattern(`auth_${admin.token}`);
+    if (admin.token) {
+      await cacheUtils.del(`auth_${admin.token}`);
+    }
 
     return successResponse(res, 200, "Admin deleted successfully");
   } catch (error) {
-    console.error("Delete admin error:", error);
+
     return errorResponse(res, 500, "Failed to delete admin");
   }
 };
@@ -189,19 +195,19 @@ const createSuperAdmin = async (req, res) => {
       email,
       password: hashedPassword,
       role: 'superadmin'
-      // All permissions will be set to true automatically by the pre-save hook
     });
 
     return successResponse(res, 201, "SuperAdmin created successfully", {
       admin: {
-        id: superAdmin._id,
+        id: superAdmin.id || superAdmin._id,
+        _id: superAdmin.id || superAdmin._id,
         name: superAdmin.name,
         email: superAdmin.email,
         role: superAdmin.role
       }
     });
   } catch (error) {
-    console.error("Create superadmin error:", error);
+
     return errorResponse(res, 500, "Failed to create SuperAdmin");
   }
 };
@@ -213,4 +219,4 @@ module.exports = {
   updateAdmin,
   deleteAdmin,
   createSuperAdmin
-}; 
+};

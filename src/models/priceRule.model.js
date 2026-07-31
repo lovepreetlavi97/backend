@@ -1,40 +1,25 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const priceRuleSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      unique: true // so no duplicate rules for "Gold"
-    },
-    metalIds: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Metal',
-    }],
+const PriceRule = sequelize.define('PriceRule', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  type: { type: DataTypes.ENUM('making_charge', 'discount', 'markup', 'fixed', 'percentage'), defaultValue: 'making_charge' },
+  value: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0.00 },
+  isPercentage: { type: DataTypes.BOOLEAN, defaultValue: false },
+  description: { type: DataTypes.TEXT, allowNull: true }
+}, {
+  tableName: 'price_rules',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
+});
 
-    price: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-
-    isDeleted: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  { timestamps: true }
-);
-
-priceRuleSchema.index({ name: 1, isActive: 1 });
-priceRuleSchema.index({ metalIds: 1 });
-
-const PriceRule = mongoose.model("PriceRule", priceRuleSchema);
+PriceRule.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
 module.exports = PriceRule;

@@ -1,40 +1,19 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const suspiciousActivitySchema = new mongoose.Schema({
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    ip: {
-        type: String,
-        required: true
-    },
-    userAgent: {
-        type: String,
-        required: true
-    },
-    activityType: {
-        type: String,
-        enum: ['NEW_DEVICE', 'NEW_LOCATION', 'MULTIPLE_FAILED_OTP', 'BRUTE_FORCE_ATTEMPT'],
-        default: 'NEW_DEVICE'
-    },
-    severity: {
-        type: String,
-        enum: ['low', 'medium', 'high', 'critical'],
-        default: 'low'
-    },
-    details: {
-        type: String
-    },
-    isResolved: {
-        type: Boolean,
-        default: false
-    }
-}, { timestamps: true });
-
-suspiciousActivitySchema.index({ userId: 1 });
-suspiciousActivitySchema.index({ activityType: 1 });
-suspiciousActivitySchema.index({ createdAt: -1 });
-
-module.exports = mongoose.model('SuspiciousActivity', suspiciousActivitySchema);
+const SuspiciousActivity = sequelize.define('SuspiciousActivity', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  ip: { type: DataTypes.STRING, allowNull: false },
+  userAgent: { type: DataTypes.TEXT, allowNull: false },
+  activityType: { type: DataTypes.ENUM('NEW_DEVICE', 'NEW_LOCATION', 'MULTIPLE_FAILED_OTP', 'BRUTE_FORCE_ATTEMPT'), defaultValue: 'NEW_DEVICE' },
+  severity: { type: DataTypes.ENUM('low', 'medium', 'high', 'critical'), defaultValue: 'low' },
+  details: { type: DataTypes.TEXT, allowNull: true },
+  isResolved: { type: DataTypes.BOOLEAN, defaultValue: false }
+}, {
+  tableName: 'suspicious_activities',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
+});
+SuspiciousActivity.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = SuspiciousActivity;

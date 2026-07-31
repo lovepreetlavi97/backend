@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { findOne } = require('../../services/mongodb/mongoService');
+const { findOne } = require('../../services/mysql/mysqlService');
 const { cacheUtils } = require('../../config/redis');
 const User = require('../../models/user.model');
 const { Admin } = require('../../models');
@@ -45,7 +45,7 @@ const authMiddleware = (requiredRoles) => {
 
       // Try to find an admin user first (admin or superadmin)
       if (roles.includes('admin') || roles.includes('superadmin')) {
-        user = await findOne(Admin, { _id: decoded.id, token: token });
+        user = await findOne(Admin, { id: decoded.id, token: token });
 
         if (user && (roles.includes(user.role))) {
           // Cache the admin user data
@@ -57,11 +57,7 @@ const authMiddleware = (requiredRoles) => {
 
       // Try to find a regular user if admin not found or role is 'user'
       if (roles.includes('user')) {
-        // console.log("👉 decoded.id:", decoded.id);
-
-        user = await findOne(User, { _id: decoded.id, token: token });
-
-        console.log("👉 user found:", user);
+        user = await findOne(User, { id: decoded.id, token: token });
 
         if (user && user.role === 'user') {
           // Cache the user data
@@ -80,7 +76,7 @@ const authMiddleware = (requiredRoles) => {
       return res.status(403).json({ status: 'error', statusCode: 403, message: 'Forbidden: Insufficient permissions' });
 
     } catch (error) {
-      console.error('Authentication error:', error);
+
       res.status(500).json({
         status: 'error',
         statusCode: 500,
@@ -111,7 +107,7 @@ const optionalAuthMiddleware = () => {
         return next();
       }
 
-      const user = await findOne(User, { _id: decoded.id, token: token });
+      const user = await findOne(User, { id: decoded.id, token: token });
       if (user && user.role === 'user') {
         await cacheUtils.set(`auth_${token}`, user, 3600);
         req.user = user;

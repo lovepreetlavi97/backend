@@ -21,7 +21,7 @@ const trackSession = async (userId, refreshToken, ip, userAgent) => {
             severity: 'low',
             details: `New login recorded from ${ip}`
         });
-        console.log(`[Security Alert] New session created for user ${userId} via ${ip}`);
+
     }
 
     // 2. Store session in user_sessions collection

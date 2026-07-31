@@ -1,41 +1,18 @@
-const mongoose = require('mongoose');
-const DEFAULT_ICON_URL = "https://plus.unsplash.com/premium_photo-1664124381855-3131b9a386d8?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const relationSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-
-  description: {
-    type: String,
-    required: true
-  },
-  image : {
-    type: String,
-    default: ""
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
-  }
-}, { timestamps: true });
-
-// Add indexes for faster queries
-relationSchema.index({ name: 1 });
-relationSchema.index({ isActive: 1 });
-relationSchema.index({ isDeleted: 1 });
-
-module.exports = mongoose.model('Relation', relationSchema);
+const Relation = sequelize.define('Relation', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+  description: { type: DataTypes.TEXT, allowNull: false },
+  image: { type: DataTypes.STRING, defaultValue: '' },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false }
+}, {
+  tableName: 'relations',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
+});
+Relation.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = Relation;

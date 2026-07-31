@@ -1,17 +1,27 @@
-const { cacheUtils } = require('../config/redis');
+const { redisClient } = require('../config/redis');
 
 /**
- * Lightweight Redis-based rate limiter to avoid extra dependencies
+ * Atomic Redis-based rate limiter
  * @param {Number} limit Max requests
  * @param {Number} timeframe Seconds
  */
 const rateLimiter = (limit, timeframe) => {
     return async (req, res, next) => {
         try {
-            const key = `ratelimit_${req.ip}_${req.originalUrl}`;
-            const attempts = await cacheUtils.get(key);
+            if (!redisClient.isReady) {
+                return next(); // Fail open if Redis is down
+            }
 
-            if (attempts && attempts.count >= limit) {
+            const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            const key = `ratelimit_${clientIp}_${req.baseUrl || req.path}`;
+            
+            const currentCount = await redisClient.incr(key);
+            if (currentCount === 1) {
+                await redisClient.expire(key, timeframe);
+            }
+
+            if (currentCount > limit) {
+                res.setHeader('Retry-After', timeframe);
                 return res.status(429).json({
                     status: 'error',
                     statusCode: 429,
@@ -19,17 +29,17 @@ const rateLimiter = (limit, timeframe) => {
                 });
             }
 
-            const currentCount = attempts ? attempts.count + 1 : 1;
-            await cacheUtils.set(key, { count: currentCount }, timeframe);
             next();
         } catch (error) {
-            console.error('Rate limiting error:', error);
-            next(); // Allow on failure to not block API
+            next(); // Fail open on error so API isn't blocked
         }
     };
 };
 
 module.exports = {
-    globalLimiter: rateLimiter(100, 60), // Global 100 req per min
-    authLimiter: rateLimiter(5, 300) // 5 auth req per 5 mins
+    globalLimiter: rateLimiter(parseInt(process.env.RATE_LIMIT_GLOBAL || '600', 10), 60), // Global 600 req/min
+    authLimiter: rateLimiter(10, 300), // 10 auth reqs per 5 mins
+    searchLimiter: rateLimiter(30, 60), // 30 searches per min
+    checkoutLimiter: rateLimiter(15, 60), // 15 checkout attempts per min
+    uploadLimiter: rateLimiter(10, 60) // 10 uploads per min
 };

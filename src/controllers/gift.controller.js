@@ -1,4 +1,5 @@
 const { Product, Gift, Banner } = require("../models");
+const { create, findOne, findMany, findAndUpdate, countDocuments } = require("../services/mysql/mysqlService");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const slugify = require("slugify");
 
@@ -7,16 +8,9 @@ const slugify = require("slugify");
  */
 const getGiftFilters = async (req, res) => {
   try {
-    // Fetch active gifts (occasions) from the new model
-    const activeGifts = await Gift.find({ isActive: true, isDeleted: false }).select("name slug image");
-
-    const [themes, recipients, giftBanner] = await Promise.all([
-      Product.distinct("attributes.style"),
-      Product.distinct("attributes.gender"),
-      Banner.findOne({ type: 'gift', isDeleted: false }).sort({ position: -1 })
-    ]);
-
-    console.log("🔍 Found gift banner:", giftBanner ? giftBanner._id : "None");
+    // Fetch active gifts (occasions) from the model
+    const activeGifts = await findMany(Gift, { isActive: true, isDeleted: false });
+    const giftBanner = await findOne(Banner, { type: 'gift', isDeleted: false }, {}, { sort: { position: -1 } });
 
     const priceRanges = [
       { label: "Under ₹1,000", min: 0, max: 1000 },
@@ -27,28 +21,15 @@ const getGiftFilters = async (req, res) => {
     ];
 
     const filters = {
-      occasions: activeGifts, // Now returns objects {name, slug, image}
-      themes: themes.filter(Boolean),
-      recipients: recipients.filter(Boolean),
+      occasions: activeGifts || [],
+      themes: [],
+      recipients: [],
       priceRanges,
       banner: giftBanner
     };
 
-    if (!giftBanner) {
-      console.log("⚠️ No active/gift banner found in database.");
-    } else {
-      console.log("✅ Gift banner found:", {
-        id: giftBanner._id,
-        title: giftBanner.title,
-        imageUrl: giftBanner.imageUrl,
-        type: giftBanner.type,
-        status: giftBanner.status
-      });
-    }
-
     return successResponse(res, 200, "Gift filters retrieved successfully", filters);
   } catch (error) {
-    console.error("Error fetching gift filters:", error);
     return errorResponse(res, 500, "Error fetching gift filters");
   }
 };
@@ -60,7 +41,7 @@ const createGift = async (req, res) => {
     const { name, image, description, isActive } = req.body;
     const slug = slugify(name, { lower: true, strict: true });
 
-    const gift = await Gift.create({
+    const gift = await create(Gift, {
       name,
       slug,
       image,
@@ -76,7 +57,7 @@ const createGift = async (req, res) => {
 
 const getAllGifts = async (req, res) => {
   try {
-    const gifts = await Gift.find({ isDeleted: false }).sort({ createdAt: -1 });
+    const gifts = await findMany(Gift, { isDeleted: false }, {}, { sort: { createdAt: -1 } });
     return successResponse(res, 200, "Gifts retrieved successfully", gifts);
   } catch (error) {
     return errorResponse(res, 500, "Error fetching gifts");
@@ -94,7 +75,7 @@ const updateGift = async (req, res) => {
       updateData.slug = slugify(name, { lower: true, strict: true });
     }
 
-    const gift = await Gift.findByIdAndUpdate(id, updateData, { new: true });
+    const gift = await findAndUpdate(Gift, { id }, updateData);
     if (!gift) return errorResponse(res, 404, "Gift not found");
 
     return successResponse(res, 200, "Gift updated successfully", gift);
@@ -108,16 +89,16 @@ const deleteGift = async (req, res) => {
     const { id } = req.params;
 
     // Check if gift exists
-    const gift = await Gift.findOne({ _id: id, isDeleted: false });
+    const gift = await findOne(Gift, { id, isDeleted: false });
     if (!gift) return errorResponse(res, 404, "Gift not found");
 
-    // Dependency check: check if any active products are using this gift in attributes.giftIds
-    const productsCount = await Product.countDocuments({ "attributes.giftIds": id, isDeleted: false });
+    // Dependency check: check if any active products are using this gift
+    const productsCount = await countDocuments(Product, { giftId: id, isDeleted: false });
     if (productsCount > 0) {
       return errorResponse(res, 400, `Cannot delete gift. There are ${productsCount} active products associated with it.`);
     }
 
-    await Gift.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    await findAndUpdate(Gift, { id }, { isDeleted: true });
     return successResponse(res, 200, "Gift deleted successfully");
   } catch (error) {
     return errorResponse(res, 500, "Error deleting gift");

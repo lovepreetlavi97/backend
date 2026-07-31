@@ -1,4 +1,5 @@
-const DesignRequest = require('../models/designRequest.model');
+const { DesignRequest } = require('../models/index');
+const { create, findOne, findMany, findAndUpdate } = require('../services/mysql/mysqlService');
 const { uploadToSpaces, getPublicUrl } = require('../middlewares/uploadMiddleware');
 const { successResponse, errorResponse } = require('../utils/responseUtil');
 
@@ -22,20 +23,21 @@ const createDesignRequest = async (req, res) => {
         const imageUrl = getPublicUrl(key);
 
         // 2. Database save
-        const newRequest = await DesignRequest.create({
+        const newRequest = await create(DesignRequest, {
             userId: req.user ? req.user.id : null, 
             name,
+            email: contact,
+            phone: contact,
             contact,
             description,
             imageUrl,
+            referenceImages: [imageUrl],
             status: 'pending'
         });
 
-        console.log(`[Notification] New design request submitted by ${name} (${contact})`);
-
         return successResponse(res, 201, "Design request submitted successfully", newRequest);
     } catch (error) {
-        console.error("Design request error:", error);
+
         return errorResponse(res, 500, "Failed to submit request", { error: error.message });
     }
 };
@@ -47,7 +49,7 @@ const getAllDesignRequests = async (req, res) => {
     try {
         const { status } = req.query;
         const query = status ? { status } : {};
-        const requests = await DesignRequest.find(query).sort({ createdAt: -1 });
+        const requests = await findMany(DesignRequest, query, null, { sort: { createdAt: -1 } });
         return successResponse(res, 200, "Design requests retrieved", requests);
     } catch (error) {
         return errorResponse(res, 500, "Error fetching requests");
@@ -59,7 +61,7 @@ const getAllDesignRequests = async (req, res) => {
  */
 const getDesignRequestById = async (req, res) => {
     try {
-        const request = await DesignRequest.findById(req.params.id);
+        const request = await findOne(DesignRequest, { id: req.params.id });
         if (!request) return errorResponse(res, 404, "Request not found");
         return successResponse(res, 200, "Request details", request);
     } catch (error) {
@@ -77,10 +79,10 @@ const updateDesignRequestStatus = async (req, res) => {
         if (status) updateData.status = status;
         if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
 
-        const request = await DesignRequest.findByIdAndUpdate(
-            req.params.id, 
-            updateData, 
-            { new: true }
+        const request = await findAndUpdate(
+            DesignRequest, 
+            { id: req.params.id }, 
+            updateData
         );
 
         if (!request) return errorResponse(res, 404, "Request not found");

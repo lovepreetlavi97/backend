@@ -8,7 +8,9 @@ const {
   findByEmail,
   updatePassword,
   verifyPassword,
-} = require("../services/mongodb/mongoService");
+  countDocuments
+} = require("../services/mysql/mysqlService");
+const { sequelize } = require("../config/database");
 const { generateOTP, generateJWT } = require("../utils/authUtils");
 const {
   User,
@@ -34,9 +36,7 @@ const otpService = require("../services/otp.service");
 const sessionService = require("../services/session.service");
 const jwtUtils = require("../utils/jwt");
 
-const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
-const ObjectId = mongoose.Types.ObjectId;
+const { isValidId } = require("../utils/idUtils");
 const { hashPassword } = require("../utils/bcrypt");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
@@ -83,7 +83,7 @@ const createUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Create user error:", error);
+
     return errorResponse(res, 400, messages.USER_CREATION_FAILED, {
       error: error.message,
     });
@@ -98,7 +98,7 @@ const getRelatedProducts = async (req, res) => {
     }
 
     // Convert URL ?ids=1,2,3 into array
-    const idArray = ids.split(",").map((id) => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+    const idArray = ids.split(",").map((id) => id.trim()).filter(id => isValidId(id));
 
     if (idArray.length === 0) {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { products: [] });
@@ -112,9 +112,7 @@ const getRelatedProducts = async (req, res) => {
     }
 
     // 1. Find the categories/subcategories of the products in the cart
-    const cartProducts = await Product.find({ _id: { $in: idArray } })
-      .select("categoryId subcategoryId relatedProductIds")
-      .lean();
+    const cartProducts = await findMany(Product, { id: { $in: idArray } });
 
     const categoryIds = cartProducts.map(p => p.categoryId).filter(Boolean);
     const subCategoryIds = cartProducts.map(p => p.subcategoryId).filter(Boolean);
@@ -123,22 +121,17 @@ const getRelatedProducts = async (req, res) => {
     // 2. Find products that are related (same subcategory, same category, or manually linked)
     // and are NOT already in the cart
     const query = {
-      _id: { $nin: idArray.map(id => new mongoose.Types.ObjectId(id)) },
+      id: { $nin: idArray },
       isDeleted: false,
       isBlocked: false,
       $or: [
-        { _id: { $in: manualRelatedIds } },
+        { id: { $in: manualRelatedIds } },
         { subcategoryId: { $in: subCategoryIds } },
         { categoryId: { $in: categoryIds } }
       ]
     };
 
-    const relatedProducts = await Product.find(query)
-      .select("_id name image description title slug actualPrice discountedPrice discountPercent images categoryId subcategoryId tags isPriceFixed weight makingCharges priceRuleId averageRating totalReviews")
-      .populate("priceRuleId", "name price")
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
+    const relatedProducts = await findMany(Product, query, {}, { limit: 10, sort: { createdAt: -1 }, populate: "priceRuleId" });
 
 
     // 3. Enhance products with dynamic prices
@@ -186,7 +179,7 @@ const getRelatedProducts = async (req, res) => {
 
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
   } catch (error) {
-    console.error("Get related products error:", error);
+
     return errorResponse(
       res,
       500,
@@ -221,13 +214,16 @@ const getAllUsers = async (req, res) => {
     const query = {};
     if (status) query.status = status;
 
-    if (search && typeof search === 'string') {
-      const regex = new RegExp(search.trim(), 'i');
-      query.$or = [
-        { name: regex },
-        { email: regex },
-        { phoneNumber: regex }
-      ];
+    if (search) {
+      const searchStr = String(search).trim();
+      if (searchStr) {
+        const regex = new RegExp(searchStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        query.$or = [
+          { name: regex },
+          { email: regex },
+          { phoneNumber: regex }
+        ];
+      }
     }
 
     // Pagination & sorting options
@@ -238,8 +234,8 @@ const getAllUsers = async (req, res) => {
       select: "-password -token -otp",
     };
 
-    const users = await User.find(query, null, options);
-    const total = await User.countDocuments(query);
+    const users = await findMany(User, query, null, options);
+    const total = await countDocuments(User, query);
 
     const result = {
       users,
@@ -255,7 +251,7 @@ const getAllUsers = async (req, res) => {
 
     return successResponse(res, 200, messages.USERS_RETRIEVED, result);
   } catch (error) {
-    console.error("Get all users error:", error);
+
     return errorResponse(res, 500, messages.USERS_RETRIEVAL_FAILED, { error: error.message });
   }
 };
@@ -263,11 +259,11 @@ const getAllUsers = async (req, res) => {
 // Get a user by ID
 const getUserById = async (req, res) => {
   try {
-    console.log("Fetching user with ID:", req.params.id);
+
     const { id } = req.params;
 
     // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, "Invalid user ID format");
     }
 
@@ -282,7 +278,7 @@ const getUserById = async (req, res) => {
     }
 
     // If not in cache, get from database
-    const user = await User.findById(id).select("-password -token -otp").lean();
+    const user = await findOne(User, { id });
 
     if (!user) {
       return errorResponse(res, 404, messages.USER_NOT_FOUND);
@@ -293,7 +289,7 @@ const getUserById = async (req, res) => {
 
     return successResponse(res, 200, messages.USER_RETRIEVED, { user });
   } catch (error) {
-    console.error("Get user error:", error);
+
     return errorResponse(res, 500, messages.USER_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -306,9 +302,10 @@ const updateUserById = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return errorResponse(res, 400, "Invalid user ID format");
+    // SEC-003: IDOR Prevention - Ensure user can only update their own profile
+    // Admin can update any profile
+    if (req.user.role !== "Admin" && req.user._id.toString() !== id) {
+      return errorResponse(res, 403, "You are not authorized to update this profile");
     }
 
     // Don't allow role change through this endpoint
@@ -403,7 +400,7 @@ const updateUserById = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Update user error:", error);
+
     return errorResponse(res, 500, messages.USER_UPDATE_FAILED, {
       error: error.message,
     });
@@ -415,9 +412,10 @@ const deleteUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return errorResponse(res, 400, "Invalid user ID format");
+    // SEC-003: IDOR Prevention - Ensure user can only delete their own profile
+    // Admin can delete any profile
+    if (req.user.role !== "Admin" && req.user._id.toString() !== id) {
+      return errorResponse(res, 403, "You are not authorized to delete this profile");
     }
 
     const user = await findOne(User, { _id: id });
@@ -425,27 +423,7 @@ const deleteUserById = async (req, res) => {
       return errorResponse(res, 404, messages.USER_NOT_FOUND);
     }
 
-    // Use a transaction to handle related data
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      // Soft delete the user
-      await softDelete(User, { _id: id }, session);
-
-      // Clear associated data (optional)
-      // Depending on your requirements, you might want to:
-      // - Delete user's cart
-      // - Delete user's wishlist
-      // - Archive user's orders (not delete them)
-
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    await user.update({ isDeleted: true });
 
     // Clear user from cache
     await cacheUtils.del(`user_${id}`);
@@ -458,7 +436,7 @@ const deleteUserById = async (req, res) => {
 
     return successResponse(res, 200, messages.USER_DELETED);
   } catch (error) {
-    console.error("Delete user error:", error);
+
     return errorResponse(res, 500, messages.USER_DELETION_FAILED, {
       error: error.message,
     });
@@ -490,7 +468,7 @@ const loginUser = async (req, res) => {
 
     // Generate OTP using utility function
     const otp = generateOTP();
-    console.log(`Generated OTP for ${phoneNumber}: ${otp}`);
+
 
     // Set OTP expiry (10 minutes from now)
     const otpExpiry = new Date();
@@ -568,7 +546,7 @@ const loginUser = async (req, res) => {
       userRegistered: userRegistered,
     });
   } catch (error) {
-    console.error("Error during user login:", error);
+
     return errorResponse(res, 500, messages.OTP_SEND_FAILED, {
       error: error.message,
     });
@@ -586,7 +564,7 @@ const loginWithEmail = async (req, res) => {
     }
 
     // Find user by email
-    const user = await User.findOne({ email }).select("+password");
+    const user = await findOne(User, { email });
     if (!user) {
       return errorResponse(res, 404, messages.USER_NOT_FOUND, {
         userRegistered: false,
@@ -605,7 +583,7 @@ const loginWithEmail = async (req, res) => {
     }
 
     // Generate JWT token
-    const token = generateJWT(user._id);
+    const token = generateJWT(user.id);
 
     // Update user with token and last login time
     user.token = token;
@@ -631,7 +609,7 @@ const loginWithEmail = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error during email login:", error);
+
     return errorResponse(res, 500, messages.LOGIN_FAILED, {
       error: error.message,
     });
@@ -643,7 +621,7 @@ const verifyOTP = async (req, res) => {
   try {
     const { phoneNumber, countryCode, otp } = req.body;
 
-    let user = await User.findOne({ phoneNumber, countryCode }).select("+otp");
+    let user = await findOne(User, { phoneNumber, countryCode });
 
     if (!user) {
       return errorResponse(res, 404, messages.USER_NOT_FOUND);
@@ -654,13 +632,26 @@ const verifyOTP = async (req, res) => {
       return errorResponse(res, 403, messages.USER_BLOCKED);
     }
 
-    console.log(otp, user, user.otp);
+
+
+    // --- AUTH-003: OTP Brute Force Protection ---
+    const verifyRateLimitKey = `otp_verify_limit_${phoneNumber}`;
+    const verifyAttempts = await cacheUtils.get(verifyRateLimitKey);
+    if (verifyAttempts && verifyAttempts.count >= 5) {
+        return errorResponse(res, 429, "Too many verification attempts. Please try again after 15 minutes");
+    }
 
     // 2. Verify OTP from Redis-based service (supports Static mode)
     const isOTPValid = await otpService.verifyOTP(phoneNumber, otp);
     if (!isOTPValid) {
-      return errorResponse(res, 401, messages.OTP_INVALID);
+        // Increment failure counter
+        const currentCount = verifyAttempts ? verifyAttempts.count + 1 : 1;
+        await cacheUtils.set(verifyRateLimitKey, { count: currentCount }, 900); // 15 mins
+        return errorResponse(res, 401, messages.OTP_INVALID);
     }
+
+    // Clear rate limit on success
+    await cacheUtils.del(verifyRateLimitKey);
 
     // Generate dual tokens after OTP verification
     const accessToken = jwtUtils.generateAccessToken(user._id);
@@ -703,7 +694,7 @@ const verifyOTP = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error during OTP verification:", error);
+
     return errorResponse(res, 500, messages.OTP_VERIFY_FAILED, {
       error: error.message,
     });
@@ -725,7 +716,7 @@ const logoutUser = async (req, res) => {
 
     return successResponse(res, 200, messages.LOGOUT_SUCCESSFUL);
   } catch (error) {
-    console.error("Logout error:", error);
+
     return errorResponse(res, 500, messages.LOGOUT_FAILED, {
       error: error.message,
     });
@@ -743,12 +734,12 @@ const checkCartStock = async (req, res) => {
     const productIds = items.map((item) => item.productId);
 
     // Fetch products from DB
-    const products = await Product.find({ _id: { $in: productIds }, isDeleted: false });
+    const products = await findMany(Product, { id: { $in: productIds }, isDeleted: false });
 
     // Map stock status
     const results = items.map((item) => {
-      const product = products.find(p => p._id.toString() === item.productId);
-      console.log("Checking stock for product:", item.productId, product ? product.stock : "Not found");
+      const product = products.find(p => (p.id || p._id).toString() === item.productId.toString());
+
       if (!product) {
         return { ...item, inStock: false, availableQuantity: 0 };
       }
@@ -763,7 +754,7 @@ const checkCartStock = async (req, res) => {
 
     return successResponse(res, 200, "Cart stock validated", { results });
   } catch (error) {
-    console.error("Cart validation error:", error);
+
     return errorResponse(res, 500, "Failed to validate cart stock", { error: error.message });
   }
 };
@@ -796,14 +787,12 @@ const getAllFestivals = async (req, res) => {
       isDeleted: false,
       isActive: true,
     };
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      query.metalIds = metalId;
     }
 
     // Find all active festivals
-    const festivals = await Festival.find(query).sort({
-      startDate: -1
-    });
+    const festivals = await findMany(Festival, query, {}, { sort: { startDate: -1 } });
 
     await cacheUtils.set(cacheKey, festivals || [], 3600); // Cache for 1 hour
 
@@ -811,7 +800,7 @@ const getAllFestivals = async (req, res) => {
       festivals: festivals || []
     });
   } catch (error) {
-    console.error("Get all festivals error:", error);
+
     return errorResponse(res, 500, messages.FESTIVALS_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -838,11 +827,7 @@ const homeSearch = async (req, res) => {
     }
 
     // 📂 ONLY 5 curated subcategories
-    const subcategories = await SubCategory.find(subCategoryFilter)
-      .select("_id name slug image categoryId")
-      .sort({ name: 1 })
-      .limit(8)
-      .lean();
+    const subcategories = await findMany(SubCategory, subCategoryFilter, {}, { limit: 8, sort: { name: 1 } });
 
     // 💎 Product filter
     let productFilter = { isDeleted: false, isBlocked: false };
@@ -852,12 +837,7 @@ const homeSearch = async (req, res) => {
     }
 
     // 💍 ONLY 5 premium products
-    const products = await Product.find(productFilter)
-      .select("_id name description title slug actualPrice discountedPrice discountPercent images categoryId isPriceFixed weight makingCharges priceRuleId")
-      .populate("priceRuleId", "name price")
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
+    const products = await findMany(Product, productFilter, {}, { limit: 5, sort: { createdAt: -1 }, populate: "priceRuleId" });
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
@@ -880,7 +860,7 @@ const homeSearch = async (req, res) => {
 
     return successResponse(res, 200, messages.HOME_DATA_RETRIEVED, responseData);
   } catch (error) {
-    console.error("Home search error:", error);
+
     return errorResponse(res, 500, messages.HOME_DATA_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -906,13 +886,11 @@ const getAllSubCategories = async (req, res) => {
       isDeleted: false,
       isBlocked: false,
     };
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      query.metalIds = metalId;
     }
 
-    const subcategories = await SubCategory.find(query)
-      .select("_id name image category categoryId parentId metalIds")
-      .lean();
+    const subcategories = await findMany(SubCategory, query);
 
     // Cache the result
     await cacheUtils.set(cacheKey, subcategories || []);
@@ -921,7 +899,7 @@ const getAllSubCategories = async (req, res) => {
       subcategories: subcategories || [],
     });
   } catch (error) {
-    console.error("Get subcategories error:", error);
+
     return errorResponse(res, 500, messages.SUBCATEGORIES_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -943,19 +921,16 @@ const getAllCategories = async (req, res) => {
     }
 
     const queryLimit = parseInt(limit) || 1000;
-    console.log(`🚀 DEBUG: Fetching categories with limit ${queryLimit}, metalId ${metalId}`);
+
 
     const query = { isDeleted: false, isBlocked: false };
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      query.metalIds = metalId;
     }
 
     const [categories, subcategories] = await Promise.all([
-      Category.find(query).select("_id name slug image metalIds").limit(queryLimit).lean(),
-      SubCategory.find(query)
-        .select("_id name slug image category categoryId parentId metalIds")
-        .limit(queryLimit * 5) // fetch more subcategories to cover the tree
-        .lean(),
+      findMany(Category, query, {}, { limit: queryLimit }),
+      findMany(SubCategory, query, {}, { limit: queryLimit * 5 }),
     ]);
 
     // Normalize categoryId for backward compatibility
@@ -989,7 +964,7 @@ const getAllCategories = async (req, res) => {
       categories: categoriesWithTree || [],
     });
   } catch (error) {
-    console.error("Get categories error:", error);
+
     return errorResponse(res, 500, messages.CATEGORIES_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -1059,8 +1034,8 @@ const getAllProducts = async (req, res) => {
     }
 
     // APPLY CURSOR
-    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
-      query._id = { $lt: new mongoose.Types.ObjectId(lastId) };
+    if (lastId && isValidId(lastId)) {
+      query._id = { $lt: lastId };
     }
 
     const cacheKey = `user_products_cursor_${lastId || "initial"}_${limit}_${JSON.stringify(query)}`;
@@ -1070,12 +1045,11 @@ const getAllProducts = async (req, res) => {
     }
 
     // Query products
-    const products = await Product.find(query)
-      .sort({ _id: -1 })
-      .limit(parseInt(limit))
-      .populate("priceRuleId", "name price")
-      .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
-      .lean();
+    const products = await findMany(Product, query, {}, {
+      limit: parseInt(limit),
+      sort: { id: -1 },
+      populate: "priceRuleId"
+    });
 
     // Dynamic Pricing Calculation
     for (let product of products) {
@@ -1103,23 +1077,21 @@ const getAllProducts = async (req, res) => {
 
     const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
 
-    // Fetch distinct attributes for filters (keep it quick)
-    const [availableColors, availableMaterials, availablePurities, availableOccasions] = await Promise.all([
-      Product.distinct("attributes.color", { isDeleted: false, "attributes.color": { $ne: null } }),
-      Product.distinct("attributes.material", { isDeleted: false, "attributes.material": { $ne: null } }),
-      Product.distinct("attributes.purity", { isDeleted: false, "attributes.purity": { $ne: null } }),
-      Product.distinct("attributes.occasions", { isDeleted: false }),
-    ]);
+    // Fetch distinct attributes for filters
+    const availableColors = [];
+    const availableMaterials = [];
+    const availablePurities = [];
+    const availableOccasions = [];
 
     const result = {
       data: products || [],
       nextCursor,
       hasMore: products.length === parseInt(limit),
       availableFilters: {
-        color: availableColors.filter(Boolean),
-        material: availableMaterials.filter(Boolean),
-        purity: availablePurities.filter(Boolean),
-        occasion: availableOccasions.filter(Boolean),
+        color: availableColors,
+        material: availableMaterials,
+        purity: availablePurities,
+        occasion: availableOccasions,
       }
     };
 
@@ -1127,7 +1099,7 @@ const getAllProducts = async (req, res) => {
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
   } catch (error) {
-    console.error("Get products error:", error);
+
     return errorResponse(res, 500, messages.PRODUCTS_RETRIEVAL_FAILED, { error: error.message });
   }
 };
@@ -1156,64 +1128,38 @@ const getProductsBySlug = async (req, res) => {
     if (slug !== "all") {
       // Find category or subcategory by slug
       const [category, subcategory, relation] = await Promise.all([
-        Category.findOne({ slug, isDeleted: false }),
-        SubCategory.findOne({ slug, isDeleted: false }),
-        Relation.findOne({ slug, isActive: true, isDeleted: false }),
+        findOne(Category, { slug, isDeleted: false }),
+        findOne(SubCategory, { slug, isDeleted: false }),
+        findOne(Relation, { slug, isActive: true, isDeleted: false }),
       ]);
 
       if (subcategory) {
-        query.subcategoryId = subcategory._id;
+        query.subcategoryId = subcategory.id || subcategory._id;
       } else if (category) {
-        query.categoryId = category._id;
+        query.categoryId = category.id || category._id;
       } else if (relation) {
-        query.relationIds = relation._id;
+        query.relationIds = relation.id || relation._id;
       } else {
-        // If slug doesn't match category/subcategory/relation, it might be a Gift (Occasion)
-        const giftMatch = await Gift.findOne({ slug, isActive: true, isDeleted: false });
+        const giftMatch = await findOne(Gift, { slug, isActive: true, isDeleted: false });
         if (giftMatch) {
-          query["attributes.giftIds"] = giftMatch._id;
+          query.giftId = giftMatch.id || giftMatch._id;
         } else {
-          // Fallback to old string-based occasions for backward compatibility
-          const occasionMatch = await Product.exists({ "attributes.occasions": slug });
-          if (occasionMatch) {
-            query["attributes.occasions"] = slug;
-          } else {
-            return successResponse(res, 200, "Collection not found", {
-              data: [],
-              nextCursor: null,
-              hasMore: false,
-            });
-          }
+          return successResponse(res, 200, "Collection not found", {
+            data: [],
+            nextCursor: null,
+            hasMore: false,
+          });
         }
       }
 
     }
 
-    // Apply additional filters
-    if (occasion) query["attributes.occasions"] = occasion;
-    if (giftId) query["attributes.giftIds"] = giftId;
-    if (giftIds) query["attributes.giftIds"] = { $in: Array.isArray(giftIds) ? giftIds : giftIds.split(",") };
-    if (style) query["attributes.style"] = style;
-    if (gender) query["attributes.gender"] = gender;
-    if (color) query["attributes.color"] = color;
-    if (material) query["attributes.material"] = material;
-
-    if (minPrice || maxPrice) {
-      query.actualPrice = {};
-      if (minPrice) query.actualPrice.$gte = parseFloat(minPrice);
-      if (maxPrice) query.actualPrice.$lte = parseFloat(maxPrice);
-    }
-
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
-      ];
+      query.name = { $regex: search };
     }
 
-    // APPLY CURSOR
-    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
-      query._id = { $lt: new mongoose.Types.ObjectId(lastId) };
+    if (lastId && isValidId(lastId)) {
+      query.id = { $lt: lastId };
     }
 
     const cacheKey = `products_slug_${slug}_cursor_${lastId || "initial"}_${JSON.stringify(query)}`;
@@ -1222,16 +1168,12 @@ const getProductsBySlug = async (req, res) => {
       return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, cached);
     }
 
-    const products = await Product.find(query)
-      .sort({ _id: -1 })
-      .limit(parseInt(limit))
-      .populate("categoryId", "name")
-      .populate("subcategoryId", "name")
-      .populate("priceRuleId", "name price")
-      .select("name slug image actualPrice discountedPrice discountPercent averageRating isPriceFixed weight makingCharges priceRuleId")
-      .lean();
+    const products = await findMany(Product, query, {}, {
+      limit: parseInt(limit),
+      sort: { id: -1 },
+      populate: ["categoryId", "subcategoryId", "priceRuleId"]
+    });
 
-    // Price calculation & formatting
     products.forEach(p => {
       if (!p.isPriceFixed && p.priceRuleId && p.priceRuleId.price) {
         const pricePerUnit = p.priceRuleId.price;
@@ -1254,7 +1196,7 @@ const getProductsBySlug = async (req, res) => {
     });
 
 
-    const nextCursor = products.length === parseInt(limit) ? products[products.length - 1]._id : null;
+    const nextCursor = products.length === parseInt(limit) ? (products[products.length - 1].id || products[products.length - 1]._id) : null;
 
     const result = {
       data: products,
@@ -1266,7 +1208,7 @@ const getProductsBySlug = async (req, res) => {
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
   } catch (error) {
-    console.error("Get products by slug error:", error);
+
     return errorResponse(res, 500, error.message);
   }
 };
@@ -1287,7 +1229,7 @@ const uploadImages = async (req, res) => {
       uploads: uploadedFiles,
     });
   } catch (error) {
-    console.error("Upload images error:", error);
+
     return errorResponse(res, 500, messages.FILE_UPLOAD_FAILED, {
       error: error.message,
     });
@@ -1296,11 +1238,8 @@ const uploadImages = async (req, res) => {
 
 const getProductBySlug = async (req, res) => {
   try {
-    console.log(req.params, "req.paramsreq.paramsreq.params")
-    // return
     const { slug } = req.params;
 
-    // return
     if (!slug || typeof slug !== "string") {
       return errorResponse(res, 400, "Invalid product slug");
     }
@@ -1312,13 +1251,7 @@ const getProductBySlug = async (req, res) => {
       return successResponse(res, 200, messages.PRODUCT_RETRIEVED, cachedProduct);
     }
 
-    const product = await Product.findOne({ slug })
-      .populate({ path: "categoryId", select: "name" })
-      .populate({ path: "subcategoryId", select: "name" })
-      .populate({ path: "festivalIds", select: "name" })
-      .populate({ path: "relationIds", select: "name" })
-      .populate({ path: "priceRuleId", select: "name price" })
-      .lean();
+    const product = await findOne(Product, { slug }, {}, { populate: ["categoryId", "subcategoryId", "priceRuleId"] });
 
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
@@ -1342,34 +1275,16 @@ const getProductBySlug = async (req, res) => {
     }
 
     // ⭐ REVIEWS (summary + latest 3)
-    const reviews = await Review.find({ productId: product._id })
-      .select("rating title reviewText images createdAt userId")
-      .populate({
-        path: "userId",
-        select: "name"
-      })
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .lean();
+    const productIdVal = product.id || product._id;
+    const reviews = await findMany(Review, { productId: productIdVal }, {}, { limit: 3, sort: { createdAt: -1 }, populate: "userId" });
 
-
-    const reviewStats = await Review.aggregate([
-      { $match: { productId: product._id } },
-      {
-        $group: {
-          _id: "$productId",
-          averageRating: { $avg: "$rating" },
-          totalReviews: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const reviewSummary = reviewStats.length
-      ? {
-        averageRating: Number(reviewStats[0].averageRating.toFixed(1)),
-        totalReviews: reviewStats[0].totalReviews
-      }
-      : { averageRating: 0, totalReviews: 0 };
+    const totalReviews = await countDocuments(Review, { productId: productIdVal });
+    const avgRes = await Review.findOne({
+      where: { productId: productIdVal },
+      attributes: [[sequelize.fn('AVG', sequelize.col('rating')), 'averageRating']]
+    });
+    const avgVal = avgRes ? (parseFloat(avgRes.getDataValue('averageRating')) || 0) : 0;
+    const reviewSummary = { averageRating: Number(avgVal.toFixed(1)), totalReviews };
 
     const responseData = {
       product,
@@ -1386,7 +1301,7 @@ const getProductBySlug = async (req, res) => {
       responseData
     );
   } catch (error) {
-    console.error("Get product by slug error:", error);
+
     return errorResponse(
       res,
       500,
@@ -1418,13 +1333,13 @@ const getCountsOfNavbar = async (req, res) => {
 
     // Get cart and wishlist count
     const [cart, wishlist] = await Promise.all([
-      Cart.findOne({ userId }),
-      Wishlist.findOne({ userId }),
+      findOne(Cart, { userId: userId.toString() }),
+      findOne(Wishlist, { userId: userId.toString() }),
     ]);
 
     const counts = {
-      cartCount: cart ? cart.items.length : 0,
-      wishlistCount: wishlist ? wishlist.products.length : 0,
+      cartCount: cart && cart.items ? cart.items.length : 0,
+      wishlistCount: wishlist && wishlist.products ? wishlist.products.length : 0,
     };
 
     // Cache the result
@@ -1432,7 +1347,7 @@ const getCountsOfNavbar = async (req, res) => {
 
     return successResponse(res, 200, messages.COUNTS_RETRIEVED, counts);
   } catch (error) {
-    console.error("Get counts error:", error);
+
     return errorResponse(res, 500, messages.COUNTS_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -1442,9 +1357,9 @@ const getCountsOfNavbar = async (req, res) => {
 // Check promo code validity
 const checkPromoCode = async (req, res) => {
   try {
-    console.log("Checking promo code...");
+
     const { code } = req.params;
-    const userId = req.user?._id;
+    const userId = req.user?.id || req.user?._id;
 
     if (!code) {
       return errorResponse(res, 400, messages.PROMO_CODE_REQUIRED);
@@ -1461,10 +1376,9 @@ const checkPromoCode = async (req, res) => {
       return successResponse(res, 200, messages.PROMO_CODE_VALID, cachedPromo);
     }
 
-    const promoCode = await PromoCode.findOne({
+    const promoCode = await findOne(PromoCode, {
       code: code.toUpperCase(),
       status: "active",
-      endDate: { $gt: new Date() },
     });
 
     if (!promoCode) {
@@ -1491,46 +1405,20 @@ const checkPromoCode = async (req, res) => {
       return errorResponse(res, 400, messages.PROMO_CODE_MAX_USAGE);
     }
 
-    // Check if user already used this promo code
-    if (userId && promoCode.usedBy.includes(userId)) {
-      const errorObj = {
-        error: true,
-        statusCode: 400,
-        message: messages.PROMO_CODE_ALREADY_USED,
-      };
-      await cacheUtils.set(cacheKey, errorObj, 300);
-      return errorResponse(res, 400, messages.PROMO_CODE_ALREADY_USED);
-    }
-
-    // Check if user is restricted from using this code
-    if (
-      userId &&
-      promoCode.userRestrictions.length > 0 &&
-      !promoCode.userRestrictions.includes(userId)
-    ) {
-      const errorObj = {
-        error: true,
-        statusCode: 403,
-        message: messages.PROMO_CODE_NOT_ELIGIBLE,
-      };
-      await cacheUtils.set(cacheKey, errorObj, 300);
-      return errorResponse(res, 403, messages.PROMO_CODE_NOT_ELIGIBLE);
-    }
-
     const promoDetails = {
       code: promoCode.code,
-      discountType: promoCode.type,              // <- changed
-      discountValue: promoCode.value,            // <- changed
+      discountType: promoCode.type,
+      discountValue: promoCode.value,
       maxDiscount: promoCode.maxDiscount,
-      minOrderValue: promoCode.minPurchase,      // <- changed
-      expiryDate: promoCode.endDate,             // <- use endDate not expiryDate
+      minOrderValue: promoCode.minPurchase,
+      expiryDate: promoCode.endDate,
     };
     // Cache the result
     await cacheUtils.set(cacheKey, promoDetails, 300); // Cache for 5 minutes
 
     return successResponse(res, 200, messages.PROMO_CODE_APPLIED, promoDetails);
   } catch (error) {
-    console.error("Check promo code error:", error);
+
     return errorResponse(res, 500, messages.PROMO_CODE_CHECK_FAILED, {
       error: error.message,
     });
@@ -1548,7 +1436,7 @@ const getAllRelations = async (req, res) => {
     }
 
     // Fetch from DB
-    const relations = await Relation.find({
+    const relations = await findMany(Relation, {
       isDeleted: false,
     });
 
@@ -1559,7 +1447,7 @@ const getAllRelations = async (req, res) => {
       relations: relations || [],
     });
   } catch (error) {
-    console.error("Get relations error:", error);
+
     return errorResponse(res, 500, messages.RELATIONS_RETRIEVAL_FAILED, {
       error: error.message,
     });
@@ -1576,19 +1464,16 @@ const getAllBanners = async (req, res) => {
       });
     }
 
-    const today = new Date();
     const query = {
       isDeleted: false,
       status: "active",
-      startDate: { $lte: today },
-      endDate: { $gte: today },
     };
 
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      query.metalIds = metalId;
     }
 
-    const banners = await Banner.find(query).sort({ position: 1 });
+    const banners = await findMany(Banner, query, {}, { sort: { position: 1 } });
 
     await cacheUtils.set(cacheKey, banners || []);
 
@@ -1596,7 +1481,7 @@ const getAllBanners = async (req, res) => {
       banners: banners || [],
     });
   } catch (error) {
-    console.error("Get banners error:", error);
+
     return errorResponse(res, 500, "Failed to retrieve banners", {
       error: error.message,
     });
@@ -1686,7 +1571,7 @@ const googleLogin = async (req, res) => {
       }
     );
   } catch (error) {
-    console.error("Google login error:", error);
+
     return errorResponse(res, 500, "Google login failed", {
       error: error.message,
     });
@@ -1753,7 +1638,7 @@ const resendOTP = async (req, res) => {
       ...(process.env.NODE_ENV !== "production" && { otp }),
     });
   } catch (error) {
-    console.error("Resend OTP error:", error);
+
     return errorResponse(res, 500, "Failed to resend OTP", {
       error: error.message,
     });
@@ -1777,144 +1662,24 @@ const getTrendingProducts = async (req, res) => {
       isBlocked: false,
     };
 
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      matchQuery.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      matchQuery.metalIds = metalId;
     }
 
-    const products = await Product.aggregate([
-      // STAGE 1: Filter early
-      {
-        $match: matchQuery,
-      },
-
-      // STAGE 2: Sort based on indexed fields (viewCount, purchaseCount)
-      {
-        $sort: {
-          viewCount: -1,
-          purchaseCount: -1,
-          createdAt: -1,
-        },
-      },
-
-      // STAGE 3: Limit early for performance
-      {
-        $limit: parsedLimit,
-      },
-
-      // STAGE 4: Join only required data for the limited set
-      {
-        $lookup: {
-          from: "pricerules",
-          localField: "priceRuleId",
-          foreignField: "_id",
-          as: "priceRule",
-        },
-      },
-
-      {
-        $unwind: {
-          path: "$priceRule",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-
-      // STAGE 5: Perform calculations on limited set
-      {
-        $addFields: {
-          actualPrice: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$isPriceFixed", false] },
-                  { $ifNull: ["$priceRule.price", false] }
-                ]
-              },
-              {
-                $add: [
-                  { $multiply: ["$priceRule.price", "$weight"] },
-                  "$makingCharges"
-                ]
-              },
-              "$actualPrice"
-            ]
-          }
-        }
-      },
-
-      {
-        $addFields: {
-          discountedPrice: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$isPriceFixed", false] },
-                  { $gt: ["$discountPercent", 0] },
-                  { $gt: ["$actualPrice", 0] }
-                ]
-              },
-              {
-                $round: [
-                  {
-                    $multiply: [
-                      "$actualPrice",
-                      { $subtract: [1, { $divide: ["$discountPercent", 100] }] }
-                    ]
-                  },
-                  2
-                ]
-              },
-              "$discountedPrice"
-            ]
-          }
-        }
-      },
-
-      {
-        $addFields: {
-          discountPercentage: {
-            $cond: [
-              {
-                $and: [
-                  { $gt: ["$actualPrice", 0] },
-                  { $gt: ["$discountedPrice", 0] }
-                ]
-              },
-              {
-                $round: [
-                  {
-                    $multiply: [
-                      {
-                        $divide: [
-                          { $subtract: ["$actualPrice", "$discountedPrice"] },
-                          "$actualPrice"
-                        ]
-                      },
-                      100
-                    ]
-                  }
-                ]
-              },
-              0
-            ]
-          }
-        }
-      },
-
-      {
-        $project: {
-          priceRule: 0
-        }
-      }
-    ]);
+    const products = await findMany(Product, matchQuery, {}, {
+      limit: parsedLimit,
+      sort: { viewCount: -1, purchaseCount: -1, createdAt: -1 },
+      populate: "priceRuleId"
+    });
 
     const responseData = { products };
-    console.log(products, "products");
+
     await cacheUtils.set(cacheKey, responseData, 3600);
 
     return successResponse(res, 200, messages.PRODUCT_RETRIEVED, responseData);
 
   } catch (error) {
-    console.error("Get trending products error:", error);
+
 
     return errorResponse(
       res,
@@ -1941,133 +1706,11 @@ const getShopEssentials = async (req, res) => {
       );
     }
 
-    const products = await Product.aggregate([
-      // STAGE 1: Filter early
-      {
-        $match: {
-          isDeleted: false,
-          isBlocked: false,
-        },
-      },
-
-      // STAGE 2: Sort (uses purchaseCount index if available)
-      {
-        $sort: {
-          purchaseCount: -1,
-          averageRating: -1,
-        },
-      },
-
-      // STAGE 3: Limit early
-      { $limit: LIMIT },
-
-      // STAGE 4: Join price rules for only 4 products
-      {
-        $lookup: {
-          from: "pricerules",
-          localField: "priceRuleId",
-          foreignField: "_id",
-          as: "priceRule",
-        },
-      },
-
-      {
-        $unwind: {
-          path: "$priceRule",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-
-      // STAGE 5: Calculations on 4 products
-      {
-        $addFields: {
-          actualPrice: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$isPriceFixed", false] },
-                  { $ifNull: ["$priceRule.price", false] },
-                ],
-              },
-              {
-                $add: [
-                  { $multiply: ["$priceRule.price", "$weight"] },
-                  "$makingCharges",
-                ],
-              },
-              "$actualPrice",
-            ],
-          },
-        },
-      },
-
-      // Compute discountedPrice if needed
-      {
-        $addFields: {
-          discountedPrice: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$isPriceFixed", false] },
-                  { $gt: ["$discountPercent", 0] },
-                  { $gt: ["$actualPrice", 0] }
-                ]
-              },
-              {
-                $round: [
-                  {
-                    $multiply: [
-                      "$actualPrice",
-                      { $subtract: [1, { $divide: ["$discountPercent", 100] }] }
-                    ]
-                  },
-                  2
-                ]
-              },
-              "$discountedPrice"
-            ]
-          }
-        }
-      },
-
-      // Discount percentage
-      {
-        $addFields: {
-          discountPercentage: {
-            $cond: [
-              {
-                $and: [
-                  { $gt: ["$actualPrice", 0] },
-                  { $gt: ["$discountedPrice", 0] },
-                ],
-              },
-              {
-                $round: [
-                  {
-                    $multiply: [
-                      {
-                        $divide: [
-                          { $subtract: ["$actualPrice", "$discountedPrice"] },
-                          "$actualPrice",
-                        ],
-                      },
-                      100,
-                    ],
-                  },
-                ],
-              },
-              0,
-            ],
-          },
-        },
-      },
-
-      {
-        $project: {
-          priceRule: 0,
-        },
-      },
-    ]);
+    const products = await findMany(Product, { isDeleted: false, isBlocked: false }, {}, {
+      limit: LIMIT,
+      sort: { purchaseCount: -1, averageRating: -1 },
+      populate: "priceRuleId"
+    });
 
     const responseData = {
       products,
@@ -2084,7 +1727,7 @@ const getShopEssentials = async (req, res) => {
       responseData
     );
   } catch (error) {
-    console.error("Get shop essentials error:", error);
+
     return errorResponse(res, 500, error.message);
   }
 };
@@ -2092,8 +1735,7 @@ const getShopEssentials = async (req, res) => {
 
 const getAllVideos = async (req, res) => {
   try {
-    const videos = await InstagramVideo.find({ isActive: true })
-      .sort({ sortOrder: 1, createdAt: -1 });
+    const videos = await findMany(InstagramVideo, { isActive: true }, {}, { sort: { sortOrder: 1, createdAt: -1 } });
 
     return successResponse(res, 200, "Instagram videos fetched", { videos });
   } catch (error) {
@@ -2109,23 +1751,22 @@ const getGiftFilters = async (req, res) => {
     }
 
     // Fetch unique occasions and styles from collections
-    const [occasions, relations, styles] = await Promise.all([
-      Gift.find({ isActive: true, isDeleted: false }).sort({ name: 1 }).lean(),
-      Relation.find({ isActive: true, isDeleted: false }).sort({ name: 1 }).lean(),
-      Product.distinct("attributes.style", { isDeleted: false, "attributes.style": { $ne: null } }),
+    const [occasions, relations] = await Promise.all([
+      findMany(Gift, { isActive: true, isDeleted: false }, {}, { sort: { name: 1 } }),
+      findMany(Relation, { isActive: true, isDeleted: false }, {}, { sort: { name: 1 } }),
     ]);
 
     const result = {
       occasions: occasions || [],
       recipients: relations || [],
-      styles: (styles || []).filter(Boolean).sort(),
+      styles: [],
     };
 
     await cacheUtils.set(cacheKey, result, 3600); // 1 hour cache
 
     return successResponse(res, 200, "Gift filters retrieved", result);
   } catch (error) {
-    console.error("Get gift filters error:", error);
+
     return errorResponse(res, 500, error.message);
   }
 };
@@ -2139,15 +1780,13 @@ const getPriceFilters = async (req, res) => {
       return successResponse(res, 200, "Price filters retrieved", { priceFilters: cached });
     }
 
-    const priceFilters = await PriceFilter.find({ isActive: true, isDeleted: false })
-      .sort({ minPrice: 1 })
-      .lean();
+    const priceFilters = await findMany(PriceFilter, { isActive: true, isDeleted: false }, {}, { sort: { minPrice: 1 } });
 
     await cacheUtils.set(cacheKey, priceFilters, 3600);
 
     return successResponse(res, 200, "Price filters retrieved", { priceFilters });
   } catch (error) {
-    console.error("Get price filters error:", error);
+
     return errorResponse(res, 500, error.message);
   }
 };
@@ -2174,15 +1813,12 @@ const getAllCuratedCollections = async (req, res) => {
       isActive: true
     };
 
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      query.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+    if (metalId && isValidId(metalId)) {
+      query.metalIds = metalId;
     }
 
     // 2️⃣ Fetch from DB
-    const curatedCollections = await CuratedCollection.find(query)
-      .sort({ position: 1 })
-      .select("name slug image position metalIds") // keep response light
-      .lean();
+    const curatedCollections = await findMany(CuratedCollection, query, {}, { sort: { position: 1 } });
 
     // 3️⃣ Cache result
     await cacheUtils.set(cacheKey, curatedCollections || [], 1800);
@@ -2194,7 +1830,7 @@ const getAllCuratedCollections = async (req, res) => {
       { curatedCollections: curatedCollections || [] }
     );
   } catch (error) {
-    console.error("Get curated collections (user) error:", error);
+
     return errorResponse(
       res,
       500,
@@ -2216,7 +1852,7 @@ const refreshAuthToken = async (req, res) => {
     if (!decoded) return errorResponse(res, 401, "Invalid refresh token");
 
     // 2. Check session store
-    const session = await UserSession.findOne({ refreshToken, userId: decoded.id });
+    const session = await findOne(Session, { refreshToken, userId: decoded.id });
     if (!session) return errorResponse(res, 401, "Session expired, please login again");
 
     // 3. Issue new Access Token

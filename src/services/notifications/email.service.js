@@ -15,7 +15,7 @@ function getTransporter() {
     });
     return transporter;
   } catch (e) {
-    console.error('Failed to create mail transporter', e);
+
     return null;
   }
 }
@@ -23,28 +23,36 @@ function getTransporter() {
 async function sendEmail(to, subject, html, options = {}) {
   const t = getTransporter();
   if (!t) return false;
-  try {
-    const mailOptions = {
-      from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@example.com',
-      to,
-      subject,
-      html,
-    };
 
-    if (options.cc) mailOptions.cc = options.cc;
-    if (options.bcc) mailOptions.bcc = options.bcc;
-    if (options.replyTo) mailOptions.replyTo = options.replyTo;
+  const MAX_RETRIES = 3;
+  let delay = 1000; // Start with 1s
 
-    // Optional default BCC for internal tracking (do not hardcode personal emails)
-    const defaultBcc = process.env.MAIL_BCC;
-    if (!mailOptions.bcc && defaultBcc) mailOptions.bcc = defaultBcc;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const mailOptions = {
+        from: process.env.MAIL_FROM || process.env.MAIL_USER || 'no-reply@gurujewellers.in',
+        to,
+        subject,
+        html,
+      };
 
-    await t.sendMail(mailOptions);
+      if (options.cc) mailOptions.cc = options.cc;
+      if (options.bcc) mailOptions.bcc = options.bcc;
+      if (options.replyTo) mailOptions.replyTo = options.replyTo;
 
-    return true;
-  } catch (err) {
-    console.error('Email send failed', err.message);
-    return false;
+      const defaultBcc = process.env.MAIL_BCC;
+      if (!mailOptions.bcc && defaultBcc) mailOptions.bcc = defaultBcc;
+
+      await t.sendMail(mailOptions);
+      return true;
+    } catch (err) {
+
+      if (attempt === MAX_RETRIES) return false;
+      
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2;
+    }
   }
 }
 

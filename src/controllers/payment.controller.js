@@ -38,7 +38,7 @@ async function createRazorpayOrder(req, res) {
 
     return res.json({ success: true, order });
   } catch (err) {
-    console.error("🔴 Razorpay Create Error:", err?.error || err);
+
     return res.status(500).json({
       success: false,
       message: err?.error?.description || err.message || "Payment order failed",
@@ -78,7 +78,7 @@ async function verifyPayment(req, res) {
 
     return res.status(400).json({ success: false, message: "Invalid signature" });
   } catch (err) {
-    console.error("Error verifying Razorpay payment:", err);
+
     return res.status(500).json({ success: false, message: "Server error during verification" });
   }
 }

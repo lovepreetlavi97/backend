@@ -1,8 +1,8 @@
 const { S3Client } = require("@aws-sdk/client-s3");
 require("dotenv").config();
 require("dotenv").config();
-console.log(process.env.AWS_ACCESS_KEY_ID, "AWS Key Check");
-console.log(process.env.AWS_SECRET_ACCESS_KEY, "AWS Secret Check");
+
+
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,

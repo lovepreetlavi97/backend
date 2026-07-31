@@ -37,7 +37,7 @@ const cacheRoute = (ttl = 3600) => {
               statusCode: res.statusCode
             }, ttl);
           } catch (err) {
-            console.error('Cache storage error:', err);
+
           }
         }
         
@@ -47,7 +47,7 @@ const cacheRoute = (ttl = 3600) => {
       
       next();
     } catch (error) {
-      console.error('Cache middleware error:', error);
+
       next(); // Proceed with the route handler even if caching fails
     }
   };
@@ -65,7 +65,7 @@ const clearRouteCache = (pattern = 'route_*') => {
       await cacheUtils.delPattern(pattern);
       next();
     } catch (error) {
-      console.error('Cache clearing error:', error);
+
       next(); // Proceed even if cache clearing fails
     }
   };

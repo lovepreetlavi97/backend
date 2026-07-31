@@ -4,7 +4,7 @@ const {
   findMany, 
   findAndUpdate, 
   deleteOne 
-} = require('../services/mongodb/mongoService');
+} = require('../services/mysql/mysqlService');
 
 const { SocialIntegration } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
@@ -29,7 +29,7 @@ const getAllIntegrations = async (req, res) => {
     
     return successResponse(res, 200, "Social integrations retrieved successfully", { integrations });
   } catch (error) {
-    console.error("Get all integrations error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to retrieve social integrations");
   }
 };
@@ -38,7 +38,7 @@ const getAllIntegrations = async (req, res) => {
 const getIntegrationById = async (req, res) => {
   try {
     const { id } = req.params;
-    const integration = await findOne(SocialIntegration, { _id: id, isDeleted: false });
+    const integration = await findOne(SocialIntegration, { id, isDeleted: false });
     
     if (!integration) {
       return errorResponse(res, 404, "Social integration not found");
@@ -46,7 +46,7 @@ const getIntegrationById = async (req, res) => {
     
     return successResponse(res, 200, "Social integration retrieved successfully", { integration });
   } catch (error) {
-    console.error("Get integration error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to retrieve social integration");
   }
 };
@@ -83,7 +83,7 @@ const createIntegration = async (req, res) => {
     
     return successResponse(res, 201, "Social integration created successfully", { integration });
   } catch (error) {
-    console.error("Create integration error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to create social integration");
   }
 };
@@ -96,7 +96,7 @@ const updateIntegration = async (req, res) => {
     
     const integration = await findAndUpdate(
       SocialIntegration,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       updateData
     );
     
@@ -109,7 +109,7 @@ const updateIntegration = async (req, res) => {
     
     return successResponse(res, 200, "Social integration updated successfully", { integration });
   } catch (error) {
-    console.error("Update integration error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to update social integration");
   }
 };
@@ -119,21 +119,24 @@ const toggleIntegration = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const integration = await findOne(SocialIntegration, { _id: id, isDeleted: false });
+    const integration = await findOne(SocialIntegration, { id, isDeleted: false });
     
     if (!integration) {
       return errorResponse(res, 404, "Social integration not found");
     }
     
-    integration.enabled = !integration.enabled;
-    await integration.save();
+    const updated = await findAndUpdate(
+      SocialIntegration,
+      { id },
+      { enabled: !integration.enabled }
+    );
     
     // Clear cache
     await cacheUtils.del('social_integrations');
     
-    return successResponse(res, 200, "Social integration status updated successfully", { integration });
+    return successResponse(res, 200, "Social integration status updated successfully", { integration: updated });
   } catch (error) {
-    console.error("Toggle integration error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to toggle social integration");
   }
 };
@@ -148,25 +151,23 @@ const updateFeature = async (req, res) => {
       return errorResponse(res, 400, "Feature name is required");
     }
     
-    const integration = await findOne(SocialIntegration, { _id: id, isDeleted: false });
+    const integration = await findOne(SocialIntegration, { id, isDeleted: false });
     
     if (!integration) {
       return errorResponse(res, 404, "Social integration not found");
     }
     
-    if (!integration.features.hasOwnProperty(feature)) {
-      return errorResponse(res, 400, "Invalid feature name");
-    }
+    const features = integration.features || {};
+    features[feature] = enabled;
     
-    integration.features[feature] = enabled;
-    await integration.save();
+    const updated = await findAndUpdate(SocialIntegration, { id }, { features });
     
     // Clear cache
     await cacheUtils.del('social_integrations');
     
-    return successResponse(res, 200, "Feature updated successfully", { integration });
+    return successResponse(res, 200, "Feature updated successfully", { integration: updated });
   } catch (error) {
-    console.error("Update feature error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to update feature");
   }
 };
@@ -178,7 +179,7 @@ const deleteIntegration = async (req, res) => {
     
     const integration = await findAndUpdate(
       SocialIntegration,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { isDeleted: true }
     );
     
@@ -191,7 +192,7 @@ const deleteIntegration = async (req, res) => {
     
     return successResponse(res, 200, "Social integration deleted successfully");
   } catch (error) {
-    console.error("Delete integration error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to delete social integration");
   }
 };
@@ -201,23 +202,22 @@ const syncIntegrationStats = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const integration = await findOne(SocialIntegration, { _id: id, isDeleted: false });
+    const integration = await findOne(SocialIntegration, { id, isDeleted: false });
     
     if (!integration) {
       return errorResponse(res, 404, "Social integration not found");
     }
     
-    // Here you would typically make API calls to the respective social platforms
-    // For now, we'll just update the lastSync timestamp
-    integration.stats.lastSync = new Date();
-    await integration.save();
+    const stats = integration.stats || {};
+    stats.lastSync = new Date();
+    const updated = await findAndUpdate(SocialIntegration, { id }, { stats });
     
     // Clear cache
     await cacheUtils.del('social_integrations');
     
-    return successResponse(res, 200, "Social integration stats synced successfully", { integration });
+    return successResponse(res, 200, "Social integration stats synced successfully", { integration: updated });
   } catch (error) {
-    console.error("Sync stats error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to sync integration stats");
   }
 };
@@ -231,4 +231,4 @@ module.exports = {
   updateFeature,
   deleteIntegration,
   syncIntegrationStats
-}; 
+};

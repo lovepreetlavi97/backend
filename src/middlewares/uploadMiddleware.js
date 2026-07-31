@@ -4,10 +4,6 @@ const { DeleteObjectCommand, DeleteObjectsCommand } = require("@aws-sdk/client-s
 const { s3Client } = require("../config/s3Client");
 const { v4: uuidv4 } = require("uuid");
 
-// Multer memory storage (no disk writing)
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
 // Accept images & videos only
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.match(/(image|video)\/(jpeg|jpg|png|gif|mp4|webp)/)) {
@@ -17,6 +13,18 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Multer memory storage with file limits
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max for single image
+    files: 1
+  },
+  fileFilter
+});
+
+
 // Middleware: upload single image under field name `image`
 const uploadSingleImage = upload.single("image");
 
@@ -24,7 +32,7 @@ const uploadSingleImage = upload.single("image");
 const uploadMultipleImagesMulter = multer({
   storage,
   limits: {
-    fileSize: 50 * 1024 * 1024,
+    fileSize: 10 * 1024 * 1024, // API-003: Lowered to 10MB to prevent MEM-001/OOM
     files: 10,
   },
   fileFilter,
@@ -50,7 +58,7 @@ const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') =
       key = key.replace(/\.[^/.]+$/, "") + ".webp"; 
     }
   } catch (error) {
-    console.warn("Image compression failed, uploading original:", error.message);
+
   }
 
   const upload = new Upload({
@@ -63,7 +71,7 @@ const uploadToSpaces = async (fileBuffer, fileName, mimeType, folder = 'misc') =
       // ACL: "public-read",
     },
   });
-console.log("Uploading to Spaces with key:", key);
+
 // return
   await upload.done();
   return key;
@@ -86,7 +94,7 @@ const uploadMultipleImages = async (files, folder = 'misc') => {
 const getPublicUrl = (key) => {
   const base = process.env.DO_PUBLIC_URL;
   if (!base) {
-    console.warn("⚠️ DO_PUBLIC_URL not set in .env");
+
     return key;
   }
   return `${base}/${key}`;
@@ -102,7 +110,7 @@ const deleteImageFromSpaces = async (key) => {
     await s3Client.send(command);
     return true;
   } catch (err) {
-    console.error("❌ Failed to delete single image:", err);
+
     return false;
   }
 };
@@ -119,7 +127,7 @@ const deleteMultipleImagesFromSpaces = async (keys) => {
     await s3Client.send(command);
     return true;
   } catch (err) {
-    console.error("❌ Failed to delete multiple images:", err);
+
     return false;
   }
 };

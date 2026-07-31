@@ -6,8 +6,8 @@ const AWS = require("aws-sdk");
 const { v4: uuidv4 } = require("uuid");
 
 // 🔍 Sanity logs (AWS ONLY)
-console.log("💬 AWS_S3_BUCKET:", process.env.AWS_S3_BUCKET);
-console.log("💬 AWS_REGION:", process.env.AWS_REGION);
+
+
 
 // ✅ Configure AWS globally (CORRECT)
 AWS.config.update({

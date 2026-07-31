@@ -1,45 +1,18 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const giftSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Gift name is required'],
-      trim: true,
-      unique: true,
-    },
-    slug: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-    },
-    image: {
-      type: String,
-      required: [true, 'Gift image is required'],
-    },
-    description: {
-      type: String,
-      trim: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// Index for performance
-giftSchema.index({ slug: 1 });
-giftSchema.index({ isActive: 1, isDeleted: 1 });
-
-const Gift = mongoose.model('Gift', giftSchema);
-
+const Gift = sequelize.define('Gift', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title: { type: DataTypes.STRING, allowNull: false },
+  slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+  image: { type: DataTypes.STRING, defaultValue: '' },
+  priceRange: { type: DataTypes.STRING, allowNull: true },
+  targetAudience: { type: DataTypes.STRING, allowNull: true },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+}, {
+  tableName: 'gifts',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
+});
+Gift.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
 module.exports = Gift;

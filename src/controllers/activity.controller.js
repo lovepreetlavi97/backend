@@ -1,4 +1,5 @@
-const SuspiciousActivity = require('../models/suspiciousActivity.model');
+const { SuspiciousActivity } = require('../models/index');
+const { findMany, findAndUpdate } = require('../services/mysql/mysqlService');
 const { successResponse, errorResponse } = require('../utils/responseUtil');
 
 /**
@@ -12,9 +13,10 @@ const getAllActivities = async (req, res) => {
         if (severity) query.severity = severity;
         if (isResolved !== undefined) query.isResolved = isResolved === 'true';
 
-        const activities = await SuspiciousActivity.find(query)
-            .populate('userId', 'name phoneNumber email')
-            .sort({ createdAt: -1 });
+        const activities = await findMany(SuspiciousActivity, query, null, {
+            sort: { createdAt: -1 },
+            populate: "userId"
+        });
 
         return successResponse(res, 200, "Security activities retrieved", activities);
     } catch (error) {
@@ -27,10 +29,10 @@ const getAllActivities = async (req, res) => {
  */
 const resolveActivity = async (req, res) => {
     try {
-        const activity = await SuspiciousActivity.findByIdAndUpdate(
-            req.params.id,
-            { isResolved: true },
-            { new: true }
+        const activity = await findAndUpdate(
+            SuspiciousActivity,
+            { id: req.params.id },
+            { isResolved: true }
         );
 
         if (!activity) return errorResponse(res, 404, "Alert not found");

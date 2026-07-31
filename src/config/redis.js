@@ -16,19 +16,19 @@ const DEFAULT_TTL = process.env.REDIS_TTL || 3600;
 const connectRedis = async () => {
   try {
     await redisClient.connect();
-    console.log('Redis connected');
+
 
     redisClient.on('error', (err) => {
-      console.error('Redis error:', err);
+
     });
 
     redisClient.on('reconnecting', () => {
-      console.log('Redis reconnecting...');
+
     });
 
     return redisClient;
   } catch (error) {
-    console.error('Error connecting to Redis:', error.message);
+
     // Allow app to continue even if Redis connection fails
     return null;
   }
@@ -43,7 +43,7 @@ const cacheUtils = {
       await redisClient.set(key, JSON.stringify(data), { EX: ttl });
       return true;
     } catch (error) {
-      console.error('Redis set error:', error);
+
       return false;
     }
   },
@@ -55,7 +55,7 @@ const cacheUtils = {
       const data = await redisClient.get(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Redis get error:', error);
+
       return null;
     }
   },
@@ -67,22 +67,28 @@ const cacheUtils = {
       await redisClient.del(key);
       return true;
     } catch (error) {
-      console.error('Redis del error:', error);
+
       return false;
     }
   },
 
-  // Delete multiple keys matching a pattern
+  // Non-blocking pattern deletion using scanIterator instead of blocking KEYS *
   async delPattern(pattern) {
     try {
       if (!redisClient.isReady) return false;
-      const keys = await redisClient.keys(pattern);
-      if (keys.length > 0) {
-        await redisClient.del(keys);
+      const keysToDelete = [];
+      for await (const key of redisClient.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+        keysToDelete.push(key);
+        if (keysToDelete.length >= 100) {
+          await redisClient.del(keysToDelete);
+          keysToDelete.length = 0;
+        }
+      }
+      if (keysToDelete.length > 0) {
+        await redisClient.del(keysToDelete);
       }
       return true;
     } catch (error) {
-      console.error('Redis delPattern error:', error);
       return false;
     }
   },
@@ -92,14 +98,12 @@ const cacheUtils = {
     return cacheUtils.delPattern(pattern);
   },
 
-  // Clear entire cache
+  // Safe cache clear targeting only application cache keys (never sessions, rate limits, or idempotency)
   async clear() {
     try {
       if (!redisClient.isReady) return false;
-      await redisClient.flushAll();
-      return true;
+      return await cacheUtils.delPattern('cache:*');
     } catch (error) {
-      console.error('Redis clear error:', error);
       return false;
     }
   }

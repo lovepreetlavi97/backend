@@ -1,105 +1,28 @@
-const mongoose = require('mongoose');
-const slugify = require('slugify');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const DEFAULT_IMAGE_URL = "https://via.placeholder.com/800x400?text=Banner+Image";
-
-const bannerSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  metalIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Metal',
-    required: true,
-  }],
-  slug: {
-    type: String,
-
-  },
-  description: {
-    type: String,
-    required: true
-  },
-  subtitle: {
-    type: String,
-    trim: true,
-    default: ""
-  },
-  buttonText: {
-    type: String,
-    trim: true,
-    default: "Shop Now"
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: ['home', 'category', 'popup', 'slider', 'gift', 'bespoke'],
-    default: 'home'
-  },
-  imageUrl: {
-    type: String,
-    default: DEFAULT_IMAGE_URL
-  },
-  link: {
-    type: String,
-    default: ''
-  },
-  startDate: {
-    type: Date,
-    required: true
-  },
-  endDate: {
-    type: Date,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'scheduled'],
-    default: 'active'
-  },
-  position: {
-    type: Number,
-    default: 0
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
+const Banner = sequelize.define('Banner', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title: { type: DataTypes.STRING, allowNull: true },
+  subtitle: { type: DataTypes.STRING, allowNull: true },
+  image: { type: DataTypes.STRING, allowNull: false },
+  mobileImage: { type: DataTypes.STRING, allowNull: true },
+  link: { type: DataTypes.STRING, allowNull: true },
+  type: { type: DataTypes.ENUM('hero', 'bespoke', 'kitty', 'festival', 'offer', 'promotional'), defaultValue: 'hero' },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  order: { type: DataTypes.INTEGER, defaultValue: 0 }
+}, {
+  tableName: 'banners',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
   }
-}, { timestamps: true });
-
-/** Pre-save hook: generate slug from title */
-bannerSchema.pre('save', function (next) {
-  if (this.isModified('title') || this.isNew) {
-    this.slug = slugify(this.title, { lower: true, strict: true });
-  }
-
-  // Auto update status based on dates
-  const now = new Date();
-  if (now < this.startDate) {
-    this.status = 'scheduled';
-  } else if (now >= this.startDate && now <= this.endDate) {
-    this.status = 'active';
-  } else {
-    this.status = 'inactive';
-  }
-
-  next();
 });
 
-/** Virtual field to check if banner is expired */
-bannerSchema.virtual('isExpired').get(function () {
-  return Date.now() > this.endDate;
-});
+Banner.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
-/** Indexes for optimized querying */
-bannerSchema.index({ title: 1 });
-bannerSchema.index({ slug: 1 });
-bannerSchema.index({ type: 1 });
-bannerSchema.index({ status: 1 });
-bannerSchema.index({ position: 1 });
-bannerSchema.index({ isDeleted: 1 });
-bannerSchema.index({ metalIds: 1 });
-
-module.exports = mongoose.model('Banner', bannerSchema);
+module.exports = Banner;

@@ -1,83 +1,27 @@
-const mongoose = require('mongoose');
-const slugify = require('slugify');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-
-const categorySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    unique: true,
-  },
-  description: {
-    type: String,
-  },
-  slug: {
-    type: String,
-    unique: true
-  },
-  subcategories: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Subcategory',
-  }],
-  metalIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Metal',
-    required: true,
-  }],
-  image: {
-    type: String,
-    default: "",
-  },
-  isFeatured: {
-    type: Boolean,
-    default: false,
-    select: false,
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false,
-    select: false,
-  },
-  isBlocked: {
-    type: Boolean,
-    default: false,
-  },
-  productCount: {
-    type: Number,
-    default: 0,
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-  },
+const Category = sequelize.define('Category', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  image: { type: DataTypes.STRING, defaultValue: '' },
+  metalIds: { type: DataTypes.JSON, defaultValue: [] },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  order: { type: DataTypes.INTEGER, defaultValue: 0 }
 }, {
+  tableName: 'categories',
   timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Indexes for better performance
-categorySchema.index({ name: 1 });
-categorySchema.index({ slug: 1 });
-categorySchema.index({ isDeleted: 1, isBlocked: 1 });
-categorySchema.index({ metalIds: 1 });
-
-// Generate slug from name
-categorySchema.pre('save', function (next) {
-  if (this.isModified('name') || !this.slug) {
-    this.slug = slugify(this.name, { lower: true, strict: true });
+  getterMethods: {
+    _id() { return this.id; }
   }
-  next();
 });
 
-// Don't show deleted categories in queries
-categorySchema.pre(/^find/, function (next) {
-  this.find({ isDeleted: { $ne: true } });
-  next();
-});
+Category.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
-
-module.exports = mongoose.model('Category', categorySchema);
+module.exports = Category;

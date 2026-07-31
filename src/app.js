@@ -19,8 +19,11 @@ dotenv.config();
 
 // Create express app
 const app = express();
+app.set('trust proxy', 1);
 app.use(compression());
 const { globalLimiter } = require('./middlewares/rateLimiter');
+const { sequelize } = require('./config/database');
+const { redisClient } = require('./config/redis');
 
 // Security Hardening
 app.use(helmet()); 
@@ -32,12 +35,48 @@ app.use((req, res, next) => {
   logger.info(`${req.method} ${req.originalUrl}`, {
     ip: req.ip,
     userAgent: req.get('user-agent'),
-    userId: req.user?._id
+    userId: req.user?.id || req.user?._id
   });
   next();
 });
 
-// Health check endpoint (for load balancers & monitoring)
+// Phase H: Health & Readiness Probes
+app.get('/health/live', (req, res) => {
+  res.status(200).json({ 
+    status: 'alive', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+app.get('/health/ready', async (req, res) => {
+  let dbReady = false;
+  let redisReady = false;
+
+  try {
+    await sequelize.authenticate();
+    dbReady = true;
+  } catch (e) {}
+
+  try {
+    redisReady = redisClient.isReady;
+  } catch (e) {}
+
+  if (!dbReady) {
+    return res.status(503).json({
+      status: 'unready',
+      database: 'down',
+      redis: redisReady ? 'up' : 'down'
+    });
+  }
+
+  return res.status(200).json({
+    status: 'ready',
+    database: 'up',
+    redis: redisReady ? 'up' : 'degraded'
+  });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'up', 
@@ -50,14 +89,26 @@ const WebhookRoutes = require('./routes/webhook.route');
 
 // Middleware for parsing JSON and handling CORS
 app.use(globalLimiter); 
-app.use(express.json({ limit: '10kb' })); // Limit body size to 10kb
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '512kb' }));
+app.use(express.urlencoded({ extended: true, limit: '512kb' }));
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) 
+  : (process.env.NODE_ENV === 'production' 
+      ? ['https://gurujewellers.in', 'https://admin.gurujewellers.in'] 
+      : '*');
 
 app.use(
   cors({
-    origin: process.env.WEB_BASE_URL || "*",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins === '*' || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+    credentials: true
   })
 );
 
@@ -121,10 +172,10 @@ app.use(errorHandler);
 connectDB();
 connectRedis()
   .then(() => {
-    console.log('Redis connection initialized');
+
   })
   .catch(err => {
-    console.warn('Redis connection failed, but application will continue:', err.message);
+
   });
 
 module.exports = app; // Export the app

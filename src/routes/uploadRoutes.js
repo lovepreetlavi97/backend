@@ -17,7 +17,7 @@ router.post("/image", adminAuth, uploadSingleImage, async (req, res) => {
   try {
     const file = req.file;
     const folder = req.body.folder || 'misc';
-    console.log("🔹 Uploading single image to:", folder);
+
 
     if (!file) return res.status(400).json({ error: "No image uploaded" });
 
@@ -27,7 +27,7 @@ router.post("/image", adminAuth, uploadSingleImage, async (req, res) => {
 
     res.status(200).json({ url, key });
   } catch (err) {
-    console.error("❌ Upload error:", err);
+
     res.status(500).json({ error: "Image upload failed" });
   }
 });
@@ -37,7 +37,7 @@ router.post("/images", adminAuth, uploadMultipleImagesMulter, async (req, res) =
   try {
     const files = req.files;
     const folder = req.body.folder || 'misc';
-    console.log("🔹 Uploading multiple images to:", folder);
+
 
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "No images uploaded" });
@@ -48,7 +48,7 @@ router.post("/images", adminAuth, uploadMultipleImagesMulter, async (req, res) =
 
     res.status(200).json({ urls, keys });
   } catch (err) {
-    console.error("❌ Multiple upload error:", err);
+
     res.status(500).json({ error: "Multiple image upload failed" });
   }
 });
@@ -64,7 +64,7 @@ router.delete("/deleteImage", adminAuth, async (req, res) => {
 
     res.status(200).json({ message: "Image deleted", key });
   } catch (err) {
-    console.error("❌ Delete error:", err);
+
     res.status(500).json({ error: "Image deletion failed" });
   }
 });
@@ -82,7 +82,7 @@ router.delete("/deleteImages", adminAuth, async (req, res) => {
 
     res.status(200).json({ message: "Images deleted", keys });
   } catch (err) {
-    console.error("❌ Bulk delete error:", err);
+
     res.status(500).json({ error: "Multiple image deletion failed" });
   }
 });

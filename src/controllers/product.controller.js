@@ -1,42 +1,27 @@
-const {
-  create,
-  findOne,
-  findMany,
-  findAndUpdate,
-  deleteOne,
-} = require("../services/mongodb/mongoService");
-const {
-  uploadToSpaces,
-  uploadMultipleImages,
-} = require("../middlewares/uploadMiddleware");
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
-const { Product, Category, SubCategory, PriceRule } = require("../models/index");
-const mongoose = require("mongoose");
-
+const { Product, Category, SubCategory, PriceRule, Metal, CuratedCollection } = require("../models/index");
+const { isValidId } = require("../utils/idUtils");
 const { cacheUtils } = require("../config/redis");
 const slugify = require("slugify");
-const parseObjectIdArray = (input) => {
+const { Op } = require("sequelize");
+
+const parseIdArray = (input) => {
   if (!input) return [];
-
   let arr;
-
   try {
     if (typeof input === "string") {
       const parsed = JSON.parse(input);
       arr = typeof parsed === "string" ? [parsed] : parsed;
     } else if (Array.isArray(input)) {
       arr = input;
-    } else if (
-      typeof input === "string" &&
-      mongoose.Types.ObjectId.isValid(input)
-    ) {
+    } else if (isValidId(input)) {
       arr = [input];
     } else {
       return [];
     }
   } catch {
-    if (mongoose.Types.ObjectId.isValid(input)) {
+    if (isValidId(input)) {
       arr = [input];
     } else {
       return [];
@@ -44,12 +29,12 @@ const parseObjectIdArray = (input) => {
   }
 
   return arr
-    .filter((id) => mongoose.Types.ObjectId.isValid(id))
-    .map((id) => new mongoose.Types.ObjectId(id));
+    .filter((id) => isValidId(id))
+    .map((id) => isNaN(Number(id)) ? id : Number(id));
 };
+
 const parseImagesArray = (input) => {
   if (!input) return [];
-
   let arr;
   try {
     arr = typeof input === "string" ? JSON.parse(input) : input;
@@ -67,7 +52,6 @@ const parseImagesArray = (input) => {
 // Create a new product
 const createProduct = async (req, res) => {
   try {
-    console.log("Request Files: ", req.body);
     const {
       name,
       description,
@@ -82,7 +66,7 @@ const createProduct = async (req, res) => {
       subcategoryId,
       festivalIds,
       relationIds,
-      relatedProductIds ,
+      relatedProductIds,
       specifications,
       tags,
       isFeatured,
@@ -99,15 +83,9 @@ const createProduct = async (req, res) => {
       collectionIds,
       metalIds,
     } = req.body;
-    console.log("Request Body: ", req.body);
-   // return
-    // Basic validation
+
     if (!name || !description) {
-      return errorResponse(
-        res,
-        400,
-        "Product name and description are required"
-      );
+      return errorResponse(res, 400, "Product name and description are required");
     }
 
     const parsedIsPriceFixed = String(isPriceFixed) === "true";
@@ -116,7 +94,7 @@ const createProduct = async (req, res) => {
         return errorResponse(res, 400, "Valid actual price is required for fixed price products");
       }
     } else {
-      if (!priceRuleId || !mongoose.Types.ObjectId.isValid(priceRuleId)) {
+      if (!priceRuleId || !isValidId(priceRuleId)) {
         return errorResponse(res, 400, "Valid price rule ID is required for dynamic price products");
       }
       if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
@@ -130,35 +108,19 @@ const createProduct = async (req, res) => {
       }
     }
 
-    if (
-      discountedPrice &&
-      (isNaN(parseFloat(discountedPrice)) || parseFloat(discountedPrice) < 0)
-    ) {
-      return errorResponse(
-        res,
-        400,
-        "Discounted price must be a valid positive number"
-      );
+    if (discountedPrice && (isNaN(parseFloat(discountedPrice)) || parseFloat(discountedPrice) < 0)) {
+      return errorResponse(res, 400, "Discounted price must be a valid positive number");
     }
 
-    if (
-      parsedIsPriceFixed && discountedPrice &&
-      parseFloat(discountedPrice) > parseFloat(actualPrice)
-    ) {
-      return errorResponse(
-        res,
-        400,
-        "Discounted price cannot be greater than actual price"
-      );
+    if (parsedIsPriceFixed && discountedPrice && parseFloat(discountedPrice) > parseFloat(actualPrice)) {
+      return errorResponse(res, 400, "Discounted price cannot be greater than actual price");
     }
 
-    // Validate category ID
     if (categoryId) {
-      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      if (!isValidId(categoryId)) {
         return errorResponse(res, 400, "Invalid category ID format");
       }
-
-      const categoryExists = await Category.exists({ _id: categoryId });
+      const categoryExists = await Category.findByPk(categoryId);
       if (!categoryExists) {
         return errorResponse(res, 404, "Category not found");
       }
@@ -166,134 +128,96 @@ const createProduct = async (req, res) => {
       return errorResponse(res, 400, "Category ID is required");
     }
 
-    // Validate subcategory ID
     if (subcategoryId) {
-      if (!mongoose.Types.ObjectId.isValid(subcategoryId)) {
+      if (!isValidId(subcategoryId)) {
         return errorResponse(res, 400, "Invalid subcategory ID format");
       }
-
-      const subcategoryExists = await SubCategory.exists({
-        _id: subcategoryId,
-      });
+      const subcategoryExists = await SubCategory.findByPk(subcategoryId);
       if (!subcategoryExists) {
         return errorResponse(res, 404, "Subcategory not found");
       }
     }
 
-    // Generate a unique slug
     let baseSlug = slugify(name, { lower: true, strict: true });
     const randomStr = Math.random().toString(36).substring(2, 8);
     const slug = `${baseSlug}-${randomStr}`;
 
-    // Validate tags
     const validTags = ["New", "Sale", "Bestseller"];
     const productTag = validTags.includes(tags) ? tags : "New";
 
-    // Process specifications
     let processedSpecs = [];
     if (specifications) {
       if (typeof specifications === "string") {
-        try {
-          processedSpecs = JSON.parse(specifications);
-        } catch (e) {
-          return errorResponse(res, 400, "Invalid specifications format");
-        }
+        try { processedSpecs = JSON.parse(specifications); } catch (e) { return errorResponse(res, 400, "Invalid specifications format"); }
       } else if (Array.isArray(specifications)) {
         processedSpecs = specifications;
       }
     }
 
-    // Process attributes
     let processedAttributes = {};
     if (attributes) {
       if (typeof attributes === "string") {
-        try {
-          processedAttributes = JSON.parse(attributes);
-        } catch (e) {
-          return errorResponse(res, 400, "Invalid attributes format");
-        }
+        try { processedAttributes = JSON.parse(attributes); } catch (e) { return errorResponse(res, 400, "Invalid attributes format"); }
       } else if (typeof attributes === "object") {
         processedAttributes = attributes;
       }
     }
 
-    // For fixed price products we store actualPrice directly.
-    // For dynamic products we keep stored actualPrice at 0 and always compute it at read-time from priceRuleId.
     let computedActualPrice = parsedIsPriceFixed ? parseFloat(actualPrice || 0) : 0;
 
-    // Build product data
     const productData = {
-      name,
+      title: name,
       slug,
       description,
-      image: image,
-      images: images,
+      image: image || "",
+      images: parseImagesArray(images),
       shortDescription,
+      basePrice: computedActualPrice,
       actualPrice: computedActualPrice,
-      discountedPrice: parsedIsPriceFixed
-        ? (discountedPrice ? parseFloat(discountedPrice) : undefined)
-        : undefined,
-      discountPercent: !parsedIsPriceFixed && discountPercent !== undefined && discountPercent !== null && discountPercent !== ""
-        ? parseFloat(discountPercent)
-        : 0,
+      discountedPrice: parsedIsPriceFixed ? (discountedPrice ? parseFloat(discountedPrice) : undefined) : undefined,
+      discountPercent: !parsedIsPriceFixed && discountPercent !== undefined && discountPercent !== null && discountPercent !== "" ? parseFloat(discountPercent) : 0,
       isPriceFixed: parsedIsPriceFixed,
-      priceRuleId: !parsedIsPriceFixed ? new mongoose.Types.ObjectId(priceRuleId) : undefined,
-      makingCharges: makingCharges ? parseFloat(makingCharges) : 0,
-      weight: parseFloat(weight),
+      priceRuleId: !parsedIsPriceFixed ? priceRuleId : undefined,
+      makingCharge: makingCharges ? parseFloat(makingCharges) : 0,
+      weight: parseFloat(weight || 0),
       unit,
       stock: stock ? parseInt(stock) : 0,
-      image: image, // Set main image field
-      images: images, // Set all images array
-      categoryId: new mongoose.Types.ObjectId(categoryId),
-      subcategoryId: subcategoryId
-        ? new mongoose.Types.ObjectId(subcategoryId)
-        : undefined,
-      festivalIds: parseObjectIdArray(festivalIds),
-      relationIds: parseObjectIdArray(relationIds),
-      relatedProductIds : parseObjectIdArray(req.body.relatedProductIds),
-      collectionIds: parseObjectIdArray(collectionIds),
-      metalIds: parseObjectIdArray(metalIds),
+      categoryId: categoryId,
+      subcategoryId: subcategoryId || undefined,
+      festivalIds: parseIdArray(festivalIds),
+      relationIds: parseIdArray(relationIds),
+      relatedProductIds: parseIdArray(req.body.relatedProductIds),
+      collectionIds: parseIdArray(collectionIds),
+      metalIds: parseIdArray(metalIds),
       specifications: processedSpecs,
       attributes: processedAttributes,
       tags: productTag,
       isFeatured: isFeatured === "true" || isFeatured === true,
-      // isInStock: stock ? parseInt(stock) > 0 : false,
-      dimensions: dimensions
-        ? typeof dimensions === "string"
-          ? JSON.parse(dimensions)
-          : dimensions
-        : undefined,
-      shippingInfo: shippingInfo
-        ? typeof shippingInfo === "string"
-          ? JSON.parse(shippingInfo)
-          : shippingInfo
-        : undefined,
+      dimensions: dimensions ? (typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions) : undefined,
+      shippingInfo: shippingInfo ? (typeof shippingInfo === "string" ? JSON.parse(shippingInfo) : shippingInfo) : undefined,
       warranty,
       sku,
-      createdBy: req.user?._id,
+      createdBy: req.user?.id || req.user?._id,
     };
-    console.log("Product Data: ", productData);
 
-    const product = await create(Product, productData);
+    const product = await Product.create(productData);
 
-    // Clear product cache
     await cacheUtils.delPattern("products_*");
     await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 201, messages.PRODUCT_CREATED, { product });
   } catch (error) {
-    console.error("Create Product Error: ", error);
     return errorResponse(res, 500, error.message || "Error creating product");
   }
 };
 
-// Get all products (Supports both Cursor-based and Page-based Pagination)
+// Get all products
 const getAllProducts = async (req, res) => {
   try {
     const {
       limit = 12,
       page = 1,
-      lastId, // Cursor
+      lastId,
       occasion,
       color,
       material,
@@ -306,100 +230,74 @@ const getAllProducts = async (req, res) => {
       style,
       collectionId,
       metalId,
-      includeBlocked = "true" // Default to true for admin
+      includeBlocked = "true"
     } = req.query;
 
-    // STEP 1: BUILD FILTER QUERY
-    const filter = {
-      isDeleted: false,
-    };
+    const where = {};
 
     if (includeBlocked !== "true") {
-      filter.isBlocked = false;
+      where.isBlocked = false;
     }
 
-    if (occasion) filter["attributes.occasions"] = occasion;
-    if (color) filter["attributes.color"] = color;
-    if (material) filter["attributes.material"] = material;
-    if (gender) filter["attributes.gender"] = gender;
-    
-    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
-      filter.categoryId = new mongoose.Types.ObjectId(categoryId);
+    if (categoryId && isValidId(categoryId)) {
+      where.categoryId = categoryId;
     }
-    
-    if (subcategoryId && mongoose.Types.ObjectId.isValid(subcategoryId)) {
-      filter.subcategoryId = new mongoose.Types.ObjectId(subcategoryId);
+
+    if (subcategoryId && isValidId(subcategoryId)) {
+      where.subcategoryId = subcategoryId;
     }
-    
-    if (minPrice) filter.actualPrice = { ...filter.actualPrice, $gte: parseFloat(minPrice) };
-    if (maxPrice) filter.actualPrice = { ...filter.actualPrice, $lte: parseFloat(maxPrice) };
-    
-    if (style) filter["attributes.style"] = style;
-    
-    if (collectionId && mongoose.Types.ObjectId.isValid(collectionId)) {
-      filter.collectionIds = new mongoose.Types.ObjectId(collectionId);
-    }
-    
-    if (metalId && mongoose.Types.ObjectId.isValid(metalId)) {
-      filter.metalIds = { $in: [new mongoose.Types.ObjectId(metalId)] };
+
+    if (minPrice || maxPrice) {
+      where.basePrice = {};
+      if (minPrice) where.basePrice[Op.gte] = parseFloat(minPrice);
+      if (maxPrice) where.basePrice[Op.lte] = parseFloat(maxPrice);
     }
 
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
-      ];
+      const searchStr = String(search).trim();
+      if (searchStr) {
+        where[Op.or] = [
+          { title: { [Op.like]: `%${searchStr}%` } },
+          { description: { [Op.like]: `%${searchStr}%` } }
+        ];
+      }
     }
 
-    // STEP 2: APPLY PAGINATION (Page-based or Cursor-based)
-    let products;
-    let total;
-
-    if (lastId && mongoose.Types.ObjectId.isValid(lastId)) {
-      // Cursor-based (for frontend storefront)
-      filter._id = { $lt: new mongoose.Types.ObjectId(lastId) };
-      products = await Product.find(filter)
-        .sort({ _id: -1 })
-        .limit(parseInt(limit))
-        .select("name slug image actualPrice discountedPrice averageRating isPriceFixed priceRuleId weight makingCharges categoryId metalIds stock isBlocked")
-        .populate("categoryId", "name")
-        .populate("metalIds", "name")
-        .lean();
-      
-      total = await Product.countDocuments(filter);
-    } else {
-      // Page-based (for admin panel)
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      total = await Product.countDocuments(filter);
-      
-      products = await Product.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .select("name slug image actualPrice discountedPrice averageRating isPriceFixed priceRuleId weight makingCharges categoryId metalIds stock isBlocked")
-        .populate("categoryId", "name")
-        .populate("metalIds", "name")
-        .lean();
+    if (lastId && isValidId(lastId)) {
+      where.id = { [Op.lt]: Number(lastId) };
     }
 
-    // Step 4: Result structure
-    const totalPages = Math.ceil(total / parseInt(limit));
+    const parsedLimit = parseInt(limit);
+    const parsedPage = parseInt(page);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const { count, rows: products } = await Product.findAndCountAll({
+      where,
+      limit: parsedLimit,
+      offset,
+      order: [['id', 'DESC']],
+      include: [
+        { model: Category, attributes: ['id', 'name'] },
+        { model: SubCategory, attributes: ['id', 'name'] }
+      ]
+    });
+
+    const totalPages = Math.ceil(count / parsedLimit);
     const result = {
       products,
       pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        total: count,
+        page: parsedPage,
+        limit: parsedLimit,
         pages: totalPages
       },
-      nextCursor: products.length === parseInt(limit) ? products[products.length - 1]._id : null,
-      hasMore: products.length === parseInt(limit)
+      nextCursor: products.length === parsedLimit ? products[products.length - 1].id : null,
+      hasMore: products.length === parsedLimit
     };
 
     return successResponse(res, 200, messages.PRODUCTS_RETRIEVED, result);
 
   } catch (error) {
-    console.error("Error fetching products:", error);
     return errorResponse(res, 500, messages.PRODUCT_FETCH_ERROR, {
       error: error.message,
     });
@@ -411,12 +309,10 @@ const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, "Invalid product ID format");
     }
 
-    // Try to get from cache first
     const cacheKey = `product_${id}`;
     const cachedProduct = await cacheUtils.get(cacheKey);
 
@@ -426,45 +322,39 @@ const getProductById = async (req, res) => {
       });
     }
 
-    // If not in cache, get from database with populated fields
-    const product = await Product.findById(id)
-      .populate({ path: "categoryId", select: "name" })
-      .populate({ path: "subcategoryId", select: "name" })
-      .populate({ path: "festivalIds", select: "name" })
-      .populate({ path: "relationIds", select: "name" })
-      .populate({ path: "relatedProductIds", select: "name" })
-      .populate({ path: "priceRuleId", select: "name price" })
-      .populate({ path: "metalIds", select: "name colorCode gradient" })
-      .lean();
+    const product = await Product.findByPk(id, {
+      include: [
+        { model: Category, attributes: ['id', 'name'] },
+        { model: SubCategory, attributes: ['id', 'name'] },
+        { model: PriceRule, attributes: ['id', 'name', 'value'] }
+      ]
+    });
 
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
-    console;
-    // Dynamic Price Calculation
-    if (!product.isPriceFixed && product.priceRuleId && product.priceRuleId.price) {
-        product.actualPrice = (product.priceRuleId.price * (product.weight || 0)) + (product.makingCharges || 0);
-        if (product.discountPercent && product.discountPercent > 0) {
-          const discounted = product.actualPrice * (1 - (product.discountPercent / 100));
-          product.discountedPrice = parseFloat(discounted.toFixed(2));
-        }
+
+    const productJson = product.toJSON();
+
+    if (!productJson.isPriceFixed && product.PriceRule && product.PriceRule.value) {
+      const priceVal = Number(product.PriceRule.value);
+      productJson.actualPrice = (priceVal * (Number(product.weight) || 0)) + (Number(product.makingCharge) || 0);
+      if (productJson.discountPercent && productJson.discountPercent > 0) {
+        const discounted = productJson.actualPrice * (1 - (productJson.discountPercent / 100));
+        productJson.discountedPrice = parseFloat(discounted.toFixed(2));
+      }
     }
 
-    // Calculate discount percentage
-    if (product.actualPrice && product.discountedPrice) {
-      product.discountPercentage = Math.round(
-        ((product.actualPrice - product.discountedPrice) /
-          product.actualPrice) *
-          100
+    if (productJson.actualPrice && productJson.discountedPrice) {
+      productJson.discountPercentage = Math.round(
+        ((productJson.actualPrice - productJson.discountedPrice) / productJson.actualPrice) * 100
       );
     }
 
-    // Cache the result
-    await cacheUtils.set(cacheKey, product, 600); // Cache for 10 minutes
+    await cacheUtils.set(cacheKey, productJson, 600);
 
-    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { product });
+    return successResponse(res, 200, messages.PRODUCT_RETRIEVED, { product: productJson });
   } catch (error) {
-    console.error("Get product error:", error);
     return errorResponse(res, 500, error.message || "Error retrieving product");
   }
 };
@@ -474,175 +364,41 @@ const updateProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, "Invalid product ID format");
     }
 
-    const { ...updatedData } = req.body;
-
-    // Find the product first
-    const product = await Product.findById(id);
+    const product = await Product.findByPk(id);
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
 
-    // Handle numeric fields
-    if (updatedData.isPriceFixed !== undefined) {
-      updatedData.isPriceFixed = String(updatedData.isPriceFixed) === "true";
-    }
+    const { ...updatedData } = req.body;
 
-    // Only update actualPrice from input if fixed; for dynamic keep stored actualPrice at 0 (computed at read-time)
-    if (updatedData.isPriceFixed) {
-      if (updatedData.actualPrice) {
-        updatedData.actualPrice = parseFloat(updatedData.actualPrice);
-      }
-    } else {
-      updatedData.actualPrice = 0;
-      // If dynamic, ensure priceRuleId is captured
-      if (updatedData.priceRuleId) {
-        updatedData.priceRuleId = new mongoose.Types.ObjectId(updatedData.priceRuleId);
-      }
-    }
-
-    // discountPercent (dynamic)
-    if (updatedData.discountPercent !== undefined) {
-      const d = parseFloat(updatedData.discountPercent);
-      if (isNaN(d) || d < 0 || d > 100) {
-        return errorResponse(res, 400, "Discount percent must be between 0 and 100");
-      }
-      updatedData.discountPercent = d;
-    }
-    
-    if (updatedData.makingCharges !== undefined) {
-        updatedData.makingCharges = parseFloat(updatedData.makingCharges);
-    }
-
-    if (updatedData.discountedPrice) {
-      updatedData.discountedPrice = parseFloat(updatedData.discountedPrice);
-    }
-
-    if (updatedData.weight) {
-      updatedData.weight = parseFloat(updatedData.weight);
-    }
-
-    if (updatedData.stock !== undefined) {
-      updatedData.stock = parseInt(updatedData.stock);
-      updatedData.isInStock = updatedData.stock > 0;
-    }
-
-    // Handle IDs
-    if (updatedData.categoryId && updatedData.categoryId !== "null") {
-      if (!mongoose.Types.ObjectId.isValid(updatedData.categoryId)) {
-        return errorResponse(res, 400, "Invalid category ID format");
-      }
-      updatedData.categoryId = new mongoose.Types.ObjectId(
-        updatedData.categoryId
-      );
-    } else if (updatedData.categoryId === "null") {
-      updatedData.categoryId = null;
-    }
-
-    if (updatedData.subcategoryId && updatedData.subcategoryId !== "null") {
-      if (!mongoose.Types.ObjectId.isValid(updatedData.subcategoryId)) {
-        return errorResponse(res, 400, "Invalid subcategory ID format");
-      }
-      updatedData.subcategoryId = new mongoose.Types.ObjectId(
-        updatedData.subcategoryId
-      );
-    } else if (updatedData.subcategoryId === "null") {
-      updatedData.subcategoryId = null;
-    }
-
-    updatedData.festivalIds = parseObjectIdArray(updatedData.festivalIds);
-    updatedData.relationIds = parseObjectIdArray(updatedData.relationIds);
-    updatedData.relatedProductIds = parseObjectIdArray(updatedData.relatedProductIds);
-    updatedData.collectionIds = parseObjectIdArray(updatedData.collectionIds);
-    updatedData.metalIds = parseObjectIdArray(updatedData.metalIds);
-    // Process specifications
-    if (updatedData.specifications) {
-      if (typeof updatedData.specifications === "string") {
-        try {
-          updatedData.specifications = JSON.parse(updatedData.specifications);
-        } catch (e) {
-          delete updatedData.specifications;
-        }
-      }
-    }
-
-    // Process attributes
-    if (updatedData.attributes) {
-      if (typeof updatedData.attributes === "string") {
-        try {
-          updatedData.attributes = JSON.parse(updatedData.attributes);
-        } catch (e) {
-          delete updatedData.attributes;
-        }
-      }
-    }
-
-    // Validate tags
-    if (updatedData.tags) {
-      const validTags = ["New", "Sale", "Bestseller"];
-      if (!validTags.includes(updatedData.tags)) {
-        updatedData.tags = "New";
-      }
-    }
-
-    // If switching to dynamic pricing, discountedPrice should not be stored (it's computed at read-time)
-    if (updatedData.isPriceFixed === false) {
-      delete updatedData.discountedPrice;
-    }
-    // If switching to fixed pricing, discountPercent is not needed
-    if (updatedData.isPriceFixed === true) {
-      updatedData.discountPercent = 0;
-    }
-
-    // Process boolean fields
-    if (updatedData.isFeatured !== undefined) {
-      updatedData.isFeatured =
-        updatedData.isFeatured === "true" || updatedData.isFeatured === true;
-    }
-
-    // Update slug if name is changed
-    if (updatedData.name && updatedData.name !== product.name) {
+    if (updatedData.name) {
+      updatedData.title = updatedData.name;
       let baseSlug = slugify(updatedData.name, { lower: true, strict: true });
       const randomStr = Math.random().toString(36).substring(2, 8);
       updatedData.slug = `${baseSlug}-${randomStr}`;
     }
 
-    // Set updatedBy field if user is available
-    if (req.user?._id) {
-      updatedData.updatedBy = req.user._id;
+    if (updatedData.categoryId && isValidId(updatedData.categoryId)) {
+      updatedData.categoryId = Number(updatedData.categoryId);
+    }
+    if (updatedData.subcategoryId && isValidId(updatedData.subcategoryId)) {
+      updatedData.subcategoryId = Number(updatedData.subcategoryId);
     }
 
-    if (updatedData.image && updatedData.image !== "") {
-      updatedData.image = updatedData.image;
-    }
+    await product.update(updatedData);
 
-    if (Array.isArray(updatedData.images)) {
-      if (updatedData.images.length === 0 || updatedData.images[0] === "") {
-        updatedData.images = [];
-      }
-    }
-
-    // Update the product
-    const updatedProduct = await findAndUpdate(
-      Product,
-      { _id: id },
-      updatedData
-    );
-
-    // Clear product cache
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
     await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 200, messages.PRODUCT_UPDATED, {
-      product: updatedProduct,
+      product,
     });
   } catch (error) {
-    console.error("Update product error:", error);
     return errorResponse(res, 500, error.message || "Error updating product");
   }
 };
@@ -652,30 +408,23 @@ const deleteProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, "Invalid product ID format");
     }
 
-    // Use soft delete instead of hard delete
-    const updatedProduct = await findAndUpdate(
-      Product,
-      { _id: id },
-      { isDeleted: true }
-    );
-
-    if (!updatedProduct) {
+    const product = await Product.findByPk(id);
+    if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
 
-    // Clear product cache
+    await product.destroy();
+
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
     await cacheUtils.delPattern("product_slug_*");
 
     return successResponse(res, 200, messages.PRODUCT_DELETED);
   } catch (error) {
-    console.error("Delete product error:", error);
     return errorResponse(res, 500, error.message || "Error deleting product");
   }
 };
@@ -685,21 +434,18 @@ const toggleBlockStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return errorResponse(res, 400, "Invalid product ID format");
     }
 
-    const product = await Product.findById(id);
+    const product = await Product.findByPk(id);
     if (!product) {
       return errorResponse(res, 404, messages.PRODUCT_NOT_FOUND);
     }
 
-    // Toggle block status
     product.isBlocked = !product.isBlocked;
     await product.save();
 
-    // Clear product cache
     await cacheUtils.del(`product_${id}`);
     await cacheUtils.delPattern("products_*");
     await cacheUtils.delPattern("product_slug_*");
@@ -707,21 +453,13 @@ const toggleBlockStatus = async (req, res) => {
     return successResponse(
       res,
       200,
-      product.isBlocked
-        ? "Product blocked successfully"
-        : "Product unblocked successfully",
+      product.isBlocked ? "Product blocked successfully" : "Product unblocked successfully",
       { isBlocked: product.isBlocked }
     );
   } catch (error) {
-    console.error("Toggle block status error:", error);
-    return errorResponse(
-      res,
-      500,
-      error.message || "Error toggling block status"
-    );
+    return errorResponse(res, 500, error.message || "Error toggling block status");
   }
 };
-
 
 module.exports = {
   createProduct,
@@ -730,5 +468,4 @@ module.exports = {
   updateProductById,
   deleteProductById,
   toggleBlockStatus,
-  
 };

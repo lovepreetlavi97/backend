@@ -3,8 +3,9 @@ const {
   findOne, 
   findMany, 
   findAndUpdate, 
-  deleteOne 
-} = require('../services/mongodb/mongoService');
+  deleteOne,
+  countDocuments
+} = require('../services/mysql/mysqlService');
 
 const { PromoCode, Order } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
@@ -33,7 +34,7 @@ const createPromoCode = async (req, res) => {
     }
 
     // Check if promo code already exists
-    const existingPromoCode = await PromoCode.findOne({ 
+    const existingPromoCode = await findOne(PromoCode, { 
       code: code.trim().toUpperCase(),
       isDeleted: false
     });
@@ -64,7 +65,7 @@ const createPromoCode = async (req, res) => {
 
     return successResponse(res, 201, messages.success.createPromocode, { promoCode });
   } catch (error) {
-    console.error("Create promo code error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -107,17 +108,15 @@ const getAllPromoCodes = async (req, res) => {
       query.type = type;
     }
 
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { createdAt: -1 }
+    };
 
     // Execute query
-    const promoCodes = await PromoCode.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    const total = await PromoCode.countDocuments(query);
+    const promoCodes = await findMany(PromoCode, query, null, options);
+    const total = await countDocuments(PromoCode, query);
 
     const result = {
       promoCodes,
@@ -134,7 +133,7 @@ const getAllPromoCodes = async (req, res) => {
 
     return successResponse(res, 200, messages.success.getPromocodes, result);
   } catch (error) {
-    console.error("Get all promo codes error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -145,7 +144,7 @@ const getPromoCodeById = async (req, res) => {
     const { id } = req.params;
 
     const promoCode = await findOne(PromoCode, { 
-      _id: id,
+      id,
       isDeleted: false
     });
 
@@ -155,7 +154,7 @@ const getPromoCodeById = async (req, res) => {
 
     return successResponse(res, 200, messages.success.getPromocode, { promoCode });
   } catch (error) {
-    console.error("Get promo code error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -167,8 +166,8 @@ const updatePromoCodeById = async (req, res) => {
     const updateData = req.body;
 
     // Check if promo code exists
-    const existingPromoCode = await PromoCode.findOne({ 
-      _id: id,
+    const existingPromoCode = await findOne(PromoCode, { 
+      id,
       isDeleted: false
     });
 
@@ -178,9 +177,9 @@ const updatePromoCodeById = async (req, res) => {
 
     // If code is being updated, check for duplicates
     if (updateData.code && updateData.code !== existingPromoCode.code) {
-      const duplicateCode = await PromoCode.findOne({
+      const duplicateCode = await findOne(PromoCode, {
         code: updateData.code.trim().toUpperCase(),
-        _id: { $ne: id },
+        id: { $ne: id },
         isDeleted: false
       });
 
@@ -194,7 +193,7 @@ const updatePromoCodeById = async (req, res) => {
     // Update promo code
     const promoCode = await findAndUpdate(
       PromoCode,
-      { _id: id },
+      { id },
       updateData
     );
 
@@ -203,7 +202,7 @@ const updatePromoCodeById = async (req, res) => {
 
     return successResponse(res, 200, messages.success.updatePromocode, { promoCode });
   } catch (error) {
-    console.error("Update promo code error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -215,7 +214,7 @@ const deletePromoCodeById = async (req, res) => {
 
     const promoCode = await findAndUpdate(
       PromoCode,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { isDeleted: true, status: 'inactive' }
     );
 
@@ -228,7 +227,7 @@ const deletePromoCodeById = async (req, res) => {
 
     return successResponse(res, 200, messages.success.deletePromocode);
   } catch (error) {
-    console.error("Delete promo code error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -238,8 +237,8 @@ const togglePromoCodeStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const promoCode = await PromoCode.findOne({ 
-      _id: id,
+    const promoCode = await findOne(PromoCode, { 
+      id,
       isDeleted: false
     });
 
@@ -247,16 +246,15 @@ const togglePromoCodeStatus = async (req, res) => {
       return errorResponse(res, 404, messages.error.noPromoCodeFound);
     }
 
-    // Toggle between active and inactive
-    promoCode.status = promoCode.status === 'active' ? 'inactive' : 'active';
-    await promoCode.save();
+    const newStatus = promoCode.status === 'active' ? 'inactive' : 'active';
+    const updatedPromoCode = await findAndUpdate(PromoCode, { id }, { status: newStatus });
 
     // Clear cache
     await cacheUtils.delPattern('promo_codes_*');
 
-    return successResponse(res, 200, messages.success.togglePromocode, { promoCode });
+    return successResponse(res, 200, messages.success.togglePromocode, { promoCode: updatedPromoCode });
   } catch (error) {
-    console.error("Toggle promo code status error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -270,12 +268,10 @@ const validatePromoCode = async (req, res) => {
       return errorResponse(res, 400, "Code and cart total are required");
     }
 
-    const promoCode = await PromoCode.findOne({
+    const promoCode = await findOne(PromoCode, {
       code: code.trim().toUpperCase(),
       status: 'active',
       isDeleted: false,
-      startDate: { $lte: new Date() },
-      endDate: { $gt: new Date() }
     });
 
     if (!promoCode) {
@@ -305,12 +301,12 @@ const validatePromoCode = async (req, res) => {
 
     return successResponse(res, 200, messages.success.validatePromocode, {
       promoCode: {
-        ...promoCode.toObject(),
+        ...promoCode,
         discountAmount
       }
     });
   } catch (error) {
-    console.error("Validate promo code error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };
@@ -320,8 +316,8 @@ const getPromoCodeAnalytics = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const promoCode = await PromoCode.findOne({ 
-      _id: id,
+    const promoCode = await findOne(PromoCode, { 
+      id,
       isDeleted: false
     });
 
@@ -330,10 +326,10 @@ const getPromoCodeAnalytics = async (req, res) => {
     }
 
     // Get orders where this promo code was used
-    const orders = await Order.find({
-      'promoCode': id,
-      'status': { $in: ['Delivered', 'Completed'] }
-    }).select('finalAmount discountAmount createdAt');
+    const orders = await findMany(Order, {
+      promoCode: id,
+      status: { $in: ['Delivered', 'Completed'] }
+    });
 
     // Calculate analytics
     const analytics = {
@@ -343,7 +339,7 @@ const getPromoCodeAnalytics = async (req, res) => {
       averageDiscount: orders.length > 0 
         ? orders.reduce((sum, order) => sum + (order.discountAmount || 0), 0) / orders.length 
         : 0,
-      totalRevenue: orders.reduce((sum, order) => sum + order.finalAmount, 0),
+      totalRevenue: orders.reduce((sum, order) => sum + (order.finalAmount || 0), 0),
       usageByMonth: {},
       status: promoCode.status,
       isExpired: new Date() > new Date(promoCode.endDate),
@@ -362,12 +358,12 @@ const getPromoCodeAnalytics = async (req, res) => {
       }
       analytics.usageByMonth[monthYear].count++;
       analytics.usageByMonth[monthYear].discount += order.discountAmount || 0;
-      analytics.usageByMonth[monthYear].revenue += order.finalAmount;
+      analytics.usageByMonth[monthYear].revenue += order.finalAmount || 0;
     });
 
     return successResponse(res, 200, messages.success.defaultMessage, { analytics });
   } catch (error) {
-    console.error("Get promo code analytics error:", error);
+
     return errorResponse(res, 500, error.message || messages.error.defaultError);
   }
 };

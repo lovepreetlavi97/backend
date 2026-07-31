@@ -5,7 +5,7 @@ const {
   findAndUpdate, 
   deleteOne,
   countDocuments
-} = require('../services/mongodb/mongoService');
+} = require('../services/mysql/mysqlService');
 const { Grievance } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
@@ -57,24 +57,15 @@ const getAllGrievances = async (req, res) => {
     // Calculate pagination values
     const pages = Math.ceil(total / limit);
     const currentPage = parseInt(page);
-    const skip = (currentPage - 1) * parseInt(limit);
-    
-    // Sort configuration
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const options = {
+      page: currentPage,
+      limit: parseInt(limit),
+      sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 },
+      populate: "userId"
+    };
     
     // Fetch grievances with pagination
-    const grievances = await findMany(
-      Grievance,
-      filter,
-      { skip, limit: parseInt(limit), sort, 
-        populate: [
-          { path: 'userId', select: 'name email' },
-          { path: 'assignedTo', select: 'name email' },
-          { path: 'replies.userId', select: 'name email' }
-        ]
-      }
-    );
+    const grievances = await findMany(Grievance, filter, null, options);
     
     const responseData = {
       grievances,
@@ -91,7 +82,7 @@ const getAllGrievances = async (req, res) => {
     
     return successResponse(res, 200, "Grievances retrieved successfully", responseData);
   } catch (error) {
-    console.error("Get all grievances error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to retrieve grievances");
   }
 };
@@ -114,14 +105,8 @@ const getGrievanceById = async (req, res) => {
     
     const grievance = await findOne(
       Grievance,
-      { _id: id, isDeleted: false },
-      { 
-        populate: [
-          { path: 'userId', select: 'name email' },
-          { path: 'assignedTo', select: 'name email' },
-          { path: 'replies.userId', select: 'name email' }
-        ]
-      }
+      { id, isDeleted: false },
+      { populate: "userId" }
     );
     
     if (!grievance) {
@@ -133,7 +118,7 @@ const getGrievanceById = async (req, res) => {
     
     return successResponse(res, 200, "Grievance retrieved successfully", { grievance });
   } catch (error) {
-    console.error("Get grievance error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to retrieve grievance");
   }
 };
@@ -160,12 +145,9 @@ const createGrievance = async (req, res) => {
     const attachments = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        // For S3 uploads, use the location property
         if (file.location) {
           attachments.push(file.location);
-        } 
-        // For local uploads, format the path
-        else if (file.path) {
+        } else if (file.path) {
           const formattedPath = file.path.replace(/\\/g, '/').split('public/')[1];
           attachments.push(formattedPath);
         }
@@ -186,11 +168,11 @@ const createGrievance = async (req, res) => {
     const grievance = await create(Grievance, grievanceData);
     
     // Clear cache
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.delPattern('grievances_*');
     
     return successResponse(res, 201, "Grievance created successfully", { grievance });
   } catch (error) {
-    console.error("Create grievance error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to create grievance");
   }
 };
@@ -209,7 +191,7 @@ const updateStatus = async (req, res) => {
     
     const grievance = await findAndUpdate(
       Grievance,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { status }
     );
     
@@ -218,12 +200,12 @@ const updateStatus = async (req, res) => {
     }
     
     // Clear cache
-    await cacheUtils.deletePattern(`grievance_${id}`);
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.del(`grievance_${id}`);
+    await cacheUtils.delPattern('grievances_*');
     
     return successResponse(res, 200, "Grievance status updated successfully", { grievance });
   } catch (error) {
-    console.error("Update status error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to update grievance status");
   }
 };
@@ -242,7 +224,7 @@ const updatePriority = async (req, res) => {
     
     const grievance = await findAndUpdate(
       Grievance,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { priority }
     );
     
@@ -251,12 +233,12 @@ const updatePriority = async (req, res) => {
     }
     
     // Clear cache
-    await cacheUtils.deletePattern(`grievance_${id}`);
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.del(`grievance_${id}`);
+    await cacheUtils.delPattern('grievances_*');
     
     return successResponse(res, 200, "Grievance priority updated successfully", { grievance });
   } catch (error) {
-    console.error("Update priority error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to update grievance priority");
   }
 };
@@ -268,39 +250,39 @@ const addReply = async (req, res) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
-    const userId = req.user._id; // From auth middleware
+    const userId = req.user ? (req.user.id || req.user._id) : null;
     
     if (!message) {
       return errorResponse(res, 400, "Reply message is required");
     }
     
-    const grievance = await findOne(Grievance, { _id: id, isDeleted: false });
+    const grievance = await findOne(Grievance, { id, isDeleted: false });
     
     if (!grievance) {
       return errorResponse(res, 404, "Grievance not found");
     }
     
-    // Add reply to the grievance
-    grievance.replies.push({
+    const replies = Array.isArray(grievance.replies) ? grievance.replies : [];
+    replies.push({
       userId,
       message,
       createdAt: new Date()
     });
     
-    // If the grievance is open and an admin is replying, change status to in_progress
-    if (grievance.status === 'open' && req.user.role === 'admin') {
-      grievance.status = 'in_progress';
+    const updateFields = { replies };
+    if (grievance.status === 'open' && req.user && req.user.role === 'admin') {
+      updateFields.status = 'in_progress';
     }
     
-    await grievance.save();
+    const updated = await findAndUpdate(Grievance, { id }, updateFields);
     
     // Clear cache
-    await cacheUtils.deletePattern(`grievance_${id}`);
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.del(`grievance_${id}`);
+    await cacheUtils.delPattern('grievances_*');
     
-    return successResponse(res, 200, "Reply added successfully", { grievance });
+    return successResponse(res, 200, "Reply added successfully", { grievance: updated });
   } catch (error) {
-    console.error("Add reply error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to add reply");
   }
 };
@@ -319,7 +301,7 @@ const assignGrievance = async (req, res) => {
     
     const grievance = await findAndUpdate(
       Grievance,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { assignedTo: adminId }
     );
     
@@ -328,12 +310,12 @@ const assignGrievance = async (req, res) => {
     }
     
     // Clear cache
-    await cacheUtils.deletePattern(`grievance_${id}`);
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.del(`grievance_${id}`);
+    await cacheUtils.delPattern('grievances_*');
     
     return successResponse(res, 200, "Grievance assigned successfully", { grievance });
   } catch (error) {
-    console.error("Assign grievance error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to assign grievance");
   }
 };
@@ -347,7 +329,7 @@ const deleteGrievance = async (req, res) => {
     
     const grievance = await findAndUpdate(
       Grievance,
-      { _id: id, isDeleted: false },
+      { id, isDeleted: false },
       { isDeleted: true }
     );
     
@@ -356,12 +338,12 @@ const deleteGrievance = async (req, res) => {
     }
     
     // Clear cache
-    await cacheUtils.deletePattern(`grievance_${id}`);
-    await cacheUtils.deletePattern('grievances_*');
+    await cacheUtils.del(`grievance_${id}`);
+    await cacheUtils.delPattern('grievances_*');
     
     return successResponse(res, 200, "Grievance deleted successfully");
   } catch (error) {
-    console.error("Delete grievance error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to delete grievance");
   }
 };
@@ -425,7 +407,7 @@ const getGrievanceAnalytics = async (req, res) => {
     
     return successResponse(res, 200, "Grievance analytics retrieved successfully", analytics);
   } catch (error) {
-    console.error("Get grievance analytics error:", error);
+
     return errorResponse(res, 500, error.message || "Failed to retrieve grievance analytics");
   }
 };

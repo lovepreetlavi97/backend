@@ -177,7 +177,7 @@ async function createAdminOrderNotifications(type, order, extra = {}) {
     // });
 
   } catch (err) {
-    console.error('createAdminOrderNotifications error', err.message);
+
   }
 }
 

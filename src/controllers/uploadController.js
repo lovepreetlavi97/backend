@@ -36,7 +36,7 @@ export const generatePresignedUrl = async (req, res) => {
 
     res.json({ uploadUrl, finalUrl });
   } catch (err) {
-    console.error("❌ Error generating signed URL:", err);
+
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

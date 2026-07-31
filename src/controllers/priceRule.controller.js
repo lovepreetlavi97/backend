@@ -2,11 +2,11 @@ const {
   create, 
   findOne, 
   findMany, 
-  findAndUpdate 
-} = require('../services/mongodb/mongoService');
+  findAndUpdate,
+  countDocuments
+} = require('../services/mysql/mysqlService');
 
-const PriceRule = require('../models/priceRule.model');
-const Product = require('../models/product.model');
+const { PriceRule, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const { cacheUtils } = require("../config/redis");
 
@@ -19,7 +19,7 @@ const createPriceRule = async (req, res) => {
       return errorResponse(res, 400, "Name and price are required");
     }
 
-    const existing = await PriceRule.findOne({ name: name.trim(), isDeleted: false });
+    const existing = await findOne(PriceRule, { name: name.trim(), isDeleted: false });
     if (existing) {
       return errorResponse(res, 409, "Price rule with this name already exists");
     }
@@ -30,7 +30,7 @@ const createPriceRule = async (req, res) => {
 
     return successResponse(res, 201, "Price rule created successfully", { priceRule });
   } catch (error) {
-    console.error("Create price rule error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -62,17 +62,14 @@ const getAllPriceRules = async (req, res) => {
       query.isActive = isActive === 'true';
     }
 
-    const skip = (page - 1) * limit;
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const options = {
+      page: Number(page),
+      limit: Number(limit),
+      sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 }
+    };
 
-    const priceRules = await PriceRule.find(query)
-      .sort(sort)
-      .skip(Number(skip))
-      .limit(Number(limit))
-      .lean();
-
-    const total = await PriceRule.countDocuments(query);
+    const priceRules = await findMany(PriceRule, query, null, options);
+    const total = await countDocuments(PriceRule, query);
 
     const result = {
       priceRules,
@@ -88,7 +85,7 @@ const getAllPriceRules = async (req, res) => {
 
     return successResponse(res, 200, "Price rules retrieved successfully", result);
   } catch (error) {
-    console.error("Get all price rules error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -98,7 +95,7 @@ const getPriceRuleById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const priceRule = await findOne(PriceRule, { _id: id, isDeleted: false });
+    const priceRule = await findOne(PriceRule, { id, isDeleted: false });
 
     if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
@@ -106,7 +103,7 @@ const getPriceRuleById = async (req, res) => {
 
     return successResponse(res, 200, "Price rule retrieved successfully", { priceRule });
   } catch (error) {
-    console.error("Get price rule error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -117,7 +114,7 @@ const updatePriceRuleById = async (req, res) => {
     const { id } = req.params;
     const { name, price, isActive } = req.body;
 
-    const existing = await PriceRule.findOne({ _id: id, isDeleted: false });
+    const existing = await findOne(PriceRule, { id, isDeleted: false });
     if (!existing) {
       return errorResponse(res, 404, "Price rule not found");
     }
@@ -127,13 +124,13 @@ const updatePriceRuleById = async (req, res) => {
     if (price !== undefined) updateData.price = price;
     if (isActive !== undefined) updateData.isActive = isActive;
 
-    const priceRule = await findAndUpdate(PriceRule, { _id: id }, updateData);
+    const priceRule = await findAndUpdate(PriceRule, { id }, updateData);
 
     await cacheUtils.delPattern('price-rules_*');
 
     return successResponse(res, 200, "Price rule updated successfully", { priceRule });
   } catch (error) {
-    console.error("Update price rule error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -143,24 +140,24 @@ const deletePriceRuleById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const priceRule = await PriceRule.findOne({ _id: id, isDeleted: false });
+    const priceRule = await findOne(PriceRule, { id, isDeleted: false });
     if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
     }
 
     // Dependency check: check if any active products are using this price rule
-    const inUse = await Product.exists({ priceRuleId: id, isDeleted: false });
-    if (inUse) {
+    const countInUse = await countDocuments(Product, { priceRuleId: id, isDeleted: false });
+    if (countInUse > 0) {
       return errorResponse(res, 400, "Cannot delete price rule. It is currently being used by one or more active products.");
     }
 
-    await findAndUpdate(PriceRule, { _id: id }, { isDeleted: true });
+    await findAndUpdate(PriceRule, { id }, { isDeleted: true });
 
     await cacheUtils.delPattern('price-rules_*');
 
     return successResponse(res, 200, "Price rule deleted successfully");
   } catch (error) {
-    console.error("Delete price rule error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
@@ -170,14 +167,14 @@ const togglePriceRuleStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const priceRule = await PriceRule.findOne({ _id: id, isDeleted: false });
+    const priceRule = await findOne(PriceRule, { id, isDeleted: false });
     if (!priceRule) {
       return errorResponse(res, 404, "Price rule not found");
     }
 
     const updated = await findAndUpdate(
       PriceRule,
-      { _id: id },
+      { id },
       { isActive: !priceRule.isActive }
     );
 
@@ -185,7 +182,7 @@ const togglePriceRuleStatus = async (req, res) => {
 
     return successResponse(res, 200, "Price rule status toggled successfully", { priceRule: updated });
   } catch (error) {
-    console.error("Toggle status error:", error);
+
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };

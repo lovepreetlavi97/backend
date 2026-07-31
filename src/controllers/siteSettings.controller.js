@@ -1,11 +1,12 @@
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
 const { SiteSettings } = require("../models");
+const { findOne, findAndUpdate, create } = require("../services/mysql/mysqlService");
 
 async function getOrCreateSettings() {
-  let doc = await SiteSettings.findOne({ key: "main" });
+  let doc = await findOne(SiteSettings, { key: "main" });
   if (!doc) {
-    doc = await SiteSettings.create({ key: "main" });
+    doc = await create(SiteSettings, { key: "main" });
   }
   return doc;
 }
@@ -15,7 +16,7 @@ const getPublicSettings = async (_req, res) => {
   try {
     const doc = await getOrCreateSettings();
 
-    // only expose safe public fields
+    // exposed safe public fields
     const data = {
       brand: doc.brand,
       contact: doc.contact,
@@ -28,7 +29,7 @@ const getPublicSettings = async (_req, res) => {
 
     return successResponse(res, 200, messages.DATA_FETCHED, data);
   } catch (error) {
-    console.error("Error fetching public site settings:", error);
+
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };
@@ -39,7 +40,7 @@ const getAdminSettings = async (_req, res) => {
     const doc = await getOrCreateSettings();
     return successResponse(res, 200, messages.DATA_FETCHED, doc);
   } catch (error) {
-    console.error("Error fetching admin site settings:", error);
+
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };
@@ -48,16 +49,17 @@ const getAdminSettings = async (_req, res) => {
 const updateAdminSettings = async (req, res) => {
   try {
     const payload = req.body || {};
+    await getOrCreateSettings();
 
-    const doc = await SiteSettings.findOneAndUpdate(
+    const doc = await findAndUpdate(
+      SiteSettings,
       { key: "main" },
-      { $set: payload },
-      { new: true, upsert: true, runValidators: true },
+      payload
     );
 
     return successResponse(res, 200, "Site settings updated", doc);
   } catch (error) {
-    console.error("Error updating site settings:", error);
+
     return errorResponse(res, 500, messages.SERVER_ERROR);
   }
 };
@@ -67,4 +69,3 @@ module.exports = {
   getAdminSettings,
   updateAdminSettings,
 };
-

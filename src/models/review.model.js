@@ -1,45 +1,26 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const ReviewSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
+const Review = sequelize.define('Review', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  productId: { type: DataTypes.INTEGER, allowNull: false },
+  rating: { type: DataTypes.INTEGER, allowNull: false },
+  reviewText: { type: DataTypes.TEXT, allowNull: true },
+  images: { type: DataTypes.JSON, defaultValue: [] },
+  helpfulCount: { type: DataTypes.INTEGER, defaultValue: 0 }
+}, {
+  tableName: 'reviews',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
+});
 
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true
-    },
+Review.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
-    rating: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 5
-    },
-    reviewText: {
-      type: String,
-      trim: true
-    },
-
-    images: [
-      {
-        type: String
-      }
-    ],
-
-    helpfulCount: {
-      type: Number,
-      default: 0
-    }
-  },
-  { timestamps: true }
-);
-
-// Prevent duplicate reviews by same user on same product
-ReviewSchema.index({ productId: 1, userId: 1 }, { unique: true });
-
-module.exports = mongoose.model('Review', ReviewSchema);
+module.exports = Review;

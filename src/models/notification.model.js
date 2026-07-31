@@ -1,20 +1,18 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const notificationSchema = new mongoose.Schema({
-  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true, index: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
-  userName: { type: String, required: false },
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: false },
-  type: {
-    type: String,
-    required: true,
-    enum: ['NEW_ORDER', 'ORDER_CANCELLED', 'ORDER_RETURNED', 'ORDER_REFUNDED']
-  },
-  message: { type: String, required: true },
-  isRead: { type: Boolean, default: false, index: true },
-  metadata: { type: Object },
-}, { timestamps: true });
-
-notificationSchema.index({ createdAt: -1 });
-
-module.exports = mongoose.model('Notification', notificationSchema);
+const Notification = sequelize.define('Notification', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  title: { type: DataTypes.STRING, allowNull: false },
+  message: { type: DataTypes.TEXT, allowNull: false },
+  type: { type: DataTypes.STRING, defaultValue: 'info' },
+  isRead: { type: DataTypes.BOOLEAN, defaultValue: false },
+  data: { type: DataTypes.JSON, defaultValue: {} }
+}, {
+  tableName: 'notifications',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
+});
+Notification.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = Notification;

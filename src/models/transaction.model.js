@@ -1,11 +1,18 @@
-const mongoose = require('mongoose');
-const TransactionSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-  paymentMethod: { type: String, enum: ['Card', 'PayPal', 'Razorpay', 'Bank Transfer'], required: true },
-  transactionId: { type: String, required: true },
-  amount: { type: Number, required: true },
-  status: { type: String, enum: ['Pending', 'Completed', 'Failed'], default: 'Pending' },
-  createdAt: { type: Date, default: Date.now }
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+
+const Transaction = sequelize.define('Transaction', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  orderId: { type: DataTypes.INTEGER, allowNull: false },
+  paymentMethod: { type: DataTypes.ENUM('Card', 'PayPal', 'Razorpay', 'Bank Transfer'), allowNull: false },
+  transactionId: { type: DataTypes.STRING, allowNull: false },
+  amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+  status: { type: DataTypes.ENUM('Pending', 'Completed', 'Failed'), defaultValue: 'Pending' }
+}, {
+  tableName: 'transactions',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
 });
-module.exports = mongoose.model('Transaction', TransactionSchema);
+Transaction.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = Transaction;

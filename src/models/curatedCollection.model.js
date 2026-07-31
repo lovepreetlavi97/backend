@@ -1,89 +1,26 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const curatedCollectionSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    metalIds: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Metal',
-      required: true,
-    }],
+const CuratedCollection = sequelize.define('CuratedCollection', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title: { type: DataTypes.STRING, allowNull: false },
+  slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  image: { type: DataTypes.STRING, defaultValue: '' },
+  bannerImage: { type: DataTypes.STRING, defaultValue: '' },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+}, {
+  tableName: 'curated_collections',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
+});
 
-    slug: {
-      type: String,
-      unique: true
-    },
+CuratedCollection.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
-    image: {
-      type: String,
-      required: true
-    },
-
-    filters: {
-      categoryIds: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Category"
-      }],
-
-      subcategoryIds: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Subcategory"
-      }],
-
-      relationIds: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Relation"
-      }],
-
-      festivalIds: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Festival"
-      }],
-
-      priceRange: {
-        min: Number,
-        max: Number
-      }
-    },
-
-    productIds: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product"
-    }],
-
-    position: {
-      type: Number,
-      default: 0
-    },
-
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      select: false
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin"
-    },
-
-    updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin"
-    }
-  },
-  { timestamps: true }
-);
-
-curatedCollectionSchema.index({ metalIds: 1 });
-
-module.exports = mongoose.model("CuratedCollection", curatedCollectionSchema);
+module.exports = CuratedCollection;

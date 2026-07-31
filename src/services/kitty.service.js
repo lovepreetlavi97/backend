@@ -1,5 +1,4 @@
-const mongoose = require("mongoose");
-const { UserKitty } = require("../models");
+const { UserKitty, User, KittyPlan } = require("../models");
 const { cacheUtils } = require("../config/redis");
 
 async function markPaymentAsPaid({
@@ -10,25 +9,36 @@ async function markPaymentAsPaid({
   paymentMethod = "razorpay",
   transactionId,
 }) {
-  console.log("💳 [markPaymentAsPaid] START — paymentId:", paymentId);
-
-  if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+  if (!paymentId) {
     throw new Error("Invalid paymentId");
   }
 
-  const userKitty = await UserKitty.findOne({
-    "payments._id": paymentId,
-    status: { $in: ["active", "paused", "pending"] },
-  }).populate("planId").populate("userId", "name email");
+  // Find all active/paused/pending user kitties
+  const allKitties = await UserKitty.findAll({
+    where: {
+      status: ["active", "paused", "pending"]
+    },
+    include: [
+      { model: KittyPlan },
+      { model: User, attributes: ['id', 'name', 'email'] }
+    ]
+  });
 
-  if (!userKitty) {
-    console.log("❌ [markPaymentAsPaid] UserKitty NOT FOUND for paymentId:", paymentId);
-    throw new Error("Kitty payment not found");
+  let userKitty = null;
+  let payment = null;
+
+  for (const uk of allKitties) {
+    const payments = Array.isArray(uk.payments) ? uk.payments : [];
+    const p = payments.find(pay => String(pay._id || pay.id) === String(paymentId));
+    if (p) {
+      userKitty = uk;
+      payment = p;
+      break;
+    }
   }
 
-  const payment = userKitty.payments.id(paymentId);
-  if (!payment) {
-    throw new Error("Kitty payment not found in array");
+  if (!userKitty || !payment) {
+    throw new Error("Kitty payment not found");
   }
 
   if (payment.status === "paid") {
@@ -48,49 +58,56 @@ async function markPaymentAsPaid({
   if (razorpaySignature) payment.razorpaySignature = razorpaySignature;
   if (transactionId) payment.transactionId = transactionId;
 
-  // Business Rule: Activate pending plan on first payment
-  if (userKitty.status === 'pending') {
-    userKitty.status = 'active';
-    console.log("🎉 [markPaymentAsPaid] Kitty ACTIVATED");
+  // Activate pending plan on first payment
+  let currentStatus = userKitty.status;
+  if (currentStatus === 'pending') {
+    currentStatus = 'active';
   }
 
-  // Count remaining pending/overdue payments
-  const unpaidPayments = userKitty.payments.filter(
+  const paymentsArray = userKitty.payments || [];
+  const unpaidPayments = paymentsArray.filter(
     (p) => p.status === "pending" || p.status === "overdue"
   );
 
-  // Update totalPaid (for safety before save)
-  const totalPaid = userKitty.payments
+  const totalPaid = paymentsArray
     .filter(p => p.status === 'paid')
-    .reduce((sum, p) => sum + p.amount, 0);
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  let completedDate = userKitty.completedDate;
+  let maturityPaidDate = userKitty.maturityPaidDate;
+  let nextPaymentDate = userKitty.nextPaymentDate;
 
   if (unpaidPayments.length === 0) {
-    // All installments paid
-    userKitty.status = "completed";
-    userKitty.completedDate = new Date();
-    userKitty.maturityPaidDate = new Date();
-    userKitty.nextPaymentDate = null;
-    console.log("🎉 [markPaymentAsPaid] Kitty COMPLETED (Full Schedule)");
+    currentStatus = "completed";
+    completedDate = new Date();
+    maturityPaidDate = new Date();
+    nextPaymentDate = null;
   } else {
-    // Set nextPaymentDate to the earliest unpaid installment's dueDate
     const nextPending = unpaidPayments.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
-    userKitty.nextPaymentDate = nextPending.dueDate;
+    nextPaymentDate = nextPending ? nextPending.dueDate : nextPaymentDate;
   }
 
-  await userKitty.save();
-  
+  await userKitty.update({
+    payments: paymentsArray,
+    status: currentStatus,
+    totalPaid: totalPaid,
+    remainingAmount: Math.max(0, Number(userKitty.totalAmount || 0) - totalPaid),
+    completedDate,
+    maturityPaidDate,
+    nextPaymentDate
+  });
+
   try {
-    // Send Confirmation Email
     const { sendEmail } = require("./notifications/email.service");
     const { getKittyPaymentSuccessTemplate, getKittyCompletionTemplate } = require("../utils/kittyEmailTemplates");
 
-    const paymentIndex = userKitty.payments.findIndex(p => p._id.toString() === paymentId.toString());
+    const paymentIndex = paymentsArray.findIndex(p => String(p._id || p.id) === String(paymentId));
     const installmentNo = paymentIndex + 1;
-    const nextPayment = userKitty.payments.find(p => p.status === 'pending' || p.status === 'overdue');
+    const nextPayment = paymentsArray.find(p => p.status === 'pending' || p.status === 'overdue');
 
     const emailHtml = getKittyPaymentSuccessTemplate({
-      userName: userKitty.userId.name || 'Valued Customer',
-      planName: userKitty.planId.name,
+      userName: userKitty.User ? userKitty.User.name : 'Valued Customer',
+      planName: userKitty.KittyPlan ? userKitty.KittyPlan.name : 'Kitty Plan',
       amount: payment.amount,
       installmentNo,
       date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -99,18 +116,18 @@ async function markPaymentAsPaid({
       totalAmount: userKitty.totalAmount
     });
 
-    await sendEmail(
-      userKitty.userId.email,
-      `Payment Received: ${userKitty.planId.name} (Inst. #${installmentNo})`,
-      emailHtml
-    );
-    console.log("📧 [markPaymentAsPaid] Confirmation email sent to:", userKitty.userId.email);
+    if (userKitty.User && userKitty.User.email) {
+      await sendEmail(
+        userKitty.User.email,
+        `Payment Received: ${userKitty.KittyPlan ? userKitty.KittyPlan.name : 'Kitty Plan'} (Inst. #${installmentNo})`,
+        emailHtml
+      );
+    }
 
-    // If fully paid, also send completion email
-    if (unpaidPayments.length === 0) {
+    if (unpaidPayments.length === 0 && userKitty.User && userKitty.User.email) {
       const completionEmailHtml = getKittyCompletionTemplate({
-        userName: userKitty.userId.name || 'Valued Customer',
-        planName: userKitty.planId.name,
+        userName: userKitty.User.name || 'Valued Customer',
+        planName: userKitty.KittyPlan ? userKitty.KittyPlan.name : 'Kitty Plan',
         totalPaid: totalPaid,
         totalAmount: userKitty.totalAmount,
         maturityAmount: userKitty.maturityAmount,
@@ -118,19 +135,16 @@ async function markPaymentAsPaid({
       });
 
       await sendEmail(
-        userKitty.userId.email,
-        `Congratulations! Your Kitty Plan is Completed: ${userKitty.planId.name}`,
+        userKitty.User.email,
+        `Congratulations! Your Kitty Plan is Completed: ${userKitty.KittyPlan ? userKitty.KittyPlan.name : 'Kitty Plan'}`,
         completionEmailHtml
       );
-      console.log("📧 [markPaymentAsPaid] Completion email sent to:", userKitty.userId.email);
     }
-  } catch (emailErr) {
-    console.error("❌ [markPaymentAsPaid] Failed to send email notifications:", emailErr.message);
-  }
+  } catch (emailErr) {}
 
   try {
-    await cacheUtils.clearPattern(`route_/kitty/my-kitties/${userKitty._id}*`);
-    await cacheUtils.clearPattern(`user:${userKitty.userId._id || userKitty.userId}:kitties:*`);
+    await cacheUtils.clearPattern(`route_/kitty/my-kitties/${userKitty.id}*`);
+    await cacheUtils.clearPattern(`user:${userKitty.userId}:kitties:*`);
   } catch (cacheErr) {}
 
   return userKitty;

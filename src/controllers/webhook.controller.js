@@ -1,8 +1,7 @@
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
-const Order = require("../models/order.model");
-const Product = require("../models/product.model");
-const User = require("../models/user.model");
+const { Order, Product, User } = require("../models/index");
+const { findOne, findAndUpdate } = require("../services/mysql/mysqlService");
 const { createAdminOrderNotifications } = require("../services/notifications/notification.service");
 const { sendEmail } = require("../services/notifications/email.service");
 const { buildOrderConfirmationEmail } = require("../services/notifications/orderConfirmationTemplate");
@@ -14,8 +13,6 @@ const razorpay = new Razorpay({
 
 async function razorpayWebhookHandler(req, res) {
   try {
-    console.log("🔔 Razorpay Webhook Received");
-
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
     // ---- SIGNATURE CHECK ----
@@ -27,11 +24,8 @@ async function razorpayWebhookHandler(req, res) {
     const receivedSignature = req.headers["x-razorpay-signature"];
 
     if (expectedSignature !== receivedSignature) {
-      console.log("❌ Invalid signature!");
       return res.status(400).json({ error: "Invalid signature" });
     }
-
-    console.log("✅ Signature verified");
 
     // ---- PARSE WEBHOOK ----
     const data = JSON.parse(req.body.toString());
@@ -39,7 +33,6 @@ async function razorpayWebhookHandler(req, res) {
 
     const payment = data?.payload?.payment?.entity;
     if (!payment) {
-      console.log("⚠️ No payment entity found");
       return res.json({ status: "ignored" });
     }
 
@@ -47,18 +40,25 @@ async function razorpayWebhookHandler(req, res) {
     const razorpayOrderId = payment.order_id;
     const amountPaid = payment.amount / 100;
 
-    // Extract your internal order ID from notes
-    const internalOrderId = payment.notes?.orderId;
+    // Webhook Idempotency check using Redis cache
+    const { cacheUtils } = require("../config/redis");
+    if (razorpayPaymentId) {
+      const isProcessed = await cacheUtils.get(`processed_webhook_${razorpayPaymentId}`);
+      if (isProcessed) {
+        return res.status(200).json({ status: "already_processed" });
+      }
+    }
+
+    // Extract internal order ID from notes or receipt fallback
+    const internalOrderId = payment.notes?.orderId || (payment.receipt ? payment.receipt.replace('order_', '') : null);
 
     if (!internalOrderId) {
-      console.log("⚠️ No orderId in Razorpay notes");
       return res.json({ status: "no_internal_order" });
     }
 
-    const order = await Order.findById(internalOrderId);
+    const order = await findOne(Order, { id: internalOrderId });
 
     if (!order) {
-      console.log("❌ Order not found in DB");
       return res.json({ status: "order_not_found" });
     }
 
@@ -66,21 +66,14 @@ async function razorpayWebhookHandler(req, res) {
     // 1️⃣ PAYMENT AUTHORIZED
     // -----------------------------
     if (event === "payment.authorized" && payment.status === "authorized") {
-      console.log("💰 Payment Authorized. Capturing now...");
-
       try {
         const capture = await razorpay.payments.capture(
           razorpayPaymentId,
           payment.amount,
           "INR"
         );
-
-        console.log("💳 Payment Captured:", capture);
-        // Keep order paymentStatus as Pending until Razorpay confirms capture via webhook.
-
         return res.json({ status: "capturing_payment" });
       } catch (e) {
-        console.log("❌ Capture failed:", e.message);
         return res.json({ status: "capture_failed" });
       }
     }
@@ -88,86 +81,85 @@ async function razorpayWebhookHandler(req, res) {
     // -----------------------------
     // 2️⃣ PAYMENT CAPTURED
     // -----------------------------
- // -----------------------------
-// 2️⃣ PAYMENT CAPTURED
-// -----------------------------
-if (event === "payment.captured" && payment.status === "captured") {
-  console.log("🎉 Payment Captured Successfully!");
+    if (event === "payment.captured" && payment.status === "captured") {
+      if (order && String(order.paymentStatus).toLowerCase() === "paid") {
+        if (razorpayPaymentId) {
+          await cacheUtils.set(`processed_webhook_${razorpayPaymentId}`, true, 86400);
+        }
+        return res.json({ status: "already_processed" });
+      }
 
-  // 🛑 Prevent duplicate processing
-  if (order.paymentStatus === "Paid") {
-    console.log("⚠️ Order already processed. Skipping email.");
-    return res.json({ status: "already_processed" });
-  }
+      const updatedOrder = await findAndUpdate(
+        Order,
+        { id: internalOrderId },
+        {
+          orderStatus: "processing",
+          paymentStatus: "paid",
+          razorpayPaymentId: razorpayPaymentId,
+          razorpayOrderId: razorpayOrderId,
+        }
+      );
 
-  order.status = "Confirmed";
-  order.paymentStatus = "Paid";
-  order.razorpayPaymentId = razorpayPaymentId;
-  order.razorpayOrderId = razorpayOrderId;
+      if (razorpayPaymentId) {
+        await cacheUtils.set(`processed_webhook_${razorpayPaymentId}`, true, 86400);
+      }
 
-  await order.save();
+      if (!updatedOrder) {
+        return res.json({ status: "already_processed" });
+      }
 
-  // -----------------------------
-  // 3️⃣ UPDATE STOCK
-  // -----------------------------
+      // -----------------------------
+      // 3️⃣ UPDATE PURCHASE COUNT
+      // -----------------------------
+      if (updatedOrder.products && Array.isArray(updatedOrder.products)) {
+        for (const item of updatedOrder.products) {
+          const product = await findOne(Product, { id: item.productId });
+          if (product) {
+            await findAndUpdate(Product, { id: item.productId }, {
+              purchaseCount: (product.purchaseCount || 0) + (item.quantity || 1)
+            });
+          }
+        }
+      }
 
-  console.log("🧾 Order keys:", Object.keys(order.toObject()));
-console.log("🧾 order.items:", order.items);
-console.log("🧾 order.products:", order.products);
+      // -----------------------------
+      // 4️⃣ CUSTOMER EMAIL + ADMIN NOTIFICATION
+      // -----------------------------
+      try {
+        let customerEmail = updatedOrder.guestEmail;
+        let customerName = updatedOrder.shippingAddress?.contactName || "";
 
-  for (const item of order.products) {
-    await Product.findByIdAndUpdate(item.productId, {
-      $inc: {
-        stock: -item.quantity,
-        purchaseCount: item.quantity,
-      },
-    });
-  }
+        if (!customerEmail && updatedOrder.userId) {
+          const u = await findOne(User, { id: updatedOrder.userId });
+          customerEmail = u?.email || customerEmail;
+          customerName = u?.name || customerName;
+        }
 
-  console.log("📦 Order Confirmed & Stock Updated");
+        if (customerEmail) {
+          const brandName = process.env.BRAND_NAME || "Guru Jewellers";
+          const supportEmail = process.env.SUPPORT_EMAIL || process.env.MAIL_USER;
+          const html = buildOrderConfirmationEmail({
+            brandName,
+            supportEmail,
+            order: updatedOrder,
+            customerName,
+          });
+          const subject = `Order confirmed • ${updatedOrder.orderNumber}`;
+          await sendEmail(customerEmail, subject, html);
+        }
+      } catch (e) {
+        console.error("Email send error:", e);
+      }
 
-  // -----------------------------
-  // 4️⃣ CUSTOMER EMAIL + ADMIN NOTIFICATION
-  // -----------------------------
-  try {
-    let customerEmail = order.guestEmail;
-    let customerName = order.shippingAddress?.contactName || "";
+      createAdminOrderNotifications('NEW_ORDER', updatedOrder)
+        .catch(e => console.error('NEW_ORDER notification error:', e));
 
-    if (!customerEmail && order.userId) {
-      const u = await User.findById(order.userId).select("name email").lean();
-      customerEmail = u?.email || customerEmail;
-      customerName = u?.name || customerName;
+      return res.json({ status: "order_confirmed" });
     }
-
-    if (customerEmail) {
-      const brandName = process.env.BRAND_NAME || "Guru Jewellers";
-      const supportEmail = process.env.SUPPORT_EMAIL || process.env.MAIL_USER;
-      const html = buildOrderConfirmationEmail({
-        brandName,
-        supportEmail,
-        order: order.toObject(),
-        customerName,
-      });
-      const subject = `Order confirmed • ${order.orderNumber}`;
-      await sendEmail(customerEmail, subject, html);
-    } else {
-      console.log("⚠️ No customer email on order; skipping customer email.");
-    }
-  } catch (e) {
-    console.error("Customer email failed:", e?.message || e);
-  }
-
-  createAdminOrderNotifications('NEW_ORDER', order)
-    .catch(e => console.error('NEW_ORDER notification error:', e));
-
-  return res.json({ status: "order_confirmed" });
-}
-
 
     return res.json({ status: "ignored_event" });
 
   } catch (err) {
-    console.error("❌ Webhook Error:", err);
     return res.status(500).json({ error: err.message });
   }
 }

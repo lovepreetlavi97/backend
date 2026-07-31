@@ -1,62 +1,20 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const linkSchema = new mongoose.Schema(
-  {
-    label: { type: String, trim: true },
-    url: { type: String, trim: true },
-  },
-  { _id: false },
-);
-
-const siteSettingsSchema = new mongoose.Schema(
-  {
-    // singleton document key
-    key: { type: String, default: "main", unique: true },
-
-    brand: {
-      name: { type: String, trim: true, default: "Guru Jewellers" },
-      tagline: { type: String, trim: true, default: "" },
-      logoUrl: { type: String, trim: true, default: "" },
-    },
-
-    contact: {
-      email: { type: String, trim: true, default: "" },
-      phone: { type: String, trim: true, default: "" },
-      whatsapp: { type: String, trim: true, default: "" },
-      address: { type: String, trim: true, default: "" },
-      googleMapUrl: { type: String, trim: true, default: "" },
-      businessHours: { type: String, trim: true, default: "" },
-    },
-
-    social: {
-      instagramAccounts: [
-        {
-          handle: { type: String, default: "@guru.jewellers" },
-          url: { type: String, default: "https://www.instagram.com/gurujewellers/" },
-        },
-      ],
-      instagramHashtag: { type: String, trim: true, default: "#GURUJEWELLERS" },
-      facebook: { type: String, trim: true, default: "" },
-      youtube: { type: String, trim: true, default: "" },
-      twitter: { type: String, trim: true, default: "" },
-    },
-
-    links: {
-      instagramPageLinks: { type: [linkSchema], default: [] },
-      footerLinks: { type: [linkSchema], default: [] },
-    },
-
-    featureBadges: { 
-      type: [String], 
-      default: ['Hallmarked Jewellery', '15-Day Returns', 'Free Delivery', 'Certified Diamonds'] 
-    },
-
-    footerAbout: { type: String, default: "" },
-
-    isActive: { type: Boolean, default: true },
-  },
-  { timestamps: true },
-);
-
-module.exports = mongoose.model("SiteSettings", siteSettingsSchema);
-
+const SiteSettings = sequelize.define('SiteSettings', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  key: { type: DataTypes.STRING, defaultValue: 'main', unique: true },
+  brand: { type: DataTypes.JSON, defaultValue: { name: 'Guru Jewellers', tagline: '', logoUrl: '' } },
+  contact: { type: DataTypes.JSON, defaultValue: { email: '', phone: '', whatsapp: '', address: '', googleMapUrl: '', businessHours: '' } },
+  social: { type: DataTypes.JSON, defaultValue: { instagramAccounts: [], instagramHashtag: '#GURUJEWELLERS', facebook: '', youtube: '', twitter: '' } },
+  links: { type: DataTypes.JSON, defaultValue: { instagramPageLinks: [], footerLinks: [] } },
+  featureBadges: { type: DataTypes.JSON, defaultValue: ['Hallmarked Jewellery', '15-Day Returns', 'Free Delivery', 'Certified Diamonds'] },
+  footerAbout: { type: DataTypes.TEXT, defaultValue: '' },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+}, {
+  tableName: 'site_settings',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
+});
+SiteSettings.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = SiteSettings;

@@ -1,78 +1,20 @@
-const mongoose = require('mongoose');
-const slugify = require('slugify');
-// const DEFAULT_IMAGE_URL = "https://plus.unsplash.com/premium_photo-1664124381855-3131b9a386d8?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const FestivalCardSchema = new mongoose.Schema(
-  {
-    image: { type: String, required: true },
-    slug: { type: String, required: true },
-  },
-  { _id: false }
-);
-
-const festivalSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  metalIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Metal',
-    required: true,
-  }],
-  description: {
-    type: String,
-    required: true
-  },
-  slug: {
-    type: String,
-    unique: true
-  },
-  startDate: {
-    type: Date,
-    required: true
-  },
-  endDate: {
-    type: Date,
-    required: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false
-  },
-  cards: [
-    {
-      image: { type: String, required: true },
-      slug: { type: String, required: true },
-    }
-  ],
-  mainImage: { type: String, required: true },
-}, { timestamps: true });
-
-// Pre-save middleware to generate slug
-festivalSchema.pre('save', function (next) {
-  // Only generate slug if name is modified or it's a new document
-  if (this.isModified('name') || this.isNew) {
-    this.slug = slugify(this.name, { lower: true, strict: true });
-  }
-  next();
+const Festival = sequelize.define('Festival', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title: { type: DataTypes.STRING, allowNull: false },
+  slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  bannerImage: { type: DataTypes.STRING, defaultValue: '' },
+  startDate: { type: DataTypes.DATE, allowNull: true },
+  endDate: { type: DataTypes.DATE, allowNull: true },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  productIds: { type: DataTypes.JSON, defaultValue: [] }
+}, {
+  tableName: 'festivals',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
 });
-
-// Virtual to check if the festival is expired
-festivalSchema.virtual('isExpired').get(function () {
-  return Date.now() > this.endDate;
-});
-
-// Add indexes for faster queries
-festivalSchema.index({ name: 1 });
-festivalSchema.index({ slug: 1 });
-festivalSchema.index({ isActive: 1 });
-festivalSchema.index({ startDate: 1, endDate: 1 });
-festivalSchema.index({ metalIds: 1 });
-
-module.exports = mongoose.model('Festival', festivalSchema);
+Festival.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = Festival;

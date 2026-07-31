@@ -1,4 +1,5 @@
-const InstagramVideo = require("../models/InstagramVideo");
+const { InstagramVideo } = require("../models/index");
+const { create, findOne, findMany, findAndUpdate, deleteOne, countDocuments } = require("../services/mysql/mysqlService");
 const {
   uploadToSpaces,
   getPublicUrl,
@@ -49,12 +50,13 @@ const createVideo = async (req, res) => {
       thumbnailUrl = getPublicUrl(thumbKey);
     }
 
-    const video = await InstagramVideo.create({
+    const video = await create(InstagramVideo, {
       caption,
       instagramLink,
       videoUrl,
       thumbnail: thumbnailUrl,
-      sortOrder,
+      sortOrder: sortOrder ? parseInt(sortOrder) : 0,
+      isActive: true
     });
 
     return successResponse(res, 201, "Instagram video created", { video });
@@ -72,14 +74,14 @@ const getAllVideos = async (req, res) => {
     const { all, page = 1, limit = 10 } = req.query;
     const filter = all === "true" ? {} : { isActive: true };
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const options = {
+      page: Number(page),
+      limit: Number(limit),
+      sort: { sortOrder: 1, createdAt: -1 }
+    };
 
-    const videos = await InstagramVideo.find(filter)
-      .sort({ sortOrder: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    const total = await InstagramVideo.countDocuments(filter);
+    const videos = await findMany(InstagramVideo, filter, null, options);
+    const total = await countDocuments(InstagramVideo, filter);
 
     return successResponse(res, 200, "Instagram videos fetched", {
       videos,
@@ -88,7 +90,7 @@ const getAllVideos = async (req, res) => {
         page: Number(page),
         limit: Number(limit),
         pages: Math.ceil(total / limit),
-        hasNext: skip + videos.length < total,
+        hasNext: (Number(page) * Number(limit)) < total,
       },
     });
   } catch (error) {
@@ -106,7 +108,7 @@ const updateVideo = async (req, res) => {
     const { id } = req.params;
     const { caption, instagramLink, sortOrder, isActive } = req.body;
 
-    const video = await InstagramVideo.findById(id);
+    const video = await findOne(InstagramVideo, { id });
     if (!video) {
       return errorResponse(res, 404, "Video not found");
     }
@@ -114,6 +116,8 @@ const updateVideo = async (req, res) => {
     // Handle context-specific uploads from multer.fields()
     const videoFile = req.files?.video?.[0];
     const thumbFile = req.files?.thumbnail?.[0];
+
+    const updateFields = {};
 
     // If new thumbnail uploaded → delete old thumbnail
     if (thumbFile) {
@@ -132,16 +136,18 @@ const updateVideo = async (req, res) => {
         "instagram-thumbnails"
       );
 
-      video.thumbnail = getPublicUrl(thumbKey);
+      updateFields.thumbnail = getPublicUrl(thumbKey);
     }
 
     // If new video uploaded → delete old video
     if (videoFile) {
-      const oldKey = video.videoUrl.replace(
-        `${process.env.DO_PUBLIC_URL}/`,
-        ""
-      );
-      await deleteImageFromSpaces(oldKey);
+      if (video.videoUrl) {
+        const oldKey = video.videoUrl.replace(
+          `${process.env.DO_PUBLIC_URL}/`,
+          ""
+        );
+        await deleteImageFromSpaces(oldKey);
+      }
 
       const newKey = await uploadToSpaces(
         videoFile.buffer,
@@ -150,17 +156,17 @@ const updateVideo = async (req, res) => {
         "instagram-videos"
       );
 
-      video.videoUrl = getPublicUrl(newKey);
+      updateFields.videoUrl = getPublicUrl(newKey);
     }
 
-    if (caption !== undefined) video.caption = caption;
-    if (instagramLink !== undefined) video.instagramLink = instagramLink;
-    if (sortOrder !== undefined) video.sortOrder = sortOrder;
-    if (isActive !== undefined) video.isActive = isActive;
+    if (caption !== undefined) updateFields.caption = caption;
+    if (instagramLink !== undefined) updateFields.instagramLink = instagramLink;
+    if (sortOrder !== undefined) updateFields.sortOrder = parseInt(sortOrder);
+    if (isActive !== undefined) updateFields.isActive = isActive;
 
-    await video.save();
+    const updatedVideo = await findAndUpdate(InstagramVideo, { id }, updateFields);
 
-    return successResponse(res, 200, "Instagram video updated", { video });
+    return successResponse(res, 200, "Instagram video updated", { video: updatedVideo });
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
@@ -168,37 +174,36 @@ const updateVideo = async (req, res) => {
 
 /**
  * ✅ DELETE
- * - Deletes from S3 + MongoDB
+ * - Deletes from S3 + MySQL
  */
 const deleteVideo = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const video = await InstagramVideo.findById(id);
+    const video = await findOne(InstagramVideo, { id });
     if (!video) {
       return errorResponse(res, 404, "Video not found");
     }
 
-// delete video
-const videoKey = video.videoUrl.replace(
-  `${process.env.DO_PUBLIC_URL}/`,
-  ""
-);
-await deleteImageFromSpaces(videoKey);
+    // delete video
+    if (video.videoUrl) {
+      const videoKey = video.videoUrl.replace(
+        `${process.env.DO_PUBLIC_URL}/`,
+        ""
+      );
+      await deleteImageFromSpaces(videoKey);
+    }
 
-// delete thumbnail
-if (video.thumbnail) {
-  const thumbKey = video.thumbnail.replace(
-    `${process.env.DO_PUBLIC_URL}/`,
-    ""
-  );
-  await deleteImageFromSpaces(thumbKey);
-}
+    // delete thumbnail
+    if (video.thumbnail) {
+      const thumbKey = video.thumbnail.replace(
+        `${process.env.DO_PUBLIC_URL}/`,
+        ""
+      );
+      await deleteImageFromSpaces(thumbKey);
+    }
 
-await video.deleteOne();
-
-
-
+    await deleteOne(InstagramVideo, { id });
 
     return successResponse(res, 200, "Instagram video deleted");
   } catch (error) {

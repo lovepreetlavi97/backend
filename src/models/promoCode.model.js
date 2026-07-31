@@ -1,130 +1,36 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const promoCodeSchema = new mongoose.Schema(
-  {
-    // ✅ Required
-    code: {
-      type: String,
-      required: true,
-      unique: true,
-      uppercase: true,
-      trim: true,
-    },
-
-    type: {
-      type: String,
-      enum: ["percentage", "fixed"],
-      required: true,
-    },
-
-    value: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    minPurchase: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
-    },
-
-    maxDiscount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    startDate: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
-
-    endDate: {
-      type: Date,
-      required: true,
-    },
-
-    usageLimit: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    usageCount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    description: {
-      type: String,
-      required: true,
-    },
-
-    status: {
-      type: String,
-      enum: ["active", "inactive", "expired"],
-      default: "active",
-    },
-
-    isDeleted: {
-      type: Boolean,
-      default: false,
-    },
-
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
-
-    // 🔁 Optional
-    minOrderValue: {
-      type: Number,
-      default: 0,
-    },
-
-    // ✅ New fields for global usage tracking
-    usedCount: {
-      type: Number,
-      default: 0,
-    },
-
-    // ✅ Track which users used this code
-    usedBy: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    // 🔁 User-level restriction
-    userRestrictions: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: "User",
-      default: [],
-    },
-  },
-  { timestamps: true }
-);
-
-// 🔍 Virtual to check expiry status
-promoCodeSchema.virtual("isExpired").get(function () {
-  return Date.now() > this.endDate;
+const PromoCode = sequelize.define('PromoCode', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  code: { type: DataTypes.STRING, allowNull: false, unique: true },
+  type: { type: DataTypes.ENUM('percentage', 'fixed'), allowNull: false },
+  value: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+  minPurchase: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0.00 },
+  minOrderValue: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0.00 },
+  maxDiscount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+  startDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+  endDate: { type: DataTypes.DATE, allowNull: false },
+  usageLimit: { type: DataTypes.INTEGER, allowNull: false },
+  usageCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  usedCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  description: { type: DataTypes.TEXT, allowNull: false },
+  status: { type: DataTypes.ENUM('active', 'inactive', 'expired'), defaultValue: 'active' },
+  isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false },
+  usedBy: { type: DataTypes.JSON, defaultValue: [] },
+  userRestrictions: { type: DataTypes.JSON, defaultValue: [] }
+}, {
+  tableName: 'promo_codes',
+  timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
 });
 
-// Add index for faster queries
-promoCodeSchema.index({ code: 1 });
-promoCodeSchema.index({ status: 1 });
-promoCodeSchema.index({ startDate: 1, endDate: 1 });
-
-const PromoCode = mongoose.model("PromoCode", promoCodeSchema);
+PromoCode.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
 module.exports = PromoCode;

@@ -1,11 +1,18 @@
-const mongoose = require('mongoose');
-const ShippingSchema = new mongoose.Schema({
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  address: { type: String, required: true },
-  trackingNumber: { type: String },
-  courierService: { type: String },
-  status: { type: String, enum: ['Processing', 'Shipped', 'Delivered'], default: 'Processing' },
-  createdAt: { type: Date, default: Date.now }
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+
+const Shipping = sequelize.define('Shipping', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  orderId: { type: DataTypes.INTEGER, allowNull: false },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  address: { type: DataTypes.TEXT, allowNull: false },
+  trackingNumber: { type: DataTypes.STRING, allowNull: true },
+  courierService: { type: DataTypes.STRING, allowNull: true },
+  status: { type: DataTypes.ENUM('Processing', 'Shipped', 'Delivered'), defaultValue: 'Processing' }
+}, {
+  tableName: 'shippings',
+  timestamps: true,
+  getterMethods: { _id() { return this.id; } }
 });
-module.exports = mongoose.model('Shipping', ShippingSchema);
+Shipping.prototype.toJSON = function() { const v = Object.assign({}, this.get()); v._id = v.id; return v; };
+module.exports = Shipping;

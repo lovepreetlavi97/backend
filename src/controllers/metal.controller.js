@@ -1,17 +1,16 @@
 const { Metal, Banner, Product } = require('../models');
+const { create, findOne, findMany, findAndUpdate, deleteOne, countDocuments } = require('../services/mysql/mysqlService');
 const { successResponse, errorResponse } = require('../utils/responseUtil');
 
 exports.createMetal = async (req, res) => {
   try {
-    console.log('Creating metal with body:', typeof req.body, req.body);
-    
-    // Auto-assign position if missing
-    if (!req.body.position) {
-      const highestMetal = await Metal.findOne().sort({ position: -1 }).limit(1);
-      req.body.position = highestMetal ? (highestMetal.position || 0) + 1 : 1;
+    const payload = { ...req.body };
+    if (!payload.position) {
+      const highestMetal = await findOne(Metal, {}, {}, { sort: { position: -1 } });
+      payload.position = highestMetal ? (highestMetal.position || 0) + 1 : 1;
     }
     
-    const metal = await Metal.create(req.body);
+    const metal = await create(Metal, payload);
     return successResponse(res, 201, 'Metal created successfully', { metal });
   } catch (error) {
     return errorResponse(res, 500, error.message || 'Error creating metal');
@@ -20,17 +19,16 @@ exports.createMetal = async (req, res) => {
 
 exports.getAllMetals = async (req, res) => {
   try {
-    const metals = await Metal.find().sort({ position: 1 });
+    const metals = await findMany(Metal, {}, null, { sort: { position: 1 } });
     return successResponse(res, 200, 'Metals retrieved successfully', { metals });
   } catch (error) {
-    console.error('Error in getAllMetals:', error);
     return errorResponse(res, 500, error.message || 'Error retrieving metals');
   }
 };
 
 exports.getMetal = async (req, res) => {
   try {
-    const metal = await Metal.findById(req.params.id);
+    const metal = await findOne(Metal, { id: req.params.id });
     if (!metal) {
       return errorResponse(res, 404, 'Metal not found');
     }
@@ -42,10 +40,7 @@ exports.getMetal = async (req, res) => {
 
 exports.updateMetal = async (req, res) => {
   try {
-    const metal = await Metal.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    const metal = await findAndUpdate(Metal, { id: req.params.id }, req.body);
     if (!metal) {
       return errorResponse(res, 404, 'Metal not found');
     }
@@ -64,28 +59,15 @@ exports.updateMetalPosition = async (req, res) => {
       return errorResponse(res, 400, "Invalid direction. Must be 'up' or 'down'");
     }
 
-    const currentMetal = await Metal.findById(id);
+    const currentMetal = await findOne(Metal, { id });
     if (!currentMetal) return errorResponse(res, 404, "Metal not found");
 
-    // Self-healing check: initialize positions for old database records that don't have them
-    if (!currentMetal.position || currentMetal.position === 0) {
-      const allMetals = await Metal.find();
-      let pos = 1;
-      for (const m of allMetals) {
-        m.position = pos++;
-        await m.save();
-        if (m._id.toString() === id) {
-          currentMetal.position = m.position;
-        }
-      }
-    }
-
-    const sortDirection = direction === 'up' ? -1 : 1;
     const positionQuery = direction === 'up' 
       ? { position: { $lt: currentMetal.position } }
       : { position: { $gt: currentMetal.position } };
 
-    const adjacentMetal = await Metal.findOne(positionQuery).sort({ position: sortDirection }).limit(1);
+    const sortDirection = direction === 'up' ? -1 : 1;
+    const adjacentMetal = await findOne(Metal, positionQuery, {}, { sort: { position: sortDirection } });
 
     if (!adjacentMetal) {
       return errorResponse(res, 400, `Cannot move metal ${direction}. It's already at the ${direction === 'up' ? 'first' : 'last'} priority.`);
@@ -93,39 +75,35 @@ exports.updateMetalPosition = async (req, res) => {
 
     // Swap positions
     const tempPosition = currentMetal.position;
-    currentMetal.position = adjacentMetal.position;
-    adjacentMetal.position = tempPosition;
-
-    await currentMetal.save();
-    await adjacentMetal.save();
+    await findAndUpdate(Metal, { id: currentMetal.id }, { position: adjacentMetal.position });
+    await findAndUpdate(Metal, { id: adjacentMetal.id }, { position: tempPosition });
 
     return successResponse(res, 200, "Metal position updated successfully");
   } catch (error) {
-    console.error("Update metal position error:", error);
     return errorResponse(res, 500, error.message || "Internal server error");
   }
 };
 
 exports.deleteMetal = async (req, res) => {
   try {
-    const metal = await Metal.findById(req.params.id);
+    const metal = await findOne(Metal, { id: req.params.id });
     if (!metal) {
       return errorResponse(res, 404, 'Metal not found');
     }
 
     // Dependency check: check if any active products are using this metal
-    const productInUse = await Product.exists({ metalIds: req.params.id, isDeleted: false });
-    if (productInUse) {
+    const productInUse = await countDocuments(Product, { metalId: req.params.id, isDeleted: false });
+    if (productInUse > 0) {
       return errorResponse(res, 400, "Cannot delete metal. It is currently being used by one or more active products.");
     }
 
     // Dependency check: check if any active banners are using this metal
-    const bannerInUse = await Banner.exists({ metalIds: req.params.id, isDeleted: false });
-    if (bannerInUse) {
+    const bannerInUse = await countDocuments(Banner, { metalId: req.params.id, isDeleted: false });
+    if (bannerInUse > 0) {
       return errorResponse(res, 400, "Cannot delete metal. It is currently being used by one or more active banners.");
     }
 
-    await Metal.findByIdAndDelete(req.params.id);
+    await deleteOne(Metal, { id: req.params.id });
     return successResponse(res, 200, 'Metal deleted successfully');
   } catch (error) {
     return errorResponse(res, 500, error.message || 'Error deleting metal');

@@ -1,42 +1,25 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const metalSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true,
-  },
-  colorCode: {
-    type: String,
-    required: true, // Example: '#D4AF37'
-  },
-  gradient: {
-    type: String,
-    required: true, // Example: 'linear-gradient(to right, #D4AF37, #F9D05F)'
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
-  position: {
-    type: Number,
-    default: 0,
-  },
+const Metal = sequelize.define('Metal', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  purity: { type: DataTypes.STRING, allowNull: true },
+  rate: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0.00 },
+  unit: { type: DataTypes.STRING, defaultValue: 'gram' },
+  description: { type: DataTypes.TEXT, allowNull: true }
 }, {
+  tableName: 'metals',
   timestamps: true,
+  getterMethods: {
+    _id() { return this.id; }
+  }
 });
 
-// Adding index on slug for fast searching
-metalSchema.index({ slug: 1 });
-
-const Metal = mongoose.model('Metal', metalSchema);
+Metal.prototype.toJSON = function() {
+  const values = Object.assign({}, this.get());
+  values._id = values.id;
+  return values;
+};
 
 module.exports = Metal;

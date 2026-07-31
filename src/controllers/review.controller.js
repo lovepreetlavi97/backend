@@ -1,28 +1,19 @@
-const {
-  create,
-  findOne,
-  findMany,
-  findAndUpdate,
-  deleteOne
-} = require('../services/mongodb/mongoService');
-
-const { Review } = require('../models/index'); // Ensure Review is included in models/index.js
+const { Review, User, Product } = require('../models/index');
 const { successResponse, errorResponse } = require("../utils/responseUtil");
 const messages = require("../utils/messages");
+const { isValidId } = require("../utils/idUtils");
+const { Op } = require("sequelize");
 
-// Create a new review
 const createReview = async (req, res) => {
   try {
     const { productId, rating, reviewText } = req.body;
-    const userId = req.user.id; // Extracted from JWT token
+    const userId = req.user.id || req.user._id;
 
     if (!productId || !rating) {
       return errorResponse(res, 400, "Product ID and rating are required.");
     }
 
-    const reviewData = { userId, productId, rating, reviewText };
-    const review = await create(Review, reviewData);
-
+    const review = await Review.create({ userId, productId, rating: Number(rating), reviewText, isApproved: true });
     return successResponse(res, 201, messages.REVIEW_CREATED, { review });
 
   } catch (error) {
@@ -30,15 +21,13 @@ const createReview = async (req, res) => {
   }
 };
 
-// Get all reviews for a product
 const getReviewsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const reviews = await findMany(Review, { productId }, null, { path: 'userId', select: 'name' });
-
-    if (!reviews.length) {
-      return successResponse(res, 200, messages.REVIEWS_NOT_FOUND, { reviews });
-    }
+    const reviews = await Review.findAll({
+      where: { productId },
+      include: [{ model: User, attributes: ['id', 'name'] }]
+    });
 
     return successResponse(res, 200, messages.REVIEWS_RETRIEVED, { reviews });
 
@@ -47,19 +36,18 @@ const getReviewsByProduct = async (req, res) => {
   }
 };
 
-// Update a review by ID
 const updateReview = async (req, res) => {
   try {
     const { id } = req.params;
     const { rating, reviewText } = req.body;
-    const userId = req.user.id; // Extracted from JWT token
+    const userId = req.user.id || req.user._id;
 
-    const review = await findAndUpdate(Review, { _id: id, userId }, { rating, reviewText });
-
+    const review = await Review.findOne({ where: { id, userId } });
     if (!review) {
       return errorResponse(res, 404, messages.REVIEW_NOT_FOUND);
     }
 
+    await review.update({ rating: Number(rating), reviewText });
     return successResponse(res, 200, messages.REVIEW_UPDATED, { review });
 
   } catch (error) {
@@ -67,118 +55,42 @@ const updateReview = async (req, res) => {
   }
 };
 
-// Delete a review by ID
 const deleteReview = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id; // Extracted from JWT token
+    const userId = req.user.id || req.user._id;
 
-    const result = await deleteOne(Review, { _id: id, userId });
-
-    if (result.deletedCount === 0) {
+    const review = await Review.findOne({ where: { id, userId } });
+    if (!review) {
       return errorResponse(res, 404, messages.REVIEW_NOT_FOUND);
     }
 
+    await review.destroy();
     return successResponse(res, 200, messages.REVIEW_DELETED);
 
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
+
 const getAllReviews = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    const search = req.query.search?.trim();
-    const minRating = parseFloat(req.query.minRating);
-    const maxRating = parseFloat(req.query.maxRating);
-
-    const matchStage = {};
-
-    // ⭐ Rating range filter
-    if (!isNaN(minRating) || !isNaN(maxRating)) {
-      matchStage.rating = {};
-      if (!isNaN(minRating)) matchStage.rating.$gte = minRating;
-      if (!isNaN(maxRating)) matchStage.rating.$lte = maxRating;
-    }
-
-    const pipeline = [
-      { $match: matchStage },
-
-      // 👤 Join users
-      {
-        $lookup: {
-          from: "users",
-          localField: "userId",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-      { $unwind: "$user" },
-
-      // 🛍 Join products
-      {
-        $lookup: {
-          from: "products",
-          localField: "productId",
-          foreignField: "_id",
-          as: "product",
-        },
-      },
-      { $unwind: "$product" },
-    ];
-
-    // 🔍 Search by user name OR product name
-    if (search) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { "user.name": { $regex: search, $options: "i" } },
-            { "product.name": { $regex: search, $options: "i" } },
-          ],
-        },
-      });
-    }
-
-    // 📊 Sort + pagination
-    pipeline.push(
-      { $sort: { createdAt: -1 } },
-      {
-        $facet: {
-          data: [{ $skip: skip }, { $limit: limit }],
-          totalCount: [{ $count: "count" }],
-        },
-      }
-    );
-
-    const result = await Review.aggregate(pipeline);
-
-    const reviews = result[0].data.map((r) => ({
-      _id: r._id,
-      rating: r.rating,
-      reviewText: r.reviewText,
-      images: r.images,
-      helpfulCount: r.helpfulCount,
-      createdAt: r.createdAt,
-      user: {
-        _id: r.user._id,
-        name: r.user.name,
-        profileImage: r.user.profileImage,
-      },
-      product: {
-        _id: r.product._id,
-        name: r.product.name,
-        slug: r.product.slug,
-        images: r.product.images,
-      },
-    }));
-
-    const total = result[0].totalCount[0]?.count || 0;
+    const { count, rows: reviews } = await Review.findAndCountAll({
+      include: [
+        { model: User, attributes: ['id', 'name'] },
+        { model: Product, attributes: ['id', 'name', 'title', 'slug'] }
+      ],
+      limit,
+      offset,
+      order: [['id', 'DESC']]
+    });
 
     return successResponse(res, 200, messages.REVIEWS_RETRIEVED, {
-      total,
+      total: count,
       page,
       limit,
       reviews,
@@ -188,12 +100,6 @@ const getAllReviews = async (req, res) => {
   }
 };
 
-module.exports = {
-  getAllReviews,
-};
-
-
-// Export all functions
 module.exports = {
   createReview,
   getReviewsByProduct,

@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const { User } = require('../models');
+const { findMany } = require('../services/mysql/mysqlService');
 const { errorResponse } = require('../utils/responseUtil');
 
 /**
@@ -17,20 +18,9 @@ const exportUsersToExcel = async (req, res) => {
       search
     } = req.query;
 
-    // Build query (same as getAllUsers)
-    const query = { isDeleted: { $ne: true } };
+    // Build query
+    const query = { isDeleted: false };
     if (status) query.status = status;
-
-    // Date filter
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) {
-        const endDateTime = new Date(endDate);
-        endDateTime.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = endDateTime;
-      }
-    }
 
     if (search && typeof search === 'string') {
       const regex = new RegExp(search.trim(), 'i');
@@ -42,13 +32,10 @@ const exportUsersToExcel = async (req, res) => {
     }
 
     // Fetch all matching users (no pagination for export)
-    const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-    const users = await User.find(query)
-      .select('-password -token -otp -otpExpiry')
-      .sort(sortObj)
-      .lean();
+    const options = { sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } };
+    const users = await findMany(User, query, null, options);
 
-    if (users.length === 0) {
+    if (!users || users.length === 0) {
       return errorResponse(res, 404, 'No users found to export');
     }
 
@@ -58,7 +45,7 @@ const exportUsersToExcel = async (req, res) => {
 
     // Define columns
     worksheet.columns = [
-      { header: 'ID', key: '_id', width: 25 },
+      { header: 'ID', key: 'id', width: 25 },
       { header: 'Name', key: 'name', width: 25 },
       { header: 'Email', key: 'email', width: 30 },
       { header: 'Phone Number', key: 'phoneNumber', width: 15 },
@@ -83,7 +70,7 @@ const exportUsersToExcel = async (req, res) => {
     // Add data rows
     users.forEach(user => {
       worksheet.addRow({
-        _id: user._id.toString(),
+        id: (user.id || user._id).toString(),
         name: user.name || '',
         email: user.email || '',
         phoneNumber: user.phoneNumber || '',
@@ -114,7 +101,7 @@ const exportUsersToExcel = async (req, res) => {
     res.end();
 
   } catch (error) {
-    console.error('Export users to Excel error:', error);
+
     return errorResponse(res, 500, 'Failed to export users', {
       error: error.message
     });
