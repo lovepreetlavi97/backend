@@ -51,23 +51,43 @@ async function main() {
   // 3. Create Default Metal Rates
   const goldMetal = await prisma.metal.upsert({
     where: { name: '22K Gold' },
-    update: { ratePerGram: 6850.00 },
+    update: { 
+      ratePerGram: 6850.00,
+      slug: 'gold',
+      colorCode: '#c5a059',
+      gradient: 'linear-gradient(to right, #c5a059, #e0c283)',
+      isActive: true,
+    },
     create: {
       name: '22K Gold',
+      slug: 'gold',
       type: MetalType.GOLD,
       ratePerGram: 6850.00,
       purity: '916',
+      colorCode: '#c5a059',
+      gradient: 'linear-gradient(to right, #c5a059, #e0c283)',
+      isActive: true,
     },
   });
 
   const silverMetal = await prisma.metal.upsert({
     where: { name: '925 Silver' },
-    update: { ratePerGram: 88.50 },
+    update: { 
+      ratePerGram: 88.50,
+      slug: 'silver',
+      colorCode: '#a0a0a0',
+      gradient: 'linear-gradient(to right, #a0a0a0, #d0d0d0)',
+      isActive: true,
+    },
     create: {
       name: '925 Silver',
+      slug: 'silver',
       type: MetalType.SILVER,
       ratePerGram: 88.50,
       purity: '925',
+      colorCode: '#a0a0a0',
+      gradient: 'linear-gradient(to right, #a0a0a0, #d0d0d0)',
+      isActive: true,
     },
   });
 

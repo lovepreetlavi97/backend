@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const meiliModule = require('meilisearch');
-const MeiliSearch = meiliModule.MeiliSearch || meiliModule.default || meiliModule;
+const Meilisearch = meiliModule.Meilisearch || meiliModule.default?.Meilisearch || meiliModule;
 
 @Injectable()
 export class MeilisearchService implements OnModuleInit {
@@ -13,7 +13,7 @@ export class MeilisearchService implements OnModuleInit {
     const host = process.env.MEILI_HOST || 'http://localhost:7700';
     const apiKey = process.env.MEILI_MASTER_KEY || 'myg_meili_master_key_2026';
     try {
-      this.meiliClient = new MeiliSearch({ host, apiKey });
+      this.meiliClient = new Meilisearch({ host, apiKey });
     } catch (e: any) {
       console.warn('⚠️ Meilisearch client init warning:', e.message);
     }

@@ -23,6 +23,8 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         ? exceptionResponse.message
         : exceptionResponse;
 
+    console.error('Exception caught by filter:', exception);
+
     response.status(status).json({
       status: 'error',
       statusCode: status,

@@ -55,6 +55,7 @@ model User {
   designRequests  DesignRequest[]
   notifications   Notification[]
   grievances      Grievance[]
+  pushTokens      PushToken[]
 
   @@index([email])
   @@index([phone])
@@ -133,9 +134,13 @@ model SubCategory {
 model Metal {
   id           String    @id @default(uuid()) @db.Uuid
   name         String    @unique
-  type         MetalType
-  ratePerGram  Decimal   @db.Decimal(10, 2)
-  purity       String
+  slug         String    @unique
+  colorCode    String?   @default("#c5a059")
+  gradient     String?   @default("linear-gradient(to right, #c5a059, #e0c283)")
+  isActive     Boolean   @default(true)
+  type         MetalType @default(GOLD)
+  ratePerGram  Decimal   @default(0.00) @db.Decimal(10, 2)
+  purity       String    @default("999")
   updatedAt    DateTime  @updatedAt
 
   products     Product[]
@@ -328,10 +333,21 @@ model DesignRequest {
 model Banner {
   id          String   @id @default(uuid()) @db.Uuid
   title       String
-  image       String
+  image       String   @default("")
+  description String   @default("")
+  type        String   @default("home")
+  imageUrl    String   @default("")
   link        String?
+  startDate   DateTime @default(now())
+  endDate     DateTime @default(now())
+  status      String   @default("active")
   isActive    Boolean  @default(true)
+  buttonText  String?  @default("Shop Now")
+  position    Int      @default(1)
+  isDeleted   Boolean  @default(false)
+  metalIds    String[] @default([])
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
 
   @@map("banners")
 }
@@ -371,6 +387,21 @@ model Notification {
   user        User     @relation(fields: [userId], references: [id])
 
   @@map("notifications")
+}
+
+model PushToken {
+  id         String   @id @default(uuid()) @db.Uuid
+  token      String   @unique
+  userId     String?  @db.Uuid
+  deviceType String?  @default("web")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 model PromoCode {

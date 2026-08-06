@@ -6,6 +6,8 @@ import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filte
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import * as express from 'express';
+import * as path from 'path';
 import { getEnvConfig } from './config/env.config';
 
 async function bootstrap() {
@@ -13,8 +15,11 @@ async function bootstrap() {
   const config = getEnvConfig();
 
   app.setGlobalPrefix('api/v1');
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: false, // Ensure local assets can be loaded across domains
+  }));
   app.use(cookieParser());
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
   app.enableCors({
     origin: true,
     credentials: true,

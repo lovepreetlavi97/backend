@@ -85,7 +85,7 @@ export class AuthService {
   }
 
   async generateTokens(userId: string, email: string, role: string) {
-    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '15m' });
+    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '7d' });
     const refreshToken = jwt.sign({ id: userId, email, role, type: 'refresh' }, this.jwtSecret, { expiresIn: '7d' });
 
     // Store active session in database
@@ -121,7 +121,7 @@ export class AuthService {
         throw new UnauthorizedException('User account inactive.');
       }
 
-      const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, this.jwtSecret, { expiresIn: '15m' });
+      const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, this.jwtSecret, { expiresIn: '7d' });
       return { accessToken };
     } catch (e) {
       throw new UnauthorizedException('Invalid refresh token.');
