@@ -3,15 +3,31 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('Settings & Customer Inquiries')
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get('public')
   @ApiOperation({ summary: 'Get public site settings' })
   async getPublicSettings() {
+    const dbSetting = await this.prisma.setting.findUnique({
+      where: { key: 'public_settings' },
+    });
+
+    if (dbSetting) {
+      return {
+        status: 200,
+        message: 'Site settings fetched successfully.',
+        data: dbSetting.value,
+      };
+    }
+
     return {
       status: 200,
       message: 'Site settings fetched successfully.',

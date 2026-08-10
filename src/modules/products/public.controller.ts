@@ -9,7 +9,7 @@ export class PublicController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly productsService: ProductsService,
-  ) {}
+  ) { }
 
   private mapProduct(product: any) {
     const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
@@ -97,16 +97,16 @@ export class PublicController {
   @Get('curated-collections/public')
   @ApiOperation({ summary: 'Get curated collections' })
   async getCuratedCollectionsPublic() {
-    const categories = await this.prisma.category.findMany({
+    const subcategories = await this.prisma.subCategory.findMany({
       where: { isDeleted: false },
       take: 5,
     });
-    const collections = categories.map(cat => ({
-      _id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      image: cat.image || '/images/default-collection.jpg',
-      description: cat.description || 'Exclusive curated collection',
+    const collections = subcategories.map(sub => ({
+      _id: sub.id,
+      name: sub.name,
+      slug: sub.slug,
+      image: sub.image || '/images/default-collection.jpg',
+      description: sub.description || 'Exclusive curated collection',
     }));
     return {
       status: 'success',
@@ -122,6 +122,17 @@ export class PublicController {
     return {
       status: 'success',
       data: {
+        banner: {
+          title: 'The Gift Store',
+          description: 'Discover the art of giving with our curated collections for every milestone.',
+          imageUrl: '/uploads/gifts/gift_store_banner.png',
+        },
+        occasions: [
+          { _id: '1', name: 'Anniversary', slug: 'anniversary', image: '/uploads/gifts/anniversary.png' },
+          { _id: '2', name: 'Birthday', slug: 'birthday', image: '/uploads/gifts/birthday.png' },
+          { _id: '3', name: 'Valentine\'s Day', slug: 'valentines-day', image: '/uploads/gifts/valentine.png' },
+          { _id: '4', name: 'Wedding', slug: 'wedding', image: '/uploads/gifts/wedding.png' },
+        ],
         priceFilters: [
           { _id: '1', min: 0, max: 10000, label: 'Under ₹10,000' },
           { _id: '2', min: 10000, max: 25000, label: '₹10,000 - ₹25,000' },
@@ -215,16 +226,16 @@ export class PublicController {
   @Get('user/curated-collections')
   @ApiOperation({ summary: 'Get curated collections list' })
   async getCuratedCollections() {
-    const categories = await this.prisma.category.findMany({
+    const subcategories = await this.prisma.subCategory.findMany({
       where: { isDeleted: false },
       take: 5,
     });
-    const curatedCollections = categories.map(cat => ({
-      _id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      image: cat.image || '/images/default-collection.jpg',
-      description: cat.description || 'Exclusive curated collection',
+    const curatedCollections = subcategories.map(sub => ({
+      _id: sub.id,
+      name: sub.name,
+      slug: sub.slug,
+      image: sub.image || '/images/default-collection.jpg',
+      description: sub.description || 'Exclusive curated collection',
     }));
     return {
       status: 'success',
@@ -237,16 +248,16 @@ export class PublicController {
   @Get('user/festivals')
   @ApiOperation({ summary: 'Get active festivals list' })
   async getFestivals() {
-    const categories = await this.prisma.category.findMany({
+    const subcategories = await this.prisma.subCategory.findMany({
       where: { isDeleted: false },
-      take: 3,
+      take: 5,
     });
-    const festivals = categories.map(cat => ({
-      _id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      mainImage: cat.image || '/images/default-festival.jpg',
-      description: cat.description || 'Celebrate seasons with luxury',
+    const festivals = subcategories.map(sub => ({
+      _id: sub.id,
+      name: sub.name,
+      slug: sub.slug,
+      mainImage: sub.image || '/images/default-festival.jpg',
+      description: sub.description || 'Celebrate seasons with luxury',
     }));
     return {
       status: 'success',
@@ -314,6 +325,41 @@ export class PublicController {
   @Get('user/products/:slug')
   @ApiOperation({ summary: 'Get list of products under a category or subcategory slug' })
   async getProductsByCategorySlug(@Param('slug') slug: string) {
+    if (slug === 'all') {
+      const rawProducts = await this.prisma.product.findMany({
+        where: { isDeleted: false, isPublished: true },
+        include: { category: true, subcategory: true, metal: true, priceRule: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      const products = rawProducts.map(product => {
+        const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
+        const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
+        const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
+        const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
+
+        const priceBreakdown = this.productsService.calculatePrice(
+          Number(product.weightGrams),
+          ratePerGram,
+          makingCharge,
+          gstPercent,
+          discountPercent
+        );
+
+        return {
+          ...product,
+          calculatedPrice: priceBreakdown
+        };
+      });
+
+      return {
+        status: 'success',
+        data: {
+          products,
+          hasMore: false,
+        },
+      };
+    }
+
     // 1. Try category
     const category = await this.prisma.category.findUnique({
       where: { slug },
@@ -402,6 +448,47 @@ export class PublicController {
         products: [],
         hasMore: false,
       },
+    };
+  }
+
+  @Get('instagram-videos')
+  @ApiOperation({ summary: 'Get Instagram reels/videos' })
+  async getInstagramVideos(@Query('page') pageStr?: string, @Query('limit') limitStr?: string) {
+    return {
+      status: 'success',
+      data: {
+        videos: [
+          {
+            _id: '1',
+            caption: 'Timeless Gold Crafts #GuruJewellers',
+            instagramLink: 'https://instagram.com/gurujewellers',
+            videoUrl: '/images/gifts/valentine.png',
+            thumbnail: '/images/gifts/valentine.png',
+          },
+          {
+            _id: '2',
+            caption: 'Handcrafted Heritage Royal Collection',
+            instagramLink: 'https://instagram.com/gurujewellers',
+            videoUrl: '/images/gifts/wedding.png',
+            thumbnail: '/images/gifts/wedding.png',
+          },
+          {
+            _id: '3',
+            caption: 'Bespoke Custom Jewellery Designs',
+            instagramLink: 'https://instagram.com/gurujewellers',
+            videoUrl: '/images/gifts/birthday.png',
+            thumbnail: '/images/gifts/birthday.png',
+          }
+        ],
+        pagination: {
+          page: pageStr ? parseInt(pageStr, 10) : 1,
+          limit: limitStr ? parseInt(limitStr, 10) : 6,
+          total: 3,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        }
+      }
     };
   }
 }

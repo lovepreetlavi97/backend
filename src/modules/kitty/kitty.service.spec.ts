@@ -5,7 +5,7 @@ describe('KittyService - Maturity Calculation', () => {
   let kittyService: KittyService;
 
   beforeEach(() => {
-    kittyService = new KittyService(null as any);
+    kittyService = new KittyService(null as any, null as any);
   });
 
   it('should accurately calculate maturity value for 11 months scheme with 1 month bonus', () => {

@@ -20,3 +20,26 @@ export class DashboardController {
     return { status: 'success', data: stats };
   }
 }
+
+@ApiTags('Dashboard & Analytics')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'SUPERADMIN')
+@Controller('admin/dashboard')
+export class AdminDashboardController {
+  constructor(private readonly dashboardService: DashboardService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Admin: Get dashboard counts' })
+  async getCounts() {
+    const data = await this.dashboardService.getCounts();
+    return { status: 'success', statusCode: 200, data };
+  }
+
+  @Get('performance')
+  @ApiOperation({ summary: 'Admin: Get dashboard performance stats' })
+  async getPerformance() {
+    const data = await this.dashboardService.getPerformance();
+    return { status: 'success', statusCode: 200, data };
+  }
+}

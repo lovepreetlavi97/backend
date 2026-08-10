@@ -1,6 +1,6 @@
 # E-Commerce Backend API
 
-A robust e-commerce backend solution built with Node.js, Express, MongoDB, and Redis. This API provides all the necessary functionality for running an online store including product management, user authentication, cart/wishlist management, order processing, and more.
+A robust e-commerce backend solution built with NestJS, Prisma, PostgreSQL, and Redis. This API provides all the necessary functionality for running an online store including product management, user authentication, cart/wishlist management, order processing, and more.
 
 ## Features
 
@@ -16,7 +16,7 @@ A robust e-commerce backend solution built with Node.js, Express, MongoDB, and R
 ## Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB (v4 or higher)
+- PostgreSQL (v12 or higher)
 - Redis (v6 or higher)
 
 ## Installation
@@ -34,7 +34,7 @@ A robust e-commerce backend solution built with Node.js, Express, MongoDB, and R
 
 3. Set up environment variables by creating a `.env` file in the root directory:
    ```
-   MONGODB_URI=mongodb://localhost:27017/ecommerce
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/mygold_db?schema=public
    JWT_SECRET_KEY=your_jwt_secret_key
    REDIS_HOST=localhost
    REDIS_PORT=6379
