@@ -38,6 +38,7 @@
     "@nestjs/platform-express": "^10.4.5",
     "@nestjs/swagger": "^7.4.2",
     "@nestjs/terminus": "^10.2.3",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "5.22.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",

@@ -3,7 +3,10 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateOrderDto {
-  userId: string;
+  userId?: string;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
   items: Array<{ productId: string; quantity: number }>;
   shippingAddress: any;
 }
@@ -29,6 +32,8 @@ export class OrdersService {
 
     let calculatedTotalPaise = 0;
     const validatedItems = [];
+    // Map to group line items per vendor for internal multi-vendor sub-orders
+    const vendorItemsMap = new Map<string, Array<any>>();
 
     for (const item of dto.items) {
       const product = productMap.get(item.productId);
@@ -48,14 +53,24 @@ export class OrdersService {
 
       calculatedTotalPaise += itemTotalPaise;
 
-      validatedItems.push({
+      const itemDetail = {
         productId: product.id,
         title: product.title,
         sku: product.sku,
         quantity: item.quantity,
         unitPrice: unitPricePaise / 100,
         itemTotal: itemTotalPaise / 100,
-      });
+        vendorId: product.vendorId || null,
+      };
+
+      validatedItems.push(itemDetail);
+
+      if (product.vendorId) {
+        if (!vendorItemsMap.has(product.vendorId)) {
+          vendorItemsMap.set(product.vendorId, []);
+        }
+        vendorItemsMap.get(product.vendorId)!.push(itemDetail);
+      }
     }
 
     const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -65,26 +80,32 @@ export class OrdersService {
     // Atomic transaction block preventing race conditions & negative stock
     return this.prisma.$transaction(async (tx) => {
       for (const item of dto.items) {
-        const currentProduct = await tx.product.findUnique({
-          where: { id: item.productId },
+        const updateResult = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stockQuantity: { gte: item.quantity },
+          },
+          data: {
+            stockQuantity: { decrement: item.quantity },
+          },
         });
 
-        if (!currentProduct || currentProduct.stockQuantity < item.quantity) {
+        if (updateResult.count === 0) {
+          const currentProduct = await tx.product.findUnique({ where: { id: item.productId } });
           throw new BadRequestException(
             `Insufficient stock for '${currentProduct?.title || item.productId}'. Stock available: ${currentProduct?.stockQuantity || 0}, requested: ${item.quantity}`,
           );
         }
-
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stockQuantity: { decrement: item.quantity } },
-        });
       }
 
+      // Create Parent Order (Visible to customer)
       const order = await tx.order.create({
         data: {
           orderNumber,
-          userId: dto.userId,
+          userId: dto.userId || null,
+          guestName: dto.guestName || null,
+          guestEmail: dto.guestEmail || null,
+          guestPhone: dto.guestPhone || null,
           totalAmount: finalAmount,
           finalAmount: finalAmount,
           items: validatedItems,
@@ -93,6 +114,22 @@ export class OrdersService {
           paymentStatus: 'PENDING',
         },
       });
+
+      // Generate internal Multi-Vendor Sub-Orders (VendorOrder) for each distinct vendor
+      let vCounter = 1;
+      for (const [vendorId, vItems] of vendorItemsMap.entries()) {
+        const vTotal = vItems.reduce((acc, curr) => acc + curr.itemTotal, 0);
+        await tx.vendorOrder.create({
+          data: {
+            orderId: order.id,
+            vendorId,
+            vendorOrderNumber: `${orderNumber}-V${vCounter++}`,
+            orderStatus: 'PENDING',
+            items: vItems,
+            totalAmount: vTotal,
+          },
+        });
+      }
 
       return order;
     });
@@ -103,5 +140,15 @@ export class OrdersService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getOrderByNumber(orderNumber: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order '${orderNumber}' not found.`);
+    }
+    return order;
   }
 }

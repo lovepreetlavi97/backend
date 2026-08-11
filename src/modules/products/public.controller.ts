@@ -1,315 +1,107 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from './products.service';
+import { PublicCatalogService } from './public-catalog.service';
+import { FilterConfigService } from '../settings/filter-config.service';
 
 @ApiTags('Client Public APIs')
 @Controller()
 export class PublicController {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly productsService: ProductsService,
-  ) { }
-
-  private mapProduct(product: any) {
-    const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-    const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-    const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-    const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
-
-    const priceBreakdown = this.productsService.calculatePrice(
-      Number(product.weightGrams),
-      ratePerGram,
-      makingCharge,
-      gstPercent,
-      discountPercent
-    );
-
-    return {
-      _id: product.id,
-      name: product.title,
-      slug: product.slug,
-      description: product.description,
-      mainImage: product.images[0] || '',
-      images: product.images,
-      weightGrams: product.weightGrams,
-      stock: product.stockQuantity,
-      isActive: product.isActive,
-      isPublished: product.isPublished,
-      metalId: product.metalId,
-      categoryId: product.categoryId,
-      subcategoryId: product.subcategoryId,
-      priceRuleId: product.priceRuleId,
-      calculatedPrice: priceBreakdown,
-      metal: product.metal,
-      category: product.category,
-      subcategory: product.subcategory,
-      priceRule: product.priceRule,
-    };
-  }
+    private readonly publicCatalogService: PublicCatalogService,
+    private readonly filterConfigService: FilterConfigService,
+  ) {}
 
   @Get('homepage')
   @ApiOperation({ summary: 'Get homepage banners and categories' })
   async getHomepage() {
-    const banners = await this.prisma.banner.findMany({
-      where: { isDeleted: false, status: 'active' },
-      orderBy: { position: 'asc' },
-    });
-
-    const categories = await this.prisma.category.findMany({
-      where: { isDeleted: false },
-      include: { subcategories: { where: { isDeleted: false } } },
-    });
-
-    const rawProducts = await this.prisma.product.findMany({
-      where: { isDeleted: false, isPublished: true },
-      include: { category: true, subcategory: true, metal: true, priceRule: true },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-    });
-    const products = rawProducts.map(p => this.mapProduct(p));
-
-    return {
-      status: 'success',
-      data: {
-        banners,
-        categories,
-        featuredProducts: products,
-        newArrivals: products,
-      },
-    };
+    return this.publicCatalogService.getHomepage();
   }
 
   @Get('categories/menu')
   @ApiOperation({ summary: 'Get category dropdown menu' })
   async getCategoryMenu() {
-    const categories = await this.prisma.category.findMany({
-      where: { isDeleted: false },
-      include: { subcategories: { where: { isDeleted: false } } },
-      orderBy: { name: 'asc' },
-    });
-    return {
-      status: 'success',
-      data: categories,
-    };
+    return this.publicCatalogService.getCategoryMenu();
   }
 
   @Get('curated-collections/public')
   @ApiOperation({ summary: 'Get curated collections' })
   async getCuratedCollectionsPublic() {
-    const subcategories = await this.prisma.subCategory.findMany({
-      where: { isDeleted: false },
-      take: 5,
-    });
-    const collections = subcategories.map(sub => ({
-      _id: sub.id,
-      name: sub.name,
-      slug: sub.slug,
-      image: sub.image || '/images/default-collection.jpg',
-      description: sub.description || 'Exclusive curated collection',
-    }));
+    const collections = await this.publicCatalogService.getFeaturedSubcategories(
+      '/images/default-collection.jpg',
+      'Exclusive curated collection',
+    );
     return {
       status: 'success',
-      data: {
-        collections,
-      },
+      data: { collections },
     };
   }
 
   @Get('user/gift/filters')
   @ApiOperation({ summary: 'Get gift page filters' })
   async getGiftFilters() {
+    const config = await this.filterConfigService.getGiftStoreConfig();
     return {
       status: 'success',
-      data: {
-        banner: {
-          title: 'The Gift Store',
-          description: 'Discover the art of giving with our curated collections for every milestone.',
-          imageUrl: '/uploads/gifts/gift_store_banner.png',
-        },
-        occasions: [
-          { _id: '1', name: 'Anniversary', slug: 'anniversary', image: '/uploads/gifts/anniversary.png' },
-          { _id: '2', name: 'Birthday', slug: 'birthday', image: '/uploads/gifts/birthday.png' },
-          { _id: '3', name: 'Valentine\'s Day', slug: 'valentines-day', image: '/uploads/gifts/valentine.png' },
-          { _id: '4', name: 'Wedding', slug: 'wedding', image: '/uploads/gifts/wedding.png' },
-        ],
-        priceFilters: [
-          { _id: '1', min: 0, max: 10000, label: 'Under ₹10,000' },
-          { _id: '2', min: 10000, max: 25000, label: '₹10,000 - ₹25,000' },
-          { _id: '3', min: 25000, max: 50000, label: '₹25,000 - ₹50,000' },
-          { _id: '4', min: 50000, max: 100000, label: '₹50,000 - ₹1,00,000' },
-          { _id: '5', min: 100000, max: 9999999, label: 'Above ₹1,00,000' },
-        ],
-        recipients: [
-          { _id: '1', name: 'Wife', slug: 'wife' },
-          { _id: '2', name: 'Husband', slug: 'husband' },
-          { _id: '3', name: 'Mother', slug: 'mother' },
-          { _id: '4', name: 'Daughter', slug: 'daughter' },
-          { _id: '5', name: 'Friend', slug: 'friend' },
-        ],
-      },
+      data: config,
     };
   }
 
   @Get('user/price-filters')
   @ApiOperation({ summary: 'Get price filters' })
   async getPriceFilters() {
+    const priceFilters = await this.filterConfigService.getPriceFilters();
     return {
       status: 'success',
-      data: {
-        priceFilters: [
-          { _id: '1', min: 0, max: 10000, label: 'Under ₹10,000' },
-          { _id: '2', min: 10000, max: 25000, label: '₹10,000 - ₹25,000' },
-          { _id: '3', min: 25000, max: 50000, label: '₹25,000 - ₹50,000' },
-          { _id: '4', min: 50000, max: 100000, label: '₹50,000 - ₹1,00,000' },
-          { _id: '5', min: 100000, max: 9999999, label: 'Above ₹1,00,000' },
-        ],
-      },
+      data: { priceFilters },
     };
   }
 
   @Get('user/relations')
   @ApiOperation({ summary: 'Get gift recipients (relations)' })
   async getRelations() {
+    const recipients = await this.filterConfigService.getRecipients();
     return {
       status: 'success',
-      data: [
-        { _id: '1', name: 'Wife', slug: 'wife' },
-        { _id: '2', name: 'Husband', slug: 'husband' },
-        { _id: '3', name: 'Mother', slug: 'mother' },
-        { _id: '4', name: 'Daughter', slug: 'daughter' },
-        { _id: '5', name: 'Friend', slug: 'friend' },
-      ],
+      data: recipients,
     };
   }
 
   @Get('user/products/essentials')
   @ApiOperation({ summary: 'Get shop essentials' })
   async getEssentials() {
-    const rawProducts = await this.prisma.product.findMany({
-      where: { isDeleted: false, isPublished: true },
-      include: { category: true, subcategory: true, metal: true, priceRule: true },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-    });
-    const products = rawProducts.map(p => this.mapProduct(p));
-    return {
-      status: 'success',
-      data: {
-        products,
-      },
-    };
+    return this.publicCatalogService.getEssentials();
   }
 
   @Get('user/trending-products')
   @ApiOperation({ summary: 'Get trending products' })
   async getTrendingProducts(@Query('metalId') metalId?: string) {
-    const rawProducts = await this.prisma.product.findMany({
-      where: {
-        isDeleted: false,
-        isPublished: true,
-        metalId: metalId || undefined,
-      },
-      include: { category: true, subcategory: true, metal: true, priceRule: true },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-    });
-    const products = rawProducts.map(p => this.mapProduct(p));
-    return {
-      status: 'success',
-      data: {
-        products,
-      },
-    };
+    return this.publicCatalogService.getTrendingProducts(metalId);
   }
 
   @Get('user/curated-collections')
   @ApiOperation({ summary: 'Get curated collections list' })
   async getCuratedCollections() {
-    const subcategories = await this.prisma.subCategory.findMany({
-      where: { isDeleted: false },
-      take: 5,
-    });
-    const curatedCollections = subcategories.map(sub => ({
-      _id: sub.id,
-      name: sub.name,
-      slug: sub.slug,
-      image: sub.image || '/images/default-collection.jpg',
-      description: sub.description || 'Exclusive curated collection',
-    }));
-    return {
-      status: 'success',
-      data: {
-        curatedCollections,
-      },
-    };
+    return this.publicCatalogService.getCuratedCollections();
   }
 
   @Get('user/festivals')
   @ApiOperation({ summary: 'Get active festivals list' })
   async getFestivals() {
-    const subcategories = await this.prisma.subCategory.findMany({
-      where: { isDeleted: false },
-      take: 5,
-    });
-    const festivals = subcategories.map(sub => ({
-      _id: sub.id,
-      name: sub.name,
-      slug: sub.slug,
-      mainImage: sub.image || '/images/default-festival.jpg',
-      description: sub.description || 'Celebrate seasons with luxury',
-    }));
-    return {
-      status: 'success',
-      data: {
-        festivals,
-      },
-    };
+    return this.publicCatalogService.getFestivals();
   }
 
   @Get('user/home-search')
   @ApiOperation({ summary: 'Get homepage search categories and products' })
   async getHomeSearch(@Query('query') queryStr?: string) {
-    const subcategories = await this.prisma.subCategory.findMany({
-      where: {
-        isDeleted: false,
-        name: queryStr ? { contains: queryStr, mode: 'insensitive' } : undefined,
-      },
-      take: 5,
-    });
-    const rawProducts = await this.prisma.product.findMany({
-      where: {
-        isDeleted: false,
-        isPublished: true,
-        OR: queryStr ? [
-          { title: { contains: queryStr, mode: 'insensitive' } },
-          { description: { contains: queryStr, mode: 'insensitive' } },
-        ] : undefined,
-      },
-      include: { category: true, subcategory: true, metal: true, priceRule: true },
-      take: 10,
-    });
-    const products = rawProducts.map(p => this.mapProduct(p));
-    return {
-      status: 'success',
-      data: {
-        subcategories,
-        products,
-      },
-    };
+    return this.publicCatalogService.getHomeSearch(queryStr);
   }
 
   @Get('user/categories')
   @ApiOperation({ summary: 'Get list of categories (user view)' })
   async getUserCategories() {
-    const categories = await this.prisma.category.findMany({
-      where: { isDeleted: false },
-      include: { subcategories: { where: { isDeleted: false } } },
-    });
-    return {
-      status: 'success',
-      data: { categories },
-    };
+    return this.publicCatalogService.getUserCategories();
   }
 
   @Get('user/product/:slug')
@@ -324,131 +116,14 @@ export class PublicController {
 
   @Get('user/products/:slug')
   @ApiOperation({ summary: 'Get list of products under a category or subcategory slug' })
-  async getProductsByCategorySlug(@Param('slug') slug: string) {
-    if (slug === 'all') {
-      const rawProducts = await this.prisma.product.findMany({
-        where: { isDeleted: false, isPublished: true },
-        include: { category: true, subcategory: true, metal: true, priceRule: true },
-        orderBy: { createdAt: 'desc' },
-      });
-      const products = rawProducts.map(product => {
-        const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-        const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-        const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-        const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
-
-        const priceBreakdown = this.productsService.calculatePrice(
-          Number(product.weightGrams),
-          ratePerGram,
-          makingCharge,
-          gstPercent,
-          discountPercent
-        );
-
-        return {
-          ...product,
-          calculatedPrice: priceBreakdown
-        };
-      });
-
-      return {
-        status: 'success',
-        data: {
-          products,
-          hasMore: false,
-        },
-      };
-    }
-
-    // 1. Try category
-    const category = await this.prisma.category.findUnique({
-      where: { slug },
-      include: {
-        products: {
-          where: { isDeleted: false, isPublished: true },
-          include: { category: true, subcategory: true, metal: true, priceRule: true },
-        },
-      },
-    });
-
-    if (category) {
-      const products = category.products.map(product => {
-        const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-        const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-        const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-        const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
-
-        const priceBreakdown = this.productsService.calculatePrice(
-          Number(product.weightGrams),
-          ratePerGram,
-          makingCharge,
-          gstPercent,
-          discountPercent
-        );
-
-        return {
-          ...product,
-          calculatedPrice: priceBreakdown
-        };
-      });
-
-      return {
-        status: 'success',
-        data: {
-          products,
-          hasMore: false,
-        },
-      };
-    }
-
-    // 2. Try subcategory
-    const subcategory = await this.prisma.subCategory.findUnique({
-      where: { slug },
-      include: {
-        products: {
-          where: { isDeleted: false, isPublished: true },
-          include: { category: true, subcategory: true, metal: true, priceRule: true },
-        },
-      },
-    });
-
-    if (subcategory) {
-      const products = subcategory.products.map(product => {
-        const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-        const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-        const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-        const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
-
-        const priceBreakdown = this.productsService.calculatePrice(
-          Number(product.weightGrams),
-          ratePerGram,
-          makingCharge,
-          gstPercent,
-          discountPercent
-        );
-
-        return {
-          ...product,
-          calculatedPrice: priceBreakdown
-        };
-      });
-
-      return {
-        status: 'success',
-        data: {
-          products,
-          hasMore: false,
-        },
-      };
-    }
-
-    return {
-      status: 'success',
-      data: {
-        products: [],
-        hasMore: false,
-      },
-    };
+  async getProductsByCategorySlug(
+    @Param('slug') slug: string,
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    const page = Math.max(1, parseInt(pageStr || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(limitStr || '20', 10)));
+    return this.publicCatalogService.getProductsByCategorySlug(slug, page, limit);
   }
 
   @Get('instagram-videos')
@@ -478,7 +153,7 @@ export class PublicController {
             instagramLink: 'https://instagram.com/gurujewellers',
             videoUrl: '/images/gifts/birthday.png',
             thumbnail: '/images/gifts/birthday.png',
-          }
+          },
         ],
         pagination: {
           page: pageStr ? parseInt(pageStr, 10) : 1,
@@ -487,8 +162,8 @@ export class PublicController {
           totalPages: 1,
           hasNext: false,
           hasPrev: false,
-        }
-      }
+        },
+      },
     };
   }
 }

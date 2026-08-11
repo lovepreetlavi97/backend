@@ -1,73 +1,30 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
+import { FilterConfigService } from './filter-config.service';
+import { UpdateGiftStoreConfigDto } from './dto/filter-config.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PrismaService } from '../prisma/prisma.service';
+import { Role } from '@prisma/client';
 
 @ApiTags('Settings & Customer Inquiries')
 @Controller('settings')
 export class SettingsController {
   constructor(
     private readonly settingsService: SettingsService,
-    private readonly prisma: PrismaService,
+    private readonly filterConfigService: FilterConfigService,
   ) {}
 
   @Get('public')
   @ApiOperation({ summary: 'Get public site settings' })
   async getPublicSettings() {
-    const dbSetting = await this.prisma.setting.findUnique({
-      where: { key: 'public_settings' },
-    });
-
-    if (dbSetting) {
-      return {
-        status: 200,
-        message: 'Site settings fetched successfully.',
-        data: dbSetting.value,
-      };
-    }
-
+    const data = await this.settingsService.getPublicSettings();
     return {
       status: 200,
       message: 'Site settings fetched successfully.',
-      data: {
-        brand: {
-          name: 'Guru Jewellers',
-          tagline: 'Crafting Elegance Since 1997',
-          logoUrl: '/logo.png',
-        },
-        contact: {
-          email: 'support@gurujewellers.com',
-          phone: '+91 98765 43210',
-          whatsapp: '+91 98765 43210',
-          address: 'Guru Jewellers, Luxury Street, Mumbai, India',
-          googleMapUrl: 'https://maps.google.com',
-          businessHours: '10:00 AM - 8:00 PM',
-        },
-        social: {
-          instagram: 'https://instagram.com/gurujewellers',
-          facebook: 'https://facebook.com/gurujewellers',
-          youtube: 'https://youtube.com/gurujewellers',
-          twitter: 'https://twitter.com/gurujewellers',
-        },
-        links: {
-          instagramPageLinks: [
-            { label: 'Follow Us', url: 'https://instagram.com/gurujewellers' }
-          ],
-          footerLinks: [
-            { label: 'Privacy Policy', url: '/privacy' },
-            { label: 'Terms of Service', url: '/terms' }
-          ]
-        },
-        featureBadges: [
-          '100% Certified Jewellery',
-          'Free Insured Shipping',
-          'Easy 15-Day Returns',
-          'Lifetime Exchange Policy'
-        ],
-        footerAbout: 'Guru Jewellers is a premier online jewelry boutique specializing in handcrafted gold, silver, and diamond masterpieces.'
-      }
+      data,
     };
   }
 
@@ -94,5 +51,19 @@ export class SettingsController {
   async designRequest(@CurrentUser('id') userId: string, @Body() dto: { description: string; images?: string[] }) {
     const result = await this.settingsService.submitDesignRequest(userId, dto);
     return { status: 'success', message: 'Custom design request submitted.', data: { request: result } };
+  }
+
+  @Put('gift-store-config')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @ApiOperation({ summary: 'Admin: Update Gift Store & Filter configuration' })
+  async updateGiftStoreConfig(@Body() dto: UpdateGiftStoreConfigDto) {
+    const updated = await this.filterConfigService.updateGiftStoreConfig(dto);
+    return {
+      status: 'success',
+      message: 'Filter configuration updated successfully.',
+      data: updated,
+    };
   }
 }

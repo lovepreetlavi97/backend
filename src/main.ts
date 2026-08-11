@@ -21,7 +21,13 @@ async function bootstrap() {
   app.use(cookieParser());
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || config.allowedOrigins.includes(origin) || config.nodeEnv === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
+    },
     credentials: true,
   });
 

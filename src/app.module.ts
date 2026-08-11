@@ -21,14 +21,26 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthModule } from './modules/health/health.module';
 
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+
+import { VendorModule } from './modules/vendor/vendor.module';
+
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     PrismaModule,
     RedisModule,
     QueueModule,
     AuthModule,
     UsersModule,
     AdminsModule,
+    VendorModule,
     ProductsModule,
     CategoriesModule,
     BannersModule,
@@ -44,6 +56,12 @@ import { HealthModule } from './modules/health/health.module';
     SettingsModule,
     UploadsModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

@@ -1,168 +1,70 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
+import { MetalsService } from './metals.service';
+import { CreateMetalDto, UpdateMetalDto } from './dto/metal.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 
 @ApiTags('Metals')
 @Controller('metals')
 export class MetalsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly metalsService: MetalsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all metals' })
   async getMetals() {
-    const metals = await this.prisma.metal.findMany({
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    const formattedMetals = metals.map((metal) => ({
-      _id: metal.id,
-      name: metal.name,
-      slug: metal.slug,
-      colorCode: metal.colorCode,
-      gradient: metal.gradient,
-      isActive: metal.isActive,
-      type: metal.type,
-      ratePerGram: Number(metal.ratePerGram),
-      purity: metal.purity,
-      createdAt: metal.updatedAt.toISOString(),
-      updatedAt: metal.updatedAt.toISOString(),
-    }));
-
+    const metals = await this.metalsService.getMetals();
     return {
       status: 'success',
-      data: {
-        metals: formattedMetals,
-      },
+      data: { metals },
     };
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single metal by ID' })
   async getMetal(@Param('id') id: string) {
-    const metal = await this.prisma.metal.findUnique({
-      where: { id },
-    });
-
-    if (!metal) {
-      throw new NotFoundException(`Metal with ID '${id}' not found.`);
-    }
-
-    return {
-      metal: {
-        _id: metal.id,
-        name: metal.name,
-        slug: metal.slug,
-        colorCode: metal.colorCode,
-        gradient: metal.gradient,
-        isActive: metal.isActive,
-        type: metal.type,
-        ratePerGram: Number(metal.ratePerGram),
-        purity: metal.purity,
-        createdAt: metal.updatedAt.toISOString(),
-        updatedAt: metal.updatedAt.toISOString(),
-      },
-    };
+    const metal = await this.metalsService.getMetal(id);
+    return { metal };
   }
 
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Admin: Create new metal' })
-  async createMetal(
-    @Body()
-    dto: {
-      name: string;
-      slug: string;
-      colorCode?: string;
-      gradient?: string;
-      isActive?: boolean;
-    },
-  ) {
-    const metal = await this.prisma.metal.create({
-      data: {
-        name: dto.name,
-        slug: dto.slug,
-        colorCode: dto.colorCode || '#c5a059',
-        gradient: dto.gradient || 'linear-gradient(to right, #c5a059, #e0c283)',
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
-      },
-    });
-
-    return {
-      metal: {
-        _id: metal.id,
-        name: metal.name,
-        slug: metal.slug,
-        colorCode: metal.colorCode,
-        gradient: metal.gradient,
-        isActive: metal.isActive,
-        type: metal.type,
-        ratePerGram: Number(metal.ratePerGram),
-        purity: metal.purity,
-        createdAt: metal.updatedAt.toISOString(),
-        updatedAt: metal.updatedAt.toISOString(),
-      },
-    };
+  async createMetal(@Body() dto: CreateMetalDto) {
+    const metal = await this.metalsService.createMetal(dto);
+    return { metal };
   }
 
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Admin: Update metal' })
-  async updateMetal(
-    @Param('id') id: string,
-    @Body()
-    dto: {
-      name?: string;
-      slug?: string;
-      colorCode?: string;
-      gradient?: string;
-      isActive?: boolean;
-    },
-  ) {
-    const metal = await this.prisma.metal.update({
-      where: { id },
-      data: {
-        ...(dto.name && { name: dto.name }),
-        ...(dto.slug && { slug: dto.slug }),
-        ...(dto.colorCode !== undefined && { colorCode: dto.colorCode }),
-        ...(dto.gradient !== undefined && { gradient: dto.gradient }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
-    });
-
-    return {
-      metal: {
-        _id: metal.id,
-        name: metal.name,
-        slug: metal.slug,
-        colorCode: metal.colorCode,
-        gradient: metal.gradient,
-        isActive: metal.isActive,
-        type: metal.type,
-        ratePerGram: Number(metal.ratePerGram),
-        purity: metal.purity,
-        createdAt: metal.updatedAt.toISOString(),
-        updatedAt: metal.updatedAt.toISOString(),
-      },
-    };
+  async updateMetal(@Param('id') id: string, @Body() dto: UpdateMetalDto) {
+    const metal = await this.metalsService.updateMetal(id, dto);
+    return { metal };
   }
 
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Admin: Delete metal' })
   async deleteMetal(@Param('id') id: string) {
-    await this.prisma.metal.delete({
-      where: { id },
-    }).catch(() => null);
-
+    await this.metalsService.deleteMetal(id);
     return {
       status: 'success',
       message: 'Metal deleted successfully.',
@@ -172,7 +74,7 @@ export class MetalsController {
   @Patch(':id/position')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SUPERADMIN')
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Admin: Update metal position' })
   async updatePosition(@Param('id') id: string, @Body() dto: { direction: 'up' | 'down' }) {
     return {

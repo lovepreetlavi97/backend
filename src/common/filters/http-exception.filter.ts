@@ -1,5 +1,6 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as crypto from 'crypto';
 
 @Catch()
 export class GlobalHttpExceptionFilter implements ExceptionFilter {
@@ -7,6 +8,8 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+
+    const requestId = (request.headers['x-request-id'] as string) || crypto.randomUUID();
 
     const status =
       exception instanceof HttpException
@@ -23,14 +26,15 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         ? exceptionResponse.message
         : exceptionResponse;
 
-    console.error('Exception caught by filter:', exception);
+    console.error(`[ERROR] [ReqID: ${requestId}] [${request.method} ${request.url}] Status ${status}:`, exception);
 
     response.status(status).json({
       status: 'error',
       statusCode: status,
+      requestId,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message,
+      message: status === HttpStatus.INTERNAL_SERVER_ERROR ? 'An internal server error occurred.' : message,
     });
   }
 }

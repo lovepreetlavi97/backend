@@ -17,8 +17,8 @@ export class WishlistService {
   }
 
   async toggleWishlist(userId: string, productId: string) {
-    const existing = await this.prisma.wishlist.findFirst({
-      where: { userId, productId },
+    const existing = await this.prisma.wishlist.findUnique({
+      where: { userId_productId: { userId, productId } },
     });
 
     if (existing) {
@@ -26,10 +26,13 @@ export class WishlistService {
       return { added: false, message: 'Removed from wishlist' };
     }
 
-    const item = await this.prisma.wishlist.create({
-      data: { userId, productId },
-    });
-
-    return { added: true, message: 'Added to wishlist', item };
+    try {
+      const item = await this.prisma.wishlist.create({
+        data: { userId, productId },
+      });
+      return { added: true, message: 'Added to wishlist', item };
+    } catch {
+      return { added: true, message: 'Already in wishlist' };
+    }
   }
 }

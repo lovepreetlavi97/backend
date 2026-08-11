@@ -383,7 +383,45 @@ async function main() {
       value: publicSettings,
     },
   });
-  console.log('✅ Public Site Settings seeded.');
+
+  const giftStoreConfig = {
+    banner: {
+      title: 'The Gift Store',
+      description: 'Discover the art of giving with our curated collections for every milestone.',
+      imageUrl: '/uploads/gifts/gift_store_banner.png',
+    },
+    occasions: [
+      { _id: '1', name: 'Anniversary', slug: 'anniversary', image: '/uploads/gifts/anniversary.png' },
+      { _id: '2', name: 'Birthday', slug: 'birthday', image: '/uploads/gifts/birthday.png' },
+      { _id: '3', name: 'Valentine\'s Day', slug: 'valentines-day', image: '/uploads/gifts/valentine.png' },
+      { _id: '4', name: 'Wedding', slug: 'wedding', image: '/uploads/gifts/wedding.png' },
+    ],
+    priceFilters: [
+      { _id: '1', min: 0, max: 10000, label: 'Under ₹10,000' },
+      { _id: '2', min: 10000, max: 25000, label: '₹10,000 - ₹25,000' },
+      { _id: '3', min: 25000, max: 50000, label: '₹25,000 - ₹50,000' },
+      { _id: '4', min: 50000, max: 100000, label: '₹50,000 - ₹1,00,000' },
+      { _id: '5', min: 100000, max: 9999999, label: 'Above ₹1,00,000' },
+    ],
+    recipients: [
+      { _id: '1', name: 'Wife', slug: 'wife' },
+      { _id: '2', name: 'Husband', slug: 'husband' },
+      { _id: '3', name: 'Mother', slug: 'mother' },
+      { _id: '4', name: 'Daughter', slug: 'daughter' },
+      { _id: '5', name: 'Friend', slug: 'friend' },
+    ],
+  };
+
+  await prisma.setting.upsert({
+    where: { key: 'gift_store_config' },
+    update: { value: giftStoreConfig },
+    create: {
+      key: 'gift_store_config',
+      value: giftStoreConfig,
+    },
+  });
+
+  console.log('✅ Public Site & Gift Store Settings seeded.');
 
   // --- 9. Seed Gold Savings Kitty Plans ---
   const planData = [

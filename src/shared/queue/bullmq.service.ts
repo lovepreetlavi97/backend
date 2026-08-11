@@ -14,18 +14,7 @@ export class BullMQQueueService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Worker processing Kitty reminders and transactional emails
-    new Worker(
-      'notifications',
-      async (job) => {
-        if (job.name === 'SEND_KITTY_REMINDER') {
-          console.log(`📩 Processing Kitty installment reminder for user: ${job.data.userId}`);
-        } else if (job.name === 'SEND_ORDER_CONFIRMATION') {
-          console.log(`📩 Processing Order confirmation email for order: ${job.data.orderNumber}`);
-        }
-      },
-      { connection: this.connection }
-    );
+    // Queue producer initialized; worker execution is handled by standalone worker process.
   }
 
   async addKittyReminderJob(userId: string, userKittyId: string) {

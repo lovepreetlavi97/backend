@@ -11,6 +11,7 @@ enum Role {
   USER
   ADMIN
   SUPERADMIN
+  VENDOR
 }
 
 enum OrderStatus {
@@ -32,6 +33,34 @@ enum MetalType {
   GOLD
   SILVER
   PLATINUM
+}
+
+enum VendorStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum ProductApprovalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum VendorOrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
 }
 
 model User {
@@ -56,9 +85,8 @@ model User {
   notifications   Notification[]
   grievances      Grievance[]
   pushTokens      PushToken[]
+  vendor          Vendor?
 
-  @@index([email])
-  @@index([phone])
   @@map("users")
 }
 
@@ -74,23 +102,52 @@ model Admin {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  sessions    Session[]
+
   @@index([email])
   @@map("admins")
 }
 
 model Session {
   id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @db.Uuid
+  userId       String?  @db.Uuid
+  adminId      String?  @db.Uuid
   refreshToken String   @unique
   userAgent    String?
   ipAddress    String?
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin        Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([adminId])
   @@map("sessions")
+}
+
+model Vendor {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @unique @db.Uuid
+  shopName        String
+  legalName       String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  gstin           String?
+  status          VendorStatus @default(PENDING)
+  rejectionReason String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products        Product[]
+  vendorOrders    VendorOrder[]
+
+  @@map("vendors")
 }
 
 model Category {
@@ -124,7 +181,6 @@ model SubCategory {
 
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   products    Product[]
-
 
   @@index([categoryId])
   @@index([slug])
@@ -162,37 +218,45 @@ model PriceRule {
 }
 
 model Product {
-  id             String       @id @default(uuid()) @db.Uuid
-  title          String
-  slug           String       @unique
-  sku            String       @unique
-  description    String       @db.Text
-  images         String[]     @default([])
-  weightGrams    Decimal      @db.Decimal(10, 3)
-  stockQuantity  Int          @default(0)
-  isFeatured     Boolean      @default(false)
-  isPublished    Boolean      @default(true)
-  isDeleted      Boolean      @default(false)
+  id              String                @id @default(uuid()) @db.Uuid
+  title           String
+  slug            String                @unique
+  sku             String                @unique
+  description     String                @db.Text
+  images          String[]              @default([])
+  weightGrams     Decimal               @db.Decimal(10, 3)
+  stockQuantity   Int                   @default(0)
+  isFeatured      Boolean               @default(false)
+  isPublished     Boolean               @default(true)
+  isDeleted       Boolean               @default(false)
 
-  categoryId     String?      @db.Uuid
-  subcategoryId  String?      @db.Uuid
-  metalId        String?      @db.Uuid
-  priceRuleId    String?      @db.Uuid
+  vendorId        String?               @db.Uuid
+  approvalStatus  ProductApprovalStatus @default(APPROVED)
+  rejectionReason String?               @db.Text
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  categoryId      String?               @db.Uuid
+  subcategoryId   String?               @db.Uuid
+  metalId         String?               @db.Uuid
+  priceRuleId     String?               @db.Uuid
 
-  category       Category?    @relation(fields: [categoryId], references: [id])
-  subcategory    SubCategory? @relation(fields: [subcategoryId], references: [id])
-  metal          Metal?       @relation(fields: [metalId], references: [id])
-  priceRule      PriceRule?   @relation(fields: [priceRuleId], references: [id])
-  reviews        Review[]
-  cartItems      Cart[]
-  wishlistItems  Wishlist[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  vendor          Vendor?               @relation(fields: [vendorId], references: [id])
+  category        Category?             @relation(fields: [categoryId], references: [id])
+  subcategory     SubCategory?          @relation(fields: [subcategoryId], references: [id])
+  metal           Metal?                @relation(fields: [metalId], references: [id])
+  priceRule       PriceRule?            @relation(fields: [priceRuleId], references: [id])
+  reviews         Review[]
+  cartItems       Cart[]
+  wishlistItems   Wishlist[]
 
   @@index([slug])
+  @@index([vendorId])
   @@index([categoryId])
   @@index([subcategoryId])
+  @@index([metalId, isPublished, isDeleted])
+  @@index([createdAt])
   @@index([isPublished, isDeleted])
   @@index([categoryId, isPublished, isDeleted])
   @@index([subcategoryId, isPublished, isDeleted])
@@ -201,15 +265,17 @@ model Product {
 
 model Cart {
   id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
+  userId    String?  @db.Uuid
+  guestId   String?
   productId String   @db.Uuid
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([guestId])
   @@map("carts")
 }
 
@@ -222,6 +288,7 @@ model Wishlist {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, productId])
   @@index([userId])
   @@map("wishlists")
 }
@@ -229,7 +296,10 @@ model Wishlist {
 model Order {
   id              String        @id @default(uuid()) @db.Uuid
   orderNumber     String        @unique
-  userId          String        @db.Uuid
+  userId          String?       @db.Uuid
+  guestName       String?
+  guestEmail      String?
+  guestPhone      String?
   totalAmount     Decimal       @db.Decimal(12, 2)
   discountAmount  Decimal       @default(0.00) @db.Decimal(12, 2)
   finalAmount     Decimal       @db.Decimal(12, 2)
@@ -241,13 +311,35 @@ model Order {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  user            User          @relation(fields: [userId], references: [id])
+  user            User?         @relation(fields: [userId], references: [id])
+  vendorOrders    VendorOrder[]
   transactions    Transaction[]
 
   @@index([userId])
   @@index([orderNumber])
   @@index([orderStatus])
   @@map("orders")
+}
+
+model VendorOrder {
+  id                String            @id @default(uuid()) @db.Uuid
+  orderId           String            @db.Uuid
+  vendorId          String            @db.Uuid
+  vendorOrderNumber String            @unique
+  orderStatus       VendorOrderStatus @default(PENDING)
+  items             Json
+  totalAmount       Decimal           @db.Decimal(12, 2)
+  trackingNumber    String?
+  carrier           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor            Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([orderId])
+  @@map("vendor_orders")
 }
 
 model KittyPlan {
@@ -297,6 +389,7 @@ model Transaction {
 
   order           Order?        @relation(fields: [orderId], references: [id])
 
+  @@index([orderId])
   @@map("transactions")
 }
 
@@ -312,6 +405,7 @@ model Review {
   product     Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
+  @@index([userId])
   @@map("reviews")
 }
 
@@ -373,6 +467,7 @@ model Grievance {
 
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([userId])
   @@map("grievances")
 }
 
@@ -386,6 +481,7 @@ model Notification {
 
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([userId])
   @@map("notifications")
 }
 
@@ -417,9 +513,9 @@ model PromoCode {
 }
 
 model Setting {
-  id    String @id @default(uuid()) @db.Uuid
-  key   String @unique
-  value Json
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

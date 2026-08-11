@@ -23,13 +23,23 @@ export class PaymentsService {
   }
 
   verifySignature(razorpayOrderId: string, razorpayPaymentId: string, signature: string): boolean {
+    if (!razorpayOrderId || !razorpayPaymentId || !signature) {
+      return false;
+    }
     const body = `${razorpayOrderId}|${razorpayPaymentId}`;
     const expectedSignature = crypto
       .createHmac('sha256', this.razorpaySecret)
       .update(body)
       .digest('hex');
 
-    return expectedSignature === signature;
+    const expectedBuf = Buffer.from(expectedSignature, 'utf-8');
+    const actualBuf = Buffer.from(signature, 'utf-8');
+
+    if (expectedBuf.length !== actualBuf.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuf, actualBuf);
   }
 
   async processPaymentVerification(

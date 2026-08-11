@@ -85,20 +85,21 @@ export class AuthService {
   }
 
   async generateTokens(userId: string, email: string, role: string) {
-    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '7d' });
+    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '15m' });
     const refreshToken = jwt.sign({ id: userId, email, role, type: 'refresh' }, this.jwtSecret, { expiresIn: '7d' });
 
-    // Store active session in database
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
+    const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
     await this.prisma.session.create({
       data: {
-        userId,
+        userId: !isAdmin ? userId : null,
+        adminId: isAdmin ? userId : null,
         refreshToken,
         expiresAt,
       },
-    }).catch(() => null);
+    });
 
     return { accessToken, refreshToken };
   }
@@ -121,7 +122,7 @@ export class AuthService {
         throw new UnauthorizedException('User account inactive.');
       }
 
-      const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, this.jwtSecret, { expiresIn: '7d' });
+      const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, this.jwtSecret, { expiresIn: '15m' });
       return { accessToken };
     } catch (e) {
       throw new UnauthorizedException('Invalid refresh token.');
@@ -133,7 +134,16 @@ export class AuthService {
       await this.prisma.session.deleteMany({ where: { refreshToken } }).catch(() => null);
     }
     if (token) {
-      await this.redis.set(`blacklist_${token}`, 'true', 900);
+      try {
+        const decoded: any = jwt.decode(token);
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = decoded && decoded.exp ? Math.max(decoded.exp - now, 0) : 900;
+        if (ttl > 0) {
+          await this.redis.set(`blacklist_${token}`, 'true', ttl);
+        }
+      } catch {
+        await this.redis.set(`blacklist_${token}`, 'true', 900);
+      }
     }
     return { message: 'Logged out successfully.' };
   }
