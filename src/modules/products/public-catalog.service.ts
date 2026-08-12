@@ -18,20 +18,22 @@ export class PublicCatalogService {
     const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
 
     const priceBreakdown = this.productsService.calculatePrice(
-      Number(product.weightGrams),
+      Number(product.weightGrams || 0),
       ratePerGram,
       makingCharge,
       gstPercent,
       discountPercent,
     );
 
+    const safeImages = Array.isArray(product?.images) ? product.images : [];
+
     return {
       _id: product.id,
       name: product.title,
       slug: product.slug,
       description: product.description,
-      mainImage: product.images[0] || '',
-      images: product.images,
+      mainImage: safeImages[0] || '',
+      images: safeImages,
       weightGrams: product.weightGrams,
       stock: product.stockQuantity,
       isActive: product.isActive,
@@ -138,13 +140,39 @@ export class PublicCatalogService {
     };
   }
 
-  async getTrendingProducts(metalId?: string) {
+  async getTrendingProducts(metalParam?: string) {
+    let targetMetalId: string | undefined = undefined;
+
+    if (metalParam && metalParam.trim() !== '' && metalParam.toLowerCase() !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metalParam);
+      if (isUuid) {
+        targetMetalId = metalParam;
+      } else {
+        const foundMetal = await this.prisma.metal.findFirst({
+          where: {
+            OR: [
+              { slug: { equals: metalParam.toLowerCase() } },
+              { name: { equals: metalParam, mode: 'insensitive' } },
+            ],
+          },
+        });
+        if (foundMetal) {
+          targetMetalId = foundMetal.id;
+        } else {
+          return {
+            status: 'success',
+            data: { products: [] },
+          };
+        }
+      }
+    }
+
     const rawProducts = await this.prisma.product.findMany({
       where: {
         isDeleted: false,
         isPublished: true,
         approvalStatus: 'APPROVED',
-        metalId: metalId || undefined,
+        metalId: targetMetalId || undefined,
       },
       include: { category: true, subcategory: true, metal: true, priceRule: true },
       orderBy: { createdAt: 'desc' },
