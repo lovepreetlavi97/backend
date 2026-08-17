@@ -56,6 +56,18 @@ export class UploadsService {
       key = `${cleanFolder}/${filename}`;
     }
 
+    const useLocal = process.env.NODE_ENV === 'development' || !process.env.AWS_ACCESS_KEY_ID;
+    if (useLocal) {
+      const uploadUrl = `http://localhost:5000/api/v1/upload/local-presigned?key=${key}`;
+      const localKey = `http://localhost:5000/uploads/${key}`;
+      return {
+        uploadUrl,
+        key: localKey,
+        originalName,
+        expiresIn: 900,
+      };
+    }
+
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -106,6 +118,37 @@ export class UploadsService {
     const finalizedKeys: string[] = [];
 
     for (const key of tempKeys) {
+      if (key.startsWith('http://') || key.startsWith('https://')) {
+        if (key.includes('/uploads/')) {
+          try {
+            const relativePath = key.split('/uploads/')[1];
+            if (relativePath.includes('/temp/')) {
+              const filename = relativePath.split('/').pop();
+              const newRelativePath = `${targetFolder.trim().replace(/\/+$/, '')}/${targetEntityId}/${filename}`;
+              
+              const srcPath = path.join(process.cwd(), 'public', 'uploads', relativePath);
+              const destPath = path.join(process.cwd(), 'public', 'uploads', newRelativePath);
+              
+              const destDir = path.dirname(destPath);
+              if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
+              }
+              
+              fs.copyFileSync(srcPath, destPath);
+              fs.unlinkSync(srcPath);
+              
+              const newUrl = key.split('/uploads/')[0] + '/uploads/' + newRelativePath;
+              finalizedKeys.push(newUrl);
+              continue;
+            }
+          } catch (err) {
+            console.warn(`⚠️ Failed to finalize local temp image ${key}:`, err.message);
+          }
+        }
+        finalizedKeys.push(key);
+        continue;
+      }
+
       if (!key.includes('/temp/')) {
         finalizedKeys.push(key);
         continue;
@@ -231,5 +274,22 @@ export class UploadsService {
     } catch (err) {
       console.warn(`⚠️ S3 Delete error for key ${key}:`, err.message);
     }
+  }
+
+  async saveLocalFile(key: string, req: any): Promise<void> {
+    const cleanKey = key.replace(/^\/+/, '');
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', path.dirname(cleanKey));
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    const filePath = path.join(process.cwd(), 'public', 'uploads', cleanKey);
+    const writer = fs.createWriteStream(filePath);
+    
+    return new Promise<void>((resolve, reject) => {
+      req.pipe(writer);
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+      req.on('error', reject);
+    });
   }
 }

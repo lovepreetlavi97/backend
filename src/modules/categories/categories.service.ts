@@ -14,11 +14,19 @@ export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    return this.prisma.category.findMany({
+    const categories = await this.prisma.category.findMany({
       where: { isDeleted: false },
       include: { subcategories: { where: { isDeleted: false } } },
       orderBy: { name: 'asc' },
     });
+    return categories.map((cat) => ({
+      ...cat,
+      _id: cat.id,
+      subcategories: cat.subcategories.map((sub) => ({
+        ...sub,
+        _id: sub.id,
+      })),
+    }));
   }
 
   async findBySlug(slug: string) {

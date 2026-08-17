@@ -3,7 +3,9 @@ import {
   Logger,
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
+import slugify from 'slugify';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../shared/redis/redis.service';
 import {
@@ -249,5 +251,92 @@ export class FilterConfigService {
   async refreshGiftStoreConfigCache(): Promise<GiftStoreConfig> {
     await this.invalidateGiftStoreConfigCache();
     return this.fetchFromDbAndCache();
+  }
+
+  async getOccasionsList() {
+    const config = await this.getGiftStoreConfig();
+    return config.occasions || [];
+  }
+
+  async addOccasion(dto: any) {
+    const config = await this.getGiftStoreConfig();
+    const occasions = config.occasions || [];
+    const newOccasion = {
+      _id: Math.random().toString(36).slice(2, 11),
+      name: dto.name,
+      slug: slugify(dto.name, { lower: true, strict: true }),
+      image: dto.image || '/uploads/gifts/default.png',
+      isActive: dto.isActive !== undefined ? dto.isActive : true,
+    };
+    occasions.push(newOccasion);
+    config.occasions = occasions;
+    await this.updateGiftStoreConfig(config);
+    return newOccasion;
+  }
+
+  async updateOccasion(id: string, dto: any) {
+    const config = await this.getGiftStoreConfig();
+    const occasions = config.occasions || [];
+    const index = occasions.findIndex((o: any) => o._id === id);
+    if (index === -1) throw new NotFoundException('Occasion not found');
+    occasions[index] = {
+      ...occasions[index],
+      ...dto,
+    };
+    config.occasions = occasions;
+    await this.updateGiftStoreConfig(config);
+    return occasions[index];
+  }
+
+  async deleteOccasion(id: string) {
+    const config = await this.getGiftStoreConfig();
+    const occasions = config.occasions || [];
+    const filtered = occasions.filter((o: any) => o._id !== id);
+    config.occasions = filtered;
+    await this.updateGiftStoreConfig(config);
+    return { success: true };
+  }
+
+  async getRecipientsList() {
+    const config = await this.getGiftStoreConfig();
+    return config.recipients || [];
+  }
+
+  async addRecipient(dto: any) {
+    const config = await this.getGiftStoreConfig();
+    const recipients = config.recipients || [];
+    const newRecipient = {
+      _id: Math.random().toString(36).slice(2, 11),
+      name: dto.name,
+      slug: slugify(dto.name, { lower: true, strict: true }),
+      isActive: dto.isActive !== undefined ? dto.isActive : true,
+    };
+    recipients.push(newRecipient);
+    config.recipients = recipients;
+    await this.updateGiftStoreConfig(config);
+    return newRecipient;
+  }
+
+  async updateRecipient(id: string, dto: any) {
+    const config = await this.getGiftStoreConfig();
+    const recipients = config.recipients || [];
+    const index = recipients.findIndex((r: any) => r._id === id);
+    if (index === -1) throw new NotFoundException('Recipient not found');
+    recipients[index] = {
+      ...recipients[index],
+      ...dto,
+    };
+    config.recipients = recipients;
+    await this.updateGiftStoreConfig(config);
+    return recipients[index];
+  }
+
+  async deleteRecipient(id: string) {
+    const config = await this.getGiftStoreConfig();
+    const recipients = config.recipients || [];
+    const filtered = recipients.filter((r: any) => r._id !== id);
+    config.recipients = filtered;
+    await this.updateGiftStoreConfig(config);
+    return { success: true };
   }
 }

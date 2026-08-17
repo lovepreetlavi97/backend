@@ -1,29 +1,54 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, Min, IsArray } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  title: string;
+  @IsOptional()
+  title?: string;
 
   @IsString()
-  @IsNotEmpty()
-  sku: string;
+  @IsOptional()
+  name?: string;
 
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @IsNumber()
+  @IsOptional()
   @Min(0.001)
-  weightGrams: number;
+  @Type(() => Number)
+  weightGrams?: number;
 
   @IsNumber()
+  @IsOptional()
   @Min(0)
-  stockQuantity: number;
+  @Type(() => Number)
+  weight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  stockQuantity?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  stock?: number;
 
   @IsString()
   @IsOptional()
   categoryId?: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 
   @IsString()
   @IsOptional()
@@ -33,15 +58,33 @@ export class CreateProductDto {
   @IsOptional()
   metalId?: string;
 
+  @IsArray()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return [];
+    return Array.isArray(value) ? value : [value];
+  })
+  metalIds?: string[];
+
   @IsString()
   @IsOptional()
   priceRuleId?: string;
 
   @IsBoolean()
   @IsOptional()
+  @Type(() => Boolean)
   isFeatured?: boolean;
 
   @IsBoolean()
   @IsOptional()
+  @Type(() => Boolean)
   isPublished?: boolean;
+
+  @IsArray()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return [];
+    return Array.isArray(value) ? value : [value];
+  })
+  images?: string[];
 }

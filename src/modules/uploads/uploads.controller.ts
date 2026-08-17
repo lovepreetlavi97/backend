@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Delete,
   UseInterceptors,
   UploadedFile,
@@ -8,7 +9,9 @@ import {
   Body,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UploadsService } from './uploads.service';
@@ -167,5 +170,15 @@ export class UploadsController {
     );
     await Promise.all(deletePromises);
     return { status: 'success', message: 'Images deleted successfully' };
+  }
+
+  @Put('local-presigned')
+  @ApiOperation({ summary: 'Local Storage Fallback: Upload a file directly to local disk' })
+  async uploadLocalPresigned(
+    @Query('key') key: string,
+    @Req() req: Request,
+  ) {
+    await this.uploadsService.saveLocalFile(key, req);
+    return { status: 'success', message: 'File uploaded locally successfully' };
   }
 }
