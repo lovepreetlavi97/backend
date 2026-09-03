@@ -28,6 +28,34 @@ export class SettingsController {
     };
   }
 
+  @Get('admin')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @ApiOperation({ summary: 'Admin: Get full site settings' })
+  async getAdminSettings() {
+    const data = await this.settingsService.getPublicSettings();
+    return {
+      status: 200,
+      message: 'Site settings fetched successfully.',
+      data,
+    };
+  }
+
+  @Put('admin')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @ApiOperation({ summary: 'Admin: Update site settings' })
+  async updateAdminSettings(@Body() dto: any) {
+    const data = await this.settingsService.updatePublicSettings(dto);
+    return {
+      status: 200,
+      message: 'Site settings updated successfully.',
+      data,
+    };
+  }
+
   @Post('contact')
   @ApiOperation({ summary: 'Submit Contact Us enquiry form' })
   async contact(@Body() dto: { name: string; email: string; subject: string; message: string }) {

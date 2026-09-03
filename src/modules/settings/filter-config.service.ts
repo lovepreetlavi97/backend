@@ -67,37 +67,26 @@ export class FilterConfigService {
    * Validate price filter range rules (min < max) and unique constraints
    */
   validateConfig(dto: UpdateGiftStoreConfigDto): void {
-    if (!dto.priceFilters || !Array.isArray(dto.priceFilters)) {
-      throw new BadRequestException('priceFilters must be an array.');
+    if (dto.priceFilters && Array.isArray(dto.priceFilters)) {
+      const priceIds = new Set<string>();
+      for (const pf of dto.priceFilters) {
+        if (pf.min >= pf.max) {
+          throw new BadRequestException(`Invalid price filter: min (${pf.min}) must be strictly less than max (${pf.max})`);
+        }
+        priceIds.add(pf._id);
+      }
     }
 
-    const priceIds = new Set<string>();
-    for (const pf of dto.priceFilters) {
-      if (pf.min >= pf.max) {
-        throw new BadRequestException(
-          `Invalid price range for '${pf.label}': min (${pf.min}) must be strictly less than max (${pf.max}).`,
-        );
+    if (dto.occasions && Array.isArray(dto.occasions)) {
+      const occasionSlugs = new Set<string>();
+      for (const occ of dto.occasions) {
+        if (occ.slug && occasionSlugs.has(occ.slug)) {
+          throw new BadRequestException(`Duplicate occasion slug detected: '${occ.slug}'`);
+        }
+        if (occ.slug) {
+          occasionSlugs.add(occ.slug);
+        }
       }
-      if (priceIds.has(pf._id)) {
-        throw new BadRequestException(`Duplicate price filter ID found: '${pf._id}'.`);
-      }
-      priceIds.add(pf._id);
-    }
-
-    const occasionSlugs = new Set<string>();
-    for (const occ of dto.occasions || []) {
-      if (occasionSlugs.has(occ.slug)) {
-        throw new BadRequestException(`Duplicate occasion slug found: '${occ.slug}'.`);
-      }
-      occasionSlugs.add(occ.slug);
-    }
-
-    const recipientSlugs = new Set<string>();
-    for (const rec of dto.recipients || []) {
-      if (recipientSlugs.has(rec.slug)) {
-        throw new BadRequestException(`Duplicate recipient slug found: '${rec.slug}'.`);
-      }
-      recipientSlugs.add(rec.slug);
     }
   }
 
@@ -177,27 +166,30 @@ export class FilterConfigService {
   }
 
   /**
-   * Get price filters list
+   * Get price filters list (Public: active only)
    */
   async getPriceFilters(): Promise<PriceFilterDto[]> {
     const config = await this.getGiftStoreConfig();
-    return config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
+    const filters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
+    return filters.filter((pf: any) => pf.isActive !== false && pf.status !== 'inactive');
   }
 
   /**
-   * Get occasions list
+   * Get occasions list (Public: active only)
    */
   async getOccasions(): Promise<OccasionDto[]> {
     const config = await this.getGiftStoreConfig();
-    return config.occasions || DEFAULT_GIFT_STORE_CONFIG.occasions;
+    const occasions = config.occasions || DEFAULT_GIFT_STORE_CONFIG.occasions;
+    return occasions.filter((o: any) => o.isActive !== false && o.status !== 'inactive');
   }
 
   /**
-   * Get recipients list
+   * Get recipients list (Public: active only)
    */
   async getRecipients(): Promise<RecipientDto[]> {
     const config = await this.getGiftStoreConfig();
-    return config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
+    const recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
+    return recipients.filter((r: any) => r.isActive !== false && r.status !== 'inactive');
   }
 
   /**
@@ -261,15 +253,27 @@ export class FilterConfigService {
   async addOccasion(dto: any) {
     const config = await this.getGiftStoreConfig();
     const occasions = config.occasions || [];
+    let baseSlug = slugify(dto.name || 'festival', { lower: true, strict: true }) || 'festival';
+    let finalSlug = baseSlug;
+    if (occasions.some((o: any) => o.slug === finalSlug)) {
+      finalSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+    }
     const newOccasion = {
       _id: Math.random().toString(36).slice(2, 11),
-      name: dto.name,
-      slug: slugify(dto.name, { lower: true, strict: true }),
-      image: dto.image || '/uploads/gifts/default.png',
-      isActive: dto.isActive !== undefined ? dto.isActive : true,
+      name: dto.name || 'Festival',
+      description: dto.description || '',
+      slug: finalSlug,
+      image: dto.image || dto.mainImage || '/uploads/gifts/default.png',
+      link: dto.link || dto.url || '',
+      startDate: dto.startDate || '',
+      endDate: dto.endDate || '',
+      metalIds: Array.isArray(dto.metalIds) ? dto.metalIds : dto.metalIds ? [dto.metalIds] : [],
+      isActive: dto.isActive === 'false' || dto.isActive === false ? false : true,
     };
-    occasions.push(newOccasion);
+    occasions.unshift(newOccasion);
     config.occasions = occasions;
+    config.priceFilters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
+    config.recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
     await this.updateGiftStoreConfig(config);
     return newOccasion;
   }
@@ -282,8 +286,13 @@ export class FilterConfigService {
     occasions[index] = {
       ...occasions[index],
       ...dto,
+      metalIds: Array.isArray(dto.metalIds) ? dto.metalIds : dto.metalIds ? [dto.metalIds] : occasions[index].metalIds || [],
+      isActive: dto.isActive !== undefined ? (dto.isActive === 'false' || dto.isActive === false ? false : true) : occasions[index].isActive,
+      link: dto.link !== undefined ? dto.link : dto.url !== undefined ? dto.url : occasions[index].link || '',
     };
     config.occasions = occasions;
+    config.priceFilters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
+    config.recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
     await this.updateGiftStoreConfig(config);
     return occasions[index];
   }
@@ -311,7 +320,7 @@ export class FilterConfigService {
       slug: slugify(dto.name, { lower: true, strict: true }),
       isActive: dto.isActive !== undefined ? dto.isActive : true,
     };
-    recipients.push(newRecipient);
+    recipients.unshift(newRecipient);
     config.recipients = recipients;
     await this.updateGiftStoreConfig(config);
     return newRecipient;

@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../../shared/redis/redis.service';
 import slugify from 'slugify';
 import * as crypto from 'crypto';
 
 export interface CalculatedProductPrice {
+  isPriceFixed: boolean;
   metalRatePerGram: number;
   weightGrams: number;
   baseMetalPrice: number;
@@ -17,37 +19,65 @@ export interface CalculatedProductPrice {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   calculatePrice(
     weightGrams: number,
     ratePerGram: number,
-    makingChargeGram: number,
-    gstPercentage: number = 3.0,
-    discountPercent: number = 0.0,
+    isPriceFixed: boolean = false,
+    actualPrice?: number | null,
+    discountedPrice?: number | null,
   ): CalculatedProductPrice {
-    const baseMetalPrice = weightGrams * ratePerGram;
-    const totalMakingCharge = weightGrams * makingChargeGram;
-    const rawTotal = baseMetalPrice + totalMakingCharge;
+    const weight = Number(weightGrams || 0);
+    const rate = Number(ratePerGram || 0);
 
-    const gstAmount = (rawTotal * gstPercentage) / 100;
-    const discountAmount = (rawTotal * discountPercent) / 100;
-    const finalPrice = Math.round((rawTotal + gstAmount - discountAmount) * 100) / 100;
+    // FIXED PRICING MODE
+    if (isPriceFixed && actualPrice && Number(actualPrice) > 0) {
+      const regular = Number(actualPrice);
+      const sale = discountedPrice && Number(discountedPrice) > 0 ? Number(discountedPrice) : regular;
+      const discount = Math.max(0, regular - sale);
+
+      return {
+        isPriceFixed: true,
+        metalRatePerGram: rate,
+        weightGrams: weight,
+        baseMetalPrice: regular,
+        makingChargeGram: 0,
+        totalMakingCharge: 0,
+        priceBeforeTax: regular,
+        gstAmount: 0,
+        discountAmount: discount,
+        finalPrice: sale,
+      };
+    }
+
+    // DYNAMIC DAILY METAL RATE MODE: Weight (e.g. 3g) * Metal Rate (e.g. ₹7,200/g) = ₹21,600
+    const dynamicTotal = Math.round(weight * rate * 100) / 100;
 
     return {
-      metalRatePerGram: ratePerGram,
-      weightGrams,
-      baseMetalPrice,
-      makingChargeGram,
-      totalMakingCharge,
-      priceBeforeTax: rawTotal,
-      gstAmount,
-      discountAmount,
-      finalPrice,
+      isPriceFixed: false,
+      metalRatePerGram: rate,
+      weightGrams: weight,
+      baseMetalPrice: dynamicTotal,
+      makingChargeGram: 0,
+      totalMakingCharge: 0,
+      priceBeforeTax: dynamicTotal,
+      gstAmount: 0,
+      discountAmount: 0,
+      finalPrice: dynamicTotal,
     };
   }
 
   async findBySlug(slug: string) {
+    const cacheKey = `cache:product:${slug}`;
+    const cached = await this.redis.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const product = await this.prisma.product.findUnique({
       where: { slug },
       include: {
@@ -63,23 +93,30 @@ export class ProductsService {
       throw new NotFoundException(`Product with slug '${slug}' not found.`);
     }
 
-    const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-    const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-    const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-    const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
+    const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
 
     const priceBreakdown = this.calculatePrice(
-      Number(product.weightGrams),
+      Number(product.weightGrams || 0),
       ratePerGram,
-      makingCharge,
-      gstPercent,
-      discountPercent,
+      product.isPriceFixed,
+      product.actualPrice ? Number(product.actualPrice) : null,
+      product.discountedPrice ? Number(product.discountedPrice) : null,
     );
 
-    return {
+    const response = {
       ...product,
       calculatedPrice: priceBreakdown,
     };
+
+    await this.redis.set(cacheKey, response, 300).catch(() => null);
+    return response;
+  }
+
+  async invalidateProductCache(slug?: string) {
+    if (slug) {
+      await this.redis.del(`cache:product:${slug}`).catch(() => null);
+    }
+    await this.redis.delPattern('cache:*').catch(() => null);
   }
 
   async findAll(params: {
@@ -88,6 +125,7 @@ export class ProductsService {
     search?: string;
     categoryId?: string;
     collectionId?: string;
+    metalId?: string;
   }) {
     const page = Math.max(1, Number(params.page || 1));
     const limit = Math.max(1, Number(params.limit || 10));
@@ -103,6 +141,10 @@ export class ProductsService {
 
     if (params.collectionId) {
       where.subcategoryId = params.collectionId;
+    }
+
+    if (params.metalId) {
+      where.metalId = params.metalId;
     }
 
     if (params.search) {
@@ -122,7 +164,7 @@ export class ProductsService {
           metal: true,
           priceRule: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
       }),
@@ -130,17 +172,14 @@ export class ProductsService {
     ]);
 
     const mappedProducts = products.map((product) => {
-      const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-      const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-      const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-      const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
+      const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
 
       const priceBreakdown = this.calculatePrice(
-        Number(product.weightGrams),
+        Number(product.weightGrams || 0),
         ratePerGram,
-        makingCharge,
-        gstPercent,
-        discountPercent,
+        product.isPriceFixed,
+        product.actualPrice ? Number(product.actualPrice) : null,
+        product.discountedPrice ? Number(product.discountedPrice) : null,
       );
 
       const safeImages = Array.isArray(product.images) ? product.images : [];
@@ -163,6 +202,7 @@ export class ProductsService {
         isPublished: product.isPublished,
         isDeleted: product.isDeleted,
         isBlocked: !product.isPublished,
+        isPriceFixed: product.isPriceFixed,
         actualPrice: priceBreakdown.finalPrice,
         discountedPrice: priceBreakdown.finalPrice,
         categoryId: product.category ? { _id: product.category.id, name: product.category.name, slug: product.category.slug } : null,
@@ -209,17 +249,14 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID '${id}' not found.`);
     }
 
-    const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-    const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-    const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-    const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
+    const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
 
     const priceBreakdown = this.calculatePrice(
-      Number(product.weightGrams),
+      Number(product.weightGrams || 0),
       ratePerGram,
-      makingCharge,
-      gstPercent,
-      discountPercent,
+      product.isPriceFixed,
+      product.actualPrice ? Number(product.actualPrice) : null,
+      product.discountedPrice ? Number(product.discountedPrice) : null,
     );
 
     const safeImages = Array.isArray(product.images) ? product.images : [];
@@ -242,6 +279,7 @@ export class ProductsService {
       isPublished: product.isPublished,
       isDeleted: product.isDeleted,
       isBlocked: !product.isPublished,
+      isPriceFixed: product.isPriceFixed,
       actualPrice: priceBreakdown.finalPrice,
       discountedPrice: priceBreakdown.finalPrice,
       categoryId: product.category ? { _id: product.category.id, name: product.category.name, slug: product.category.slug } : null,
@@ -269,7 +307,11 @@ export class ProductsService {
     const metalId = dto.metalId || (dto.metalIds && dto.metalIds.length > 0 ? dto.metalIds[0] : undefined);
     const categoryId = dto.categoryId || dto.category || undefined;
 
-    return this.prisma.product.create({
+    const isPriceFixed = dto.isPriceFixed === true || dto.isPriceFixed === 'true';
+    const actualPrice = dto.actualPrice !== undefined && dto.actualPrice !== null && dto.actualPrice !== '' ? Number(dto.actualPrice) : null;
+    const discountedPrice = dto.discountedPrice !== undefined && dto.discountedPrice !== null && dto.discountedPrice !== '' ? Number(dto.discountedPrice) : null;
+
+    const created = await this.prisma.product.create({
       data: {
         title,
         slug,
@@ -282,10 +324,18 @@ export class ProductsService {
         subcategoryId: dto.subcategoryId || undefined,
         metalId,
         priceRuleId: dto.priceRuleId || undefined,
+        isPriceFixed,
+        actualPrice,
+        discountedPrice,
         isFeatured: dto.isFeatured === 'true' || dto.isFeatured === true,
-        isPublished: dto.isPublished === 'true' || dto.isPublished === true,
+        isPublished: dto.isPublished !== undefined
+          ? (dto.isPublished === 'true' || dto.isPublished === true)
+          : (dto.tags !== 'Draft'),
       },
     });
+
+    await this.invalidateProductCache(created.slug);
+    return created;
   }
 
   async update(id: string, dto: any) {
@@ -316,13 +366,27 @@ export class ProductsService {
       data.metalId = dto.metalId || (dto.metalIds && dto.metalIds.length > 0 ? dto.metalIds[0] : null);
     }
     if (dto.priceRuleId !== undefined) data.priceRuleId = dto.priceRuleId || null;
+
+    if (dto.isPriceFixed !== undefined) {
+      data.isPriceFixed = dto.isPriceFixed === true || dto.isPriceFixed === 'true';
+    }
+    if (dto.actualPrice !== undefined) {
+      data.actualPrice = dto.actualPrice !== null && dto.actualPrice !== '' ? Number(dto.actualPrice) : null;
+    }
+    if (dto.discountedPrice !== undefined) {
+      data.discountedPrice = dto.discountedPrice !== null && dto.discountedPrice !== '' ? Number(dto.discountedPrice) : null;
+    }
+
     if (dto.isFeatured !== undefined) data.isFeatured = dto.isFeatured === 'true' || dto.isFeatured === true;
     if (dto.isPublished !== undefined) data.isPublished = dto.isPublished === 'true' || dto.isPublished === true;
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data,
     });
+
+    await this.invalidateProductCache(product.slug);
+    return updated;
   }
 
   async delete(id: string) {
@@ -331,10 +395,12 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID '${id}' not found.`);
     }
 
-    return this.prisma.product.update({
+    await this.prisma.product.update({
       where: { id },
-      data: { isDeleted: true, isPublished: false },
+      data: { isDeleted: true },
     });
+
+    await this.invalidateProductCache(product.slug);
   }
 
   async toggleBlock(id: string) {
@@ -343,9 +409,12 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID '${id}' not found.`);
     }
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: { isPublished: !product.isPublished },
     });
+
+    await this.invalidateProductCache(product.slug);
+    return updated;
   }
 }

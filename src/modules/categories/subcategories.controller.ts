@@ -49,7 +49,7 @@ export class SubCategoriesController {
         include: { category: true },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
       this.prisma.subCategory.count({ where }),
     ]);

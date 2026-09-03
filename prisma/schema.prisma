@@ -239,6 +239,10 @@ model Product {
   metalId         String?               @db.Uuid
   priceRuleId     String?               @db.Uuid
 
+  isPriceFixed    Boolean               @default(false)
+  actualPrice     Decimal?              @db.Decimal(12, 2)
+  discountedPrice Decimal?              @db.Decimal(12, 2)
+
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 

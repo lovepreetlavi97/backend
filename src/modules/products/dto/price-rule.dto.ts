@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 
 export class CreatePriceRuleDto {
   @IsString()
@@ -24,6 +24,10 @@ export class CreatePriceRuleDto {
   @Min(0)
   @IsOptional()
   discountPercent?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class UpdatePriceRuleDto {
@@ -40,4 +44,18 @@ export class UpdatePriceRuleDto {
   @Min(0)
   @IsOptional()
   makingChargeGram?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  gstPercentage?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  discountPercent?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

@@ -25,6 +25,29 @@ export class PublicController {
     return this.publicCatalogService.getCategoryMenu();
   }
 
+  @Get('curated-collections')
+  @ApiOperation({ summary: 'Admin/Public: Get curated collections' })
+  async getCuratedCollectionsAdmin() {
+    const collections = await this.publicCatalogService.getFeaturedSubcategories(
+      '/images/default-collection.jpg',
+      'Exclusive curated collection',
+    );
+    const mapped = collections.map((c: any, index: number) => ({
+      _id: c.id || c._id,
+      id: c.id || c._id,
+      name: c.name,
+      slug: c.slug,
+      image: c.image || '/images/default-collection.jpg',
+      isActive: true,
+      position: index + 1,
+      createdAt: new Date().toISOString(),
+    }));
+    return {
+      status: 'success',
+      data: { curated: mapped, collections: mapped },
+    };
+  }
+
   @Get('curated-collections/public')
   @ApiOperation({ summary: 'Get curated collections' })
   async getCuratedCollectionsPublic() {
@@ -34,7 +57,7 @@ export class PublicController {
     );
     return {
       status: 'success',
-      data: { collections },
+      data: { collections, curated: collections },
     };
   }
 
@@ -114,16 +137,23 @@ export class PublicController {
     };
   }
 
+  @Get('user/related-products')
+  @ApiOperation({ summary: 'Get related products based on product IDs' })
+  async getRelatedProducts(@Query('ids') ids?: string) {
+    return this.publicCatalogService.getRelatedProducts(ids);
+  }
+
   @Get('user/products/:slug')
   @ApiOperation({ summary: 'Get list of products under a category or subcategory slug' })
   async getProductsByCategorySlug(
     @Param('slug') slug: string,
     @Query('page') pageStr?: string,
     @Query('limit') limitStr?: string,
+    @Query('metalId') metalId?: string,
   ) {
     const page = Math.max(1, parseInt(pageStr || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(limitStr || '20', 10)));
-    return this.publicCatalogService.getProductsByCategorySlug(slug, page, limit);
+    return this.publicCatalogService.getProductsByCategorySlug(slug, page, limit, metalId);
   }
 
   @Get('instagram-videos')

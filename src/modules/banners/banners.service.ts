@@ -1,31 +1,51 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { RedisService } from '../../shared/redis/redis.service';
 
 @Injectable()
 export class BannersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadsService: UploadsService,
+    private readonly redis: RedisService,
   ) {}
 
-  async findAll(params?: { type?: string; status?: string }) {
+  async findAll(params?: { type?: string; status?: string; metalId?: string }) {
+    const isPublic = params?.status !== 'all' && (!params?.status || params.status === 'active');
+    const cacheKey = `cache:banners:${params?.type || 'all'}:${params?.metalId || 'all'}`;
+
+    if (isPublic) {
+      const cached = await this.redis.get<any>(cacheKey);
+      if (cached) return cached;
+    }
+
     const where: any = { isDeleted: false };
     if (params?.type) {
       where.type = params.type;
     }
-    if (params?.status) {
+    
+    if (params?.status === 'all') {
+      // Admin request - return all non-deleted banners
+    } else if (params?.status) {
       where.status = params.status;
+      if (params.status === 'active') {
+        where.isActive = true;
+      }
+    } else {
+      // Public website default - return ONLY active banners
+      where.status = 'active';
+      where.isActive = true;
     }
 
     const banners = await this.prisma.banner.findMany({
       where,
-      orderBy: { position: 'asc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
-    const allMetals = await this.prisma.metal.findMany();
+    const allMetals = await this.prisma.metal.findMany({ where: { isActive: true } });
 
-    return banners.map((banner) => {
+    const result = banners.map((banner) => {
       const matchedMetals = allMetals
         .filter((metal) => banner.metalIds.includes(metal.id))
         .map((metal) => ({
@@ -54,6 +74,16 @@ export class BannersService {
         updatedAt: banner.updatedAt,
       };
     });
+
+    if (isPublic) {
+      await this.redis.set(cacheKey, result, 300).catch(() => null);
+    }
+
+    return result;
+  }
+
+  private async invalidateBannerCache() {
+    await this.redis.delPattern('cache:*').catch(() => null);
   }
 
   async findById(id: string) {
@@ -142,6 +172,7 @@ export class BannersService {
       },
     });
 
+    await this.invalidateBannerCache();
     return this.findById(banner.id);
   }
 
@@ -198,6 +229,7 @@ export class BannersService {
       },
     });
 
+    await this.invalidateBannerCache();
     return this.findById(id);
   }
 
@@ -206,6 +238,7 @@ export class BannersService {
       where: { id },
       data: { isDeleted: true },
     });
+    await this.invalidateBannerCache();
     return { success: true };
   }
 
@@ -226,6 +259,7 @@ export class BannersService {
       },
     });
 
+    await this.invalidateBannerCache();
     return this.findById(id);
   }
 
@@ -241,6 +275,7 @@ export class BannersService {
       data: { position: newPosition },
     });
 
+    await this.invalidateBannerCache();
     return { success: true };
   }
 }

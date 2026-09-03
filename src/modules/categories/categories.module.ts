@@ -5,9 +5,10 @@ import { SubCategoriesController } from './subcategories.controller';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { RedisModule } from '../../shared/redis/redis.module';
 
 @Module({
-  imports: [AuthModule, PrismaModule, UploadsModule],
+  imports: [AuthModule, PrismaModule, UploadsModule, RedisModule],
   controllers: [CategoriesController, SubCategoriesController],
   providers: [CategoriesService],
   exports: [CategoriesService],

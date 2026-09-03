@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateMetalDto {
   @IsString()
@@ -16,6 +17,16 @@ export class CreateMetalDto {
   @IsString()
   @IsOptional()
   gradient?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  ratePerGram?: number;
+
+  @IsString()
+  @IsOptional()
+  purity?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -38,6 +49,16 @@ export class UpdateMetalDto {
   @IsString()
   @IsOptional()
   gradient?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  ratePerGram?: number;
+
+  @IsString()
+  @IsOptional()
+  purity?: string;
 
   @IsBoolean()
   @IsOptional()

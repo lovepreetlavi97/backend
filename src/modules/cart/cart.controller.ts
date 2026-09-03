@@ -18,7 +18,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Cart')
-@Controller('cart')
+@Controller(['cart', 'user/cart'])
 export class CartController {
   constructor(
     private readonly cartService: CartService,
@@ -161,6 +161,34 @@ export class CartController {
     }
 
     return this.cartService.getUserCart(userId);
+  }
+
+  @Post('check-stock')
+  @ApiOperation({ summary: 'Check stock availability for cart items' })
+  async checkStock(@Body() body: { items: { productId: string; quantity: number }[] }) {
+    const items = body.items || [];
+    const productIds = items.map((i) => i.productId).filter(Boolean);
+
+    const products = await this.cartService.prisma.product.findMany({
+      where: { id: { in: productIds }, isDeleted: false },
+      select: { id: true, stockQuantity: true },
+    });
+
+    const productMap = new Map(products.map((p) => [p.id, p.stockQuantity]));
+
+    const results = items.map((item) => {
+      const stock = productMap.get(item.productId) ?? 0;
+      return {
+        productId: item.productId,
+        inStock: stock >= (item.quantity || 1),
+        availableQuantity: stock,
+      };
+    });
+
+    return {
+      status: 'success',
+      data: { results },
+    };
   }
 
   // === Mobile/Admin API compatibility ===

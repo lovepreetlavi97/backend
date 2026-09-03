@@ -5,7 +5,7 @@ describe('ProductsService - Price Calculation', () => {
   let productsService: ProductsService;
 
   beforeEach(() => {
-    productsService = new ProductsService(null as any);
+    productsService = new ProductsService(null as any, null as any);
   });
 
   it('should accurately calculate gold price with making charges, GST and discount', () => {

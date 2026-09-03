@@ -39,6 +39,29 @@ export class OccasionDto {
   @IsString()
   @IsOptional()
   image?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  link?: string;
+
+  @IsString()
+  @IsOptional()
+  startDate?: string;
+
+  @IsString()
+  @IsOptional()
+  endDate?: string;
+
+  @IsArray()
+  @IsOptional()
+  metalIds?: string[];
+
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class PriceFilterDto {

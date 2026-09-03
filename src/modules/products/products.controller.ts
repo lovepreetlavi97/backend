@@ -35,10 +35,11 @@ export class ProductsController {
     @Query('search') search?: string,
     @Query('categoryId') categoryId?: string,
     @Query('collectionId') collectionId?: string,
+    @Query('metalId') metalId?: string,
   ) {
     const page = pageStr ? parseInt(pageStr, 10) : 1;
     const limit = limitStr ? parseInt(limitStr, 10) : 10;
-    return this.productsService.findAll({ page, limit, search, categoryId, collectionId });
+    return this.productsService.findAll({ page, limit, search, categoryId, collectionId, metalId });
   }
 
   @Post()

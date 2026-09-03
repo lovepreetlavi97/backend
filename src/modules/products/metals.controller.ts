@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -22,9 +23,9 @@ export class MetalsController {
   constructor(private readonly metalsService: MetalsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all metals' })
-  async getMetals() {
-    const metals = await this.metalsService.getMetals();
+  @ApiOperation({ summary: 'Get metals (defaults to active)' })
+  async getMetals(@Query('status') status?: string) {
+    const metals = await this.metalsService.getMetals(status);
     return {
       status: 'success',
       data: { metals },

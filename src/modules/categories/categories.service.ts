@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { RedisService } from '../../shared/redis/redis.service';
 import slugify from 'slugify';
 
 export interface CreateCategoryDto {
@@ -15,6 +16,7 @@ export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadsService: UploadsService,
+    private readonly redis: RedisService,
   ) {}
 
   async findAll(params?: { page?: number; limit?: number; search?: string }) {
@@ -26,29 +28,61 @@ export class CategoriesService {
       where.name = { contains: params.search, mode: 'insensitive' };
     }
 
+    const allActiveMetals = await this.prisma.metal.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true },
+    });
+
+    const defaultMetals = allActiveMetals.map((m) => ({
+      _id: m.id,
+      id: m.id,
+      name: m.name,
+      slug: m.slug,
+    }));
+
     if (page && limit) {
       const skip = (page - 1) * limit;
       const [categories, total] = await Promise.all([
         this.prisma.category.findMany({
           where,
-          include: { subcategories: { where: { isDeleted: false } } },
+          include: {
+            subcategories: { where: { isDeleted: false } },
+            products: { where: { isDeleted: false }, select: { id: true, metal: true } },
+          },
           skip,
           take: limit,
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         }),
         this.prisma.category.count({ where }),
       ]);
 
-      const mapped = categories.map((cat) => ({
-        ...cat,
-        _id: cat.id,
-        metalIds: [],
-        isActive: true,
-        subcategories: cat.subcategories.map((sub) => ({
-          ...sub,
-          _id: sub.id,
-        })),
-      }));
+      const mapped = categories.map((cat) => {
+        const metalMap = new Map<string, any>();
+        cat.products.forEach((p: any) => {
+          if (p.metal) {
+            metalMap.set(p.metal.id, {
+              _id: p.metal.id,
+              id: p.metal.id,
+              name: p.metal.name,
+              slug: p.metal.slug,
+            });
+          }
+        });
+        const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+
+        return {
+          ...cat,
+          _id: cat.id,
+          metalIds: categoryMetals,
+          metals: categoryMetals,
+          productCount: cat.products.length,
+          isActive: true,
+          subcategories: cat.subcategories.map((sub) => ({
+            ...sub,
+            _id: sub.id,
+          })),
+        };
+      });
 
       return {
         categories: mapped,
@@ -63,20 +97,40 @@ export class CategoriesService {
 
     const categories = await this.prisma.category.findMany({
       where,
-      include: { subcategories: { where: { isDeleted: false } } },
-      orderBy: { name: 'asc' },
+      include: {
+        subcategories: { where: { isDeleted: false } },
+        products: { where: { isDeleted: false }, select: { id: true, metal: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
-    return categories.map((cat) => ({
-      ...cat,
-      _id: cat.id,
-      metalIds: [],
-      isActive: true,
-      subcategories: cat.subcategories.map((sub) => ({
-        ...sub,
-        _id: sub.id,
-      })),
-    }));
+    return categories.map((cat) => {
+      const metalMap = new Map<string, any>();
+      cat.products.forEach((p: any) => {
+        if (p.metal) {
+          metalMap.set(p.metal.id, {
+            _id: p.metal.id,
+            id: p.metal.id,
+            name: p.metal.name,
+            slug: p.metal.slug,
+          });
+        }
+      });
+      const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+
+      return {
+        ...cat,
+        _id: cat.id,
+        metalIds: categoryMetals,
+        metals: categoryMetals,
+        productCount: cat.products.length,
+        isActive: true,
+        subcategories: cat.subcategories.map((sub) => ({
+          ...sub,
+          _id: sub.id,
+        })),
+      };
+    });
   }
 
   async findBySlugOrId(identifier: string) {
@@ -141,6 +195,8 @@ export class CategoriesService {
       },
     });
 
+    await this.redis.delPattern('cache:*').catch(() => null);
+
     return {
       ...category,
       _id: category.id,
@@ -199,6 +255,8 @@ export class CategoriesService {
       data: dataToUpdate,
     });
 
+    await this.redis.delPattern('cache:*').catch(() => null);
+
     return {
       ...updated,
       _id: updated.id,
@@ -219,6 +277,8 @@ export class CategoriesService {
       where: { id },
       data: { isDeleted: true },
     });
+
+    await this.redis.delPattern('cache:*').catch(() => null);
 
     return { message: 'Category deleted successfully.' };
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FilterConfigService } from './filter-config.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,9 +12,12 @@ export class RelationsController {
   constructor(private readonly filterConfigService: FilterConfigService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all relations/recipients' })
-  async getAllRelations() {
-    const relations = await this.filterConfigService.getRecipientsList();
+  @ApiOperation({ summary: 'Get relations/recipients (defaults to active for public)' })
+  async getAllRelations(@Query('status') status?: string) {
+    let relations = await this.filterConfigService.getRecipientsList();
+    if (status !== 'all') {
+      relations = relations.filter((r: any) => r.isActive !== false && r.status !== 'inactive');
+    }
     const mapped = relations.map((r: any) => ({
       _id: r._id,
       id: r._id,
@@ -26,8 +29,8 @@ export class RelationsController {
       status: 'success',
       data: {
         relations: mapped,
-        pagination: { total: mapped.length, page: 1, limit: 100, pages: 1 }
-      }
+        pagination: { total: mapped.length, page: 1, limit: 100, pages: 1 },
+      },
     };
   }
 

@@ -85,21 +85,23 @@ export class AuthService {
   }
 
   async generateTokens(userId: string, email: string, role: string) {
-    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '15m' });
-    const refreshToken = jwt.sign({ id: userId, email, role, type: 'refresh' }, this.jwtSecret, { expiresIn: '7d' });
+    const accessToken = jwt.sign({ id: userId, email, role }, this.jwtSecret, { expiresIn: '7d' });
+    const refreshToken = jwt.sign({ id: userId, email, role, type: 'refresh' }, this.jwtSecret, { expiresIn: '30d' });
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + 30);
 
-    const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
+    const adminAccount = await this.prisma.admin.findUnique({ where: { id: userId } }).catch(() => null);
+    const isActuallyAdminTable = !!adminAccount;
+
     await this.prisma.session.create({
       data: {
-        userId: !isAdmin ? userId : null,
-        adminId: isAdmin ? userId : null,
+        userId: !isActuallyAdminTable ? userId : null,
+        adminId: isActuallyAdminTable ? userId : null,
         refreshToken,
         expiresAt,
       },
-    });
+    }).catch(() => null);
 
     return { accessToken, refreshToken };
   }

@@ -12,12 +12,23 @@ export class BannersController {
   constructor(private readonly bannersService: BannersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get active promotional banners and collections' })
+  @ApiOperation({ summary: 'Get active promotional banners' })
   async getActiveBanners(
     @Query('type') type?: string,
     @Query('status') status?: string,
+    @Query('metalId') metalId?: string,
   ) {
-    const banners = await this.bannersService.findAll({ type, status });
+    const banners = await this.bannersService.findAll({ type, status, metalId });
+    return { status: 'success', data: { banners } };
+  }
+
+  @Get('admin/all')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiOperation({ summary: 'Admin: Get all promotional banners including inactive' })
+  async getAllBannersAdmin(@Query('type') type?: string) {
+    const banners = await this.bannersService.findAll({ type, status: 'all' });
     return { status: 'success', data: { banners } };
   }
 
