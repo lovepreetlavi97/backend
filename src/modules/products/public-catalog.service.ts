@@ -20,24 +20,49 @@ export class PublicCatalogService {
       product.isPriceFixed,
       product.actualPrice ? Number(product.actualPrice) : null,
       product.discountedPrice ? Number(product.discountedPrice) : null,
+      product.grossWeight ? Number(product.grossWeight) : null,
+      product.netGoldWeight ? Number(product.netGoldWeight) : null,
+      product.stoneWeight ? Number(product.stoneWeight) : null,
+      product.wastagePercent ? Number(product.wastagePercent) : null,
+      product.priceRule,
     );
 
     const safeImages = Array.isArray(product?.images) ? product.images : [];
+    const festivalIds = Array.isArray(product?.festivalIds) ? product.festivalIds : [];
+    const relationIds = Array.isArray(product?.relationIds) ? product.relationIds : [];
+    const collectionIds = Array.isArray(product?.collectionIds) ? product.collectionIds : [];
 
     return {
       _id: product.id,
+      id: product.id,
       name: product.title,
+      title: product.title,
       slug: product.slug,
+      sku: product.sku,
       description: product.description,
+      image: safeImages[0] || '',
       mainImage: safeImages[0] || '',
       images: safeImages,
-      weightGrams: product.weightGrams,
+      weight: Number(product.weightGrams || 0),
+      weightGrams: Number(product.weightGrams || 0),
+      grossWeight: product.grossWeight ? Number(product.grossWeight) : Number(product.weightGrams || 0),
+      netGoldWeight: product.netGoldWeight ? Number(product.netGoldWeight) : Number(product.weightGrams || 0),
+      stoneWeight: product.stoneWeight ? Number(product.stoneWeight) : 0,
+      purity: product.purity || '22KT',
+      wastagePercent: product.wastagePercent ? Number(product.wastagePercent) : 0,
+      bisHallmark: product.bisHallmark ?? true,
       stock: product.stockQuantity,
-      isActive: product.isActive,
+      stockQuantity: product.stockQuantity,
+      isActive: product.isActive ?? true,
       isPublished: product.isPublished,
       isPriceFixed: product.isPriceFixed,
       actualPrice: priceBreakdown.finalPrice,
       discountedPrice: priceBreakdown.finalPrice,
+      festivalIds,
+      relationIds,
+      collectionIds,
+      attributes: product.attributes || {},
+      specifications: product.specifications || [],
       metalId: product.metalId,
       categoryId: product.categoryId,
       subcategoryId: product.subcategoryId,
@@ -146,8 +171,8 @@ export class PublicCatalogService {
     return response;
   }
 
-  async getTrendingProducts(metalParam?: string) {
-    const cacheKey = `cache:trending:${metalParam || 'all'}`;
+  async getTrendingProducts(metalParam?: string, limit: number = 4) {
+    const cacheKey = `cache:trending:${metalParam || 'all'}:${limit}`;
     const cached = await this.redis.get<any>(cacheKey);
     if (cached) return cached;
 
@@ -186,7 +211,7 @@ export class PublicCatalogService {
       },
       include: { category: true, subcategory: true, metal: true, priceRule: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 8,
+      take: limit,
     });
     const products = rawProducts.map((p) => this.mapProduct(p));
     const response = {
@@ -572,6 +597,50 @@ export class PublicCatalogService {
             hasMore: page * limit < total,
           },
           hasMore: page * limit < total,
+        },
+      };
+    }
+
+    // 4. Try Multi-Taxonomy Match (Festivals, Relations, Collections, Occasions)
+    const multiTaxonomyCondition = {
+      isDeleted: false,
+      isPublished: true,
+      approvalStatus: 'APPROVED' as const,
+      OR: [
+        { festivalIds: { has: slug } },
+        { relationIds: { has: slug } },
+        { collectionIds: { has: slug } },
+      ],
+      ...metalCondition,
+    };
+
+    const [taxProducts, taxTotal] = await Promise.all([
+      this.prisma.product.findMany({
+        where: multiTaxonomyCondition,
+        include: { category: true, subcategory: true, metal: true, priceRule: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.product.count({
+        where: multiTaxonomyCondition,
+      }),
+    ]);
+
+    if (taxTotal > 0) {
+      const products = taxProducts.map((product) => this.mapProduct(product));
+      return {
+        status: 'success',
+        data: {
+          products,
+          pagination: {
+            page,
+            limit,
+            total: taxTotal,
+            totalPages: Math.ceil(taxTotal / limit),
+            hasMore: page * limit < taxTotal,
+          },
+          hasMore: page * limit < taxTotal,
         },
       };
     }

@@ -20,6 +20,18 @@ async function bootstrap() {
   }));
   app.use(cookieParser());
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.get('/', (req: any, res: any) => {
+    res.json({
+      status: 'online',
+      message: 'MYG Backend API Server is Running',
+      docs: '/api-docs',
+      health: '/api/v1/health',
+      api_base: '/api/v1',
+      version: '2.0.0'
+    });
+  });
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin || config.allowedOrigins.includes(origin) || config.nodeEnv === 'development') {

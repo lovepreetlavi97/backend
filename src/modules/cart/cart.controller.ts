@@ -43,17 +43,13 @@ export class CartController {
 
     const items = rawItems.map((item) => {
       const product = item.product;
-      const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 6500;
-      const makingCharge = product.priceRule ? Number(product.priceRule.makingChargeGram) : 450;
-      const gstPercent = product.priceRule ? Number(product.priceRule.gstPercentage) : 3.0;
-      const discountPercent = product.priceRule ? Number(product.priceRule.discountPercent) : 0.0;
-
+      const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
       const priceBreakdown = this.productsService.calculatePrice(
-        Number(product.weightGrams),
+        Number(product.weightGrams || 0),
         ratePerGram,
-        makingCharge,
-        gstPercent,
-        discountPercent,
+        product.isPriceFixed,
+        product.actualPrice ? Number(product.actualPrice) : null,
+        product.discountedPrice ? Number(product.discountedPrice) : null,
       );
 
       return {

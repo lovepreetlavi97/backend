@@ -99,8 +99,8 @@ export class PublicController {
 
   @Get('user/trending-products')
   @ApiOperation({ summary: 'Get trending products' })
-  async getTrendingProducts(@Query('metalId') metalId?: string) {
-    return this.publicCatalogService.getTrendingProducts(metalId);
+  async getTrendingProducts(@Query('metalId') metalId?: string, @Query('limit') limit?: number) {
+    return this.publicCatalogService.getTrendingProducts(metalId, limit ? Number(limit) : 4);
   }
 
   @Get('user/curated-collections')

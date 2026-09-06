@@ -87,4 +87,13 @@ export class CreateProductDto {
     return Array.isArray(value) ? value : [value];
   })
   images?: string[];
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsString()
+  @IsOptional()
+  mainImage?: string;
 }
+

@@ -8,32 +8,38 @@ describe('ProductsService - Price Calculation', () => {
     productsService = new ProductsService(null as any, null as any);
   });
 
-  it('should accurately calculate gold price with making charges, GST and discount', () => {
+  it('should accurately calculate gold price with dynamic rate, hallmarking and GST', () => {
     const weight = 10; // 10 grams
     const ratePerGram = 6000; // 6000 per gram
-    const makingCharge = 500; // 500 per gram
-    const gstPercent = 3; // 3% GST
-    const discountPercent = 5; // 5% discount
 
     const result = productsService.calculatePrice(
       weight,
       ratePerGram,
-      makingCharge,
-      gstPercent,
-      discountPercent,
+      false,
     );
 
     // Base metal = 10 * 6000 = 60,000
     expect(result.baseMetalPrice).toBe(60000);
-    // Making charge = 10 * 500 = 5,000
-    expect(result.totalMakingCharge).toBe(5000);
-    // Price before tax = 65,000
-    expect(result.priceBeforeTax).toBe(65000);
-    // GST 3% of 65,000 = 1,950
-    expect(result.gstAmount).toBe(1950);
-    // Discount 5% of 65,000 = 3,250
-    expect(result.discountAmount).toBe(3250);
-    // Final price = 65000 + 1950 - 3250 = 63,700
-    expect(result.finalPrice).toBe(63700);
+    expect(result.hallmarkingFee).toBe(0);
+    // Subtotal before tax = 60000
+    expect(result.priceBeforeTax).toBe(60000);
+    // GST 3% of 60000 = 1800
+    expect(result.gstAmount).toBe(1800);
+    // Final price = 60000 + 1800 = 61800
+    expect(result.finalPrice).toBe(61800);
+  });
+
+  it('should calculate fixed price correctly', () => {
+    const result = productsService.calculatePrice(
+      10,
+      6000,
+      true,
+      50000,
+      45000,
+    );
+
+    expect(result.baseMetalPrice).toBe(50000);
+    expect(result.finalPrice).toBe(45000);
+    expect(result.discountAmount).toBe(5000);
   });
 });

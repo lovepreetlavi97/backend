@@ -29,15 +29,17 @@ export class SubCategoriesController {
     @Query('page') pageStr?: string,
     @Query('limit') limitStr?: string,
     @Query('search') search?: string,
-    @Query('categoryId') categoryId?: string,
+    @Query('categoryId') categoryIdParam?: string,
+    @Query('category') categoryParam?: string,
   ) {
     const page = pageStr ? parseInt(pageStr, 10) : 1;
-    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const limit = limitStr ? parseInt(limitStr, 10) : 100;
     const skip = (page - 1) * limit;
 
     const where: any = { isDeleted: false };
-    if (categoryId) {
-      where.categoryId = categoryId;
+    const catId = categoryIdParam || categoryParam;
+    if (catId) {
+      where.categoryId = catId;
     }
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
