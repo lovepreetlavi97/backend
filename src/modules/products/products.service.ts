@@ -35,6 +35,31 @@ const sanitizeUUID = (val: any): string | null => {
   return isValidUUID(str) ? str.trim() : null;
 };
 
+const parseSafeJson = (val: any): any => {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'string') {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return val;
+    }
+  }
+  return val;
+};
+
+const parseSafeArray = (val: any): any[] => {
+  if (val === undefined || val === null || val === '') return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    return [val];
+  }
+  return [val];
+};
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -155,6 +180,16 @@ export class ProductsService {
     const relationIds = Array.isArray(product.relationIds) ? product.relationIds : [];
     const collectionIds = Array.isArray(product.collectionIds) ? product.collectionIds : [];
 
+    const rawAttributes = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+      ? { ...product.attributes }
+      : {};
+    const rawSizes = Array.isArray(rawAttributes.sizes)
+      ? rawAttributes.sizes
+      : (Array.isArray((product as any).sizes) ? (product as any).sizes : []);
+    rawAttributes.sizes = rawSizes;
+
+    const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : 'Bestseller');
+
     return {
       _id: product.id,
       id: product.id,
@@ -166,6 +201,8 @@ export class ProductsService {
       image: safeImages[0] || '',
       mainImage: safeImages[0] || '',
       images: safeImages,
+      tags: rawTag,
+      tag: rawTag,
       weight: Number(product.weightGrams),
       weightGrams: Number(product.weightGrams),
       grossWeight: product.grossWeight ? Number(product.grossWeight) : Number(product.weightGrams),
@@ -186,7 +223,8 @@ export class ProductsService {
       festivalIds,
       relationIds,
       collectionIds,
-      attributes: product.attributes || {},
+      attributes: rawAttributes,
+      sizes: rawSizes,
       specifications: product.specifications || [],
       categoryId: product.category ? { _id: product.category.id, name: product.category.name, slug: product.category.slug } : null,
       subcategoryId: product.subcategory ? { _id: product.subcategory.id, name: product.subcategory.name, slug: product.subcategory.slug } : null,
@@ -245,6 +283,13 @@ export class ProductsService {
     relationId?: string;
     occasion?: string;
     metalId?: string;
+    minPrice?: number | string;
+    maxPrice?: number | string;
+    price?: string | string[];
+    purity?: string;
+    inStock?: boolean | string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
   }) {
     const page = Math.max(1, Number(params.page || 1));
     const limit = Math.max(1, Number(params.limit || 10));
@@ -285,28 +330,44 @@ export class ProductsService {
       ];
     }
 
-    const [products, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        include: {
-          category: true,
-          subcategory: true,
-          metal: true,
-          priceRule: true,
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip,
-        take: limit,
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+    const rawProducts = await this.prisma.product.findMany({
+      where,
+      include: {
+        category: true,
+        subcategory: true,
+        metal: true,
+        priceRule: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
 
-    const mappedProducts = products.map((product) => this.mapProductRecord(product));
+    let mappedProducts = rawProducts.map((product) => this.mapProductRecord(product));
+
+    // Price range filter
+    const minP = params.minPrice !== undefined && params.minPrice !== '' ? Number(params.minPrice) : null;
+    const maxP = params.maxPrice !== undefined && params.maxPrice !== '' ? Number(params.maxPrice) : null;
+
+    if (minP !== null || maxP !== null) {
+      mappedProducts = mappedProducts.filter((p) => {
+        const price = Number(p.calculatedPrice?.finalPrice ?? p.actualPrice ?? p.discountedPrice ?? 0);
+        if (minP !== null && !isNaN(minP) && price < minP) return false;
+        if (maxP !== null && !isNaN(maxP) && price > maxP) return false;
+        return true;
+      });
+    }
+
+    // In stock filter
+    if (params.inStock === true || params.inStock === 'true') {
+      mappedProducts = mappedProducts.filter((p) => Number(p.stockQuantity || 0) > 0);
+    }
+
+    const total = mappedProducts.length;
+    const paginatedProducts = mappedProducts.slice(skip, skip + limit);
 
     return {
       status: 'success',
       data: {
-        products: mappedProducts,
+        products: paginatedProducts,
         pagination: {
           total,
           page,
@@ -360,17 +421,31 @@ export class ProductsService {
     const metalId = sanitizeUUID(dto.metalId || (dto.metalIds && dto.metalIds.length > 0 ? dto.metalIds[0] : null));
     const priceRuleId = sanitizeUUID(dto.priceRuleId);
 
-    const festivalIds = Array.isArray(dto.festivalIds)
-      ? dto.festivalIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-      : (dto.festivals ? dto.festivals : []);
-    const relationIds = Array.isArray(dto.relationIds)
-      ? dto.relationIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-      : (dto.relations ? dto.relations : []);
-    const collectionIds = Array.isArray(dto.collectionIds)
-      ? dto.collectionIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-      : (dto.collections ? dto.collections : []);
-    const attributes = dto.attributes && typeof dto.attributes === 'object' ? dto.attributes : {};
-    const specifications = Array.isArray(dto.specifications) ? dto.specifications : [];
+    const festivalIds = parseSafeArray(dto.festivalIds || dto.festivals)
+      .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+      .filter(Boolean);
+    const relationIds = parseSafeArray(dto.relationIds || dto.relations)
+      .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+      .filter(Boolean);
+    const collectionIds = parseSafeArray(dto.collectionIds || dto.collections)
+      .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+      .filter(Boolean);
+
+    const parsedAttributes = parseSafeJson(dto.attributes) || {};
+    const attributes = typeof parsedAttributes === 'object' && !Array.isArray(parsedAttributes)
+      ? { ...parsedAttributes }
+      : {};
+
+    const rawSizes = dto.sizes !== undefined ? parseSafeArray(dto.sizes) : parseSafeArray(attributes.sizes);
+    if (rawSizes.length > 0) {
+      attributes.sizes = rawSizes;
+    }
+
+    if (dto.tags) {
+      attributes.tags = dto.tags;
+      attributes.tag = dto.tags;
+    }
+    const specifications = parseSafeArray(parseSafeJson(dto.specifications) || dto.specifications);
 
     // Collect all images from dto.images, dto.image, dto.mainImage
     let imagesList: string[] = [];
@@ -392,6 +467,8 @@ export class ProductsService {
         imagesList.unshift(cleanMain);
       }
     }
+
+    const isBestseller = dto.tags && String(dto.tags).toLowerCase() === 'bestseller';
 
     const created = await this.prisma.product.create({
       data: {
@@ -420,7 +497,7 @@ export class ProductsService {
         isPriceFixed,
         actualPrice,
         discountedPrice,
-        isFeatured: dto.isFeatured === 'true' || dto.isFeatured === true,
+        isFeatured: dto.isFeatured === 'true' || dto.isFeatured === true || isBestseller,
         isPublished: dto.isPublished !== undefined
           ? (dto.isPublished === 'true' || dto.isPublished === true)
           : (dto.tags !== 'Draft'),
@@ -486,25 +563,50 @@ export class ProductsService {
     }
 
     if (dto.festivalIds !== undefined) {
-      data.festivalIds = Array.isArray(dto.festivalIds)
-        ? dto.festivalIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-        : [];
+      data.festivalIds = parseSafeArray(dto.festivalIds)
+        .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+        .filter(Boolean);
     }
     if (dto.relationIds !== undefined) {
-      data.relationIds = Array.isArray(dto.relationIds)
-        ? dto.relationIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-        : [];
+      data.relationIds = parseSafeArray(dto.relationIds)
+        .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+        .filter(Boolean);
     }
     if (dto.collectionIds !== undefined) {
-      data.collectionIds = Array.isArray(dto.collectionIds)
-        ? dto.collectionIds.map((item: any) => typeof item === 'object' ? (item._id || item.id) : item).filter(Boolean)
-        : [];
+      data.collectionIds = parseSafeArray(dto.collectionIds)
+        .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
+        .filter(Boolean);
     }
-    if (dto.attributes !== undefined) data.attributes = dto.attributes;
-    if (dto.specifications !== undefined) data.specifications = Array.isArray(dto.specifications) ? dto.specifications : [];
+    if (dto.attributes !== undefined || dto.tags !== undefined || dto.sizes !== undefined) {
+      const existingAttrs = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+        ? { ...(product.attributes as any) }
+        : {};
+      const parsedAttrs = dto.attributes !== undefined ? parseSafeJson(dto.attributes) : undefined;
+      const newAttrs: Record<string, any> = (parsedAttrs && typeof parsedAttrs === 'object' && !Array.isArray(parsedAttrs))
+        ? { ...existingAttrs, ...parsedAttrs }
+        : { ...existingAttrs };
+
+      const explicitSizes = dto.sizes !== undefined
+        ? parseSafeArray(dto.sizes)
+        : (parsedAttrs?.sizes !== undefined ? parseSafeArray(parsedAttrs.sizes) : undefined);
+      if (explicitSizes !== undefined) {
+        newAttrs.sizes = explicitSizes;
+      }
+
+      if (dto.tags !== undefined) {
+        newAttrs.tags = dto.tags;
+        newAttrs.tag = dto.tags;
+      }
+      data.attributes = newAttrs;
+    }
+    if (dto.specifications !== undefined) {
+      const parsedSpecs = parseSafeJson(dto.specifications);
+      data.specifications = Array.isArray(parsedSpecs) ? parsedSpecs : parseSafeArray(dto.specifications);
+    }
 
     if (dto.metalId !== undefined || dto.metalIds !== undefined) {
-      const mId = dto.metalId || (Array.isArray(dto.metalIds) && dto.metalIds.length > 0 ? dto.metalIds[0] : null);
+      const parsedMetals = parseSafeArray(dto.metalIds);
+      const mId = dto.metalId || (parsedMetals.length > 0 ? parsedMetals[0] : null);
       data.metalId = sanitizeUUID(mId);
     }
     if (dto.priceRuleId !== undefined) {
@@ -524,7 +626,13 @@ export class ProductsService {
       data.discountedPrice = dto.discountedPrice !== null && dto.discountedPrice !== '' ? Number(dto.discountedPrice) : null;
     }
 
-    if (dto.isFeatured !== undefined) data.isFeatured = dto.isFeatured === 'true' || dto.isFeatured === true;
+    if (dto.isFeatured !== undefined) {
+      data.isFeatured = dto.isFeatured === 'true' || dto.isFeatured === true;
+    } else if (dto.tags !== undefined) {
+      if (String(dto.tags).toLowerCase() === 'bestseller') {
+        data.isFeatured = true;
+      }
+    }
     if (dto.isPublished !== undefined) data.isPublished = dto.isPublished === 'true' || dto.isPublished === true;
 
     const updated = await this.prisma.product.update({

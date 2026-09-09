@@ -147,13 +147,9 @@ export class PublicController {
   @ApiOperation({ summary: 'Get list of products under a category or subcategory slug' })
   async getProductsByCategorySlug(
     @Param('slug') slug: string,
-    @Query('page') pageStr?: string,
-    @Query('limit') limitStr?: string,
-    @Query('metalId') metalId?: string,
+    @Query() query: any,
   ) {
-    const page = Math.max(1, parseInt(pageStr || '1', 10));
-    const limit = Math.min(100, Math.max(1, parseInt(limitStr || '20', 10)));
-    return this.publicCatalogService.getProductsByCategorySlug(slug, page, limit, metalId);
+    return this.publicCatalogService.getProductsByCategorySlug(slug, query);
   }
 
   @Get('instagram-videos')

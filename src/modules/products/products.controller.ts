@@ -30,16 +30,11 @@ export class ProductsController {
   @Roles(Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Admin: Get all products with filters' })
   async getAllProducts(
-    @Query('page') pageStr?: string,
-    @Query('limit') limitStr?: string,
-    @Query('search') search?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('collectionId') collectionId?: string,
-    @Query('metalId') metalId?: string,
+    @Query() query: any,
   ) {
-    const page = pageStr ? parseInt(pageStr, 10) : 1;
-    const limit = limitStr ? parseInt(limitStr, 10) : 10;
-    return this.productsService.findAll({ page, limit, search, categoryId, collectionId, metalId });
+    const page = query?.page ? parseInt(query.page, 10) : 1;
+    const limit = query?.limit ? parseInt(query.limit, 10) : 10;
+    return this.productsService.findAll({ ...query, page, limit });
   }
 
   @Post()
