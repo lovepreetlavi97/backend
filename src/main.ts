@@ -1,3 +1,4 @@
+import 'dotenv/config';
 process.env.UV_THREADPOOL_SIZE = '64';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

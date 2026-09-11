@@ -13,28 +13,33 @@ export class PromoCodesService {
       _id: p.id,
       id: p.id,
       code: p.code,
-      type: 'percentage',
+      type: p.type || 'percentage',
       value: Number(p.discountPercent),
       discountPercent: Number(p.discountPercent),
       maxDiscount: p.maxDiscount ? Number(p.maxDiscount) : 0,
-      minPurchase: 0,
-      minOrderValue: 0,
-      startDate: p.createdAt.toISOString(),
-      endDate: p.validUntil.toISOString(),
-      validUntil: p.validUntil.toISOString(),
-      usageLimit: 1000,
-      usageCount: 0,
-      description: `${p.discountPercent}% OFF coupon discount`,
+      minPurchase: p.minPurchase ? Number(p.minPurchase) : 0,
+      minOrderValue: p.minPurchase ? Number(p.minPurchase) : 0,
+      startDate: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
+      endDate: p.validUntil ? p.validUntil.toISOString() : new Date().toISOString(),
+      validUntil: p.validUntil ? p.validUntil.toISOString() : new Date().toISOString(),
+      usageLimit: p.usageLimit || 1000,
+      usageCount: p.usageCount || 0,
+      description: p.description || `${p.discountPercent}% OFF coupon discount`,
+      showInProductDetail: p.showInProductDetail !== undefined ? p.showInProductDetail : true,
       status,
       isActive: p.isActive,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.createdAt.toISOString(),
+      createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: p.updatedAt ? p.updatedAt.toISOString() : new Date().toISOString(),
     };
   }
 
-  async validatePromoCode(code: string, totalAmount: number) {
+  async validatePromoCode(code: string, totalAmount: number = 0) {
+    if (!code) {
+      throw new BadRequestException('Coupon promo code is required.');
+    }
+
     const promo = await this.prisma.promoCode.findUnique({
-      where: { code: code.toUpperCase() },
+      where: { code: code.trim().toUpperCase() },
     });
 
     if (!promo || !promo.isActive || new Date() > promo.validUntil) {
@@ -42,10 +47,17 @@ export class PromoCodesService {
     }
 
     const discountPercentage = Number(promo.discountPercent);
-    let discountAmount = (totalAmount * discountPercentage) / 100;
+    const isFixed = promo.type === 'fixed';
+    let discountAmount = isFixed
+      ? discountPercentage
+      : (totalAmount * discountPercentage) / 100;
 
     if (promo.maxDiscount && discountAmount > Number(promo.maxDiscount)) {
       discountAmount = Number(promo.maxDiscount);
+    }
+
+    if (totalAmount > 0 && discountAmount > totalAmount) {
+      discountAmount = totalAmount;
     }
 
     const finalAmount = Math.max(0, totalAmount - discountAmount);
@@ -55,24 +67,44 @@ export class PromoCodesService {
       discountPercent: discountPercentage,
       discountAmount: Math.round(discountAmount * 100) / 100,
       finalAmount: Math.round(finalAmount * 100) / 100,
+      discountType: promo.type || 'percentage',
+      discountValue: discountPercentage,
+      maxDiscount: promo.maxDiscount ? Number(promo.maxDiscount) : 0,
+      minOrderValue: promo.minPurchase ? Number(promo.minPurchase) : 0,
+      description: promo.description || (isFixed ? `₹${discountPercentage} FLAT OFF` : `${discountPercentage}% OFF`),
+      promo: {
+        code: promo.code,
+        discountType: promo.type || 'percentage',
+        discountValue: discountPercentage,
+        discountPercent: discountPercentage,
+        maxDiscount: promo.maxDiscount ? Number(promo.maxDiscount) : 0,
+        minOrderValue: promo.minPurchase ? Number(promo.minPurchase) : 0,
+        description: promo.description || (isFixed ? `₹${discountPercentage} FLAT OFF` : `${discountPercentage}% OFF`),
+      },
     };
   }
 
-  async getActivePromos() {
+  async getActivePromos(onlyProductDetail: boolean = false) {
+    const where: any = {
+      isActive: true,
+      validUntil: { gte: new Date() },
+    };
+
+    if (onlyProductDetail) {
+      where.showInProductDetail = true;
+    }
+
     let promos = await this.prisma.promoCode.findMany({
-      where: {
-        isActive: true,
-        validUntil: { gte: new Date() },
-      },
+      where,
       orderBy: { discountPercent: 'desc' },
     });
 
-    if (promos.length === 0) {
+    if (promos.length === 0 && !onlyProductDetail) {
       // Auto seed default initial coupons
       const defaultPromos = [
-        { code: 'GURU10', discountPercent: 10, maxDiscount: 2500, validUntil: new Date('2028-12-31') },
-        { code: 'GURU5', discountPercent: 5, maxDiscount: 1500, validUntil: new Date('2028-12-31') },
-        { code: 'FESTIVE500', discountPercent: 7, maxDiscount: 500, validUntil: new Date('2028-12-31') },
+        { code: 'GURU10', discountPercent: 10, maxDiscount: 2500, description: 'Flat 10% Off on Gold Jewellery', showInProductDetail: true, validUntil: new Date('2028-12-31') },
+        { code: 'GURU5', discountPercent: 5, maxDiscount: 1500, description: '5% Instant Discount for New Users', showInProductDetail: true, validUntil: new Date('2028-12-31') },
+        { code: 'FESTIVE500', discountPercent: 7, maxDiscount: 500, description: 'Festive Season Special Discount', showInProductDetail: true, validUntil: new Date('2028-12-31') },
       ];
 
       for (const p of defaultPromos) {
@@ -84,7 +116,8 @@ export class PromoCodesService {
       }
 
       promos = await this.prisma.promoCode.findMany({
-        where: { isActive: true },
+        where,
+        orderBy: { discountPercent: 'desc' },
       });
     }
 
@@ -146,15 +179,7 @@ export class PromoCodesService {
     return this.mapPromo(promo);
   }
 
-  async createPromoCode(dto: {
-    code: string;
-    discountPercent?: number;
-    value?: number;
-    maxDiscount?: number;
-    validUntil?: Date | string;
-    endDate?: Date | string;
-    isActive?: boolean;
-  }) {
+  async createPromoCode(dto: any) {
     const code = (dto.code || '').trim().toUpperCase();
     const discount = dto.discountPercent !== undefined ? Number(dto.discountPercent) : Number(dto.value || 10);
     const validUntilDate = dto.validUntil
@@ -163,13 +188,20 @@ export class PromoCodesService {
       ? new Date(dto.endDate)
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
+    const showInProductDetail = dto.showInProductDetail !== undefined ? Boolean(dto.showInProductDetail) : true;
+
     const promo = await this.prisma.promoCode.create({
       data: {
         code,
         discountPercent: discount,
         maxDiscount: dto.maxDiscount ? Number(dto.maxDiscount) : null,
+        minPurchase: dto.minPurchase !== undefined ? Number(dto.minPurchase) : (dto.minOrderValue !== undefined ? Number(dto.minOrderValue) : 0),
+        type: dto.type || 'percentage',
+        description: dto.description || `${discount}% OFF coupon discount`,
+        showInProductDetail,
+        usageLimit: dto.usageLimit ? Number(dto.usageLimit) : 1000,
         validUntil: validUntilDate,
-        isActive: dto.isActive !== undefined ? dto.isActive : true,
+        isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : (dto.status ? dto.status === 'active' : true),
       },
     });
 
@@ -186,13 +218,28 @@ export class PromoCodesService {
       data.discountPercent = Number(dto.discountPercent !== undefined ? dto.discountPercent : dto.value);
     }
     if (dto.maxDiscount !== undefined) {
-      data.maxDiscount = Number(dto.maxDiscount);
+      data.maxDiscount = dto.maxDiscount ? Number(dto.maxDiscount) : null;
+    }
+    if (dto.minPurchase !== undefined || dto.minOrderValue !== undefined) {
+      data.minPurchase = Number(dto.minPurchase !== undefined ? dto.minPurchase : dto.minOrderValue);
+    }
+    if (dto.type !== undefined) {
+      data.type = dto.type;
+    }
+    if (dto.description !== undefined) {
+      data.description = dto.description;
+    }
+    if (dto.showInProductDetail !== undefined) {
+      data.showInProductDetail = Boolean(dto.showInProductDetail);
+    }
+    if (dto.usageLimit !== undefined) {
+      data.usageLimit = Number(dto.usageLimit);
     }
     if (dto.validUntil || dto.endDate) {
       data.validUntil = new Date(dto.validUntil || dto.endDate);
     }
     if (dto.isActive !== undefined) {
-      data.isActive = dto.isActive;
+      data.isActive = Boolean(dto.isActive);
     }
     if (dto.status !== undefined) {
       data.isActive = dto.status === 'active';
@@ -221,6 +268,18 @@ export class PromoCodesService {
     const updated = await this.prisma.promoCode.update({
       where: { id },
       data: { isActive: !existing.isActive },
+    });
+
+    return this.mapPromo(updated);
+  }
+
+  async toggleShowInProductDetail(id: string) {
+    const existing = await this.prisma.promoCode.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException(`Promo code not found`);
+
+    const updated = await this.prisma.promoCode.update({
+      where: { id },
+      data: { showInProductDetail: !existing.showInProductDetail },
     });
 
     return this.mapPromo(updated);

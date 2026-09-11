@@ -22,17 +22,26 @@ export class PromoCodesController {
   constructor(private readonly promoCodesService: PromoCodesService) {}
 
   @Get('active')
-  @ApiOperation({ summary: 'Get all active promo codes for products' })
-  async getActivePromos() {
-    const promos = await this.promoCodesService.getActivePromos();
+  @ApiOperation({ summary: 'Get all active promo codes for products (optionally filtered by showInProductDetail)' })
+  async getActivePromos(@Query('productDetail') productDetail?: string) {
+    const isProductDetail = productDetail === 'true' || productDetail === '1';
+    const promos = await this.promoCodesService.getActivePromos(isProductDetail);
     return { status: 'success', data: { promos } };
   }
 
   @Post('validate')
   @ApiOperation({ summary: 'Validate coupon promo code for order checkout' })
-  async validate(@Body() dto: { code: string; totalAmount: number }) {
-    const result = await this.promoCodesService.validatePromoCode(dto.code, dto.totalAmount);
-    return { status: 'success', data: result };
+  async validate(@Body() dto: { code: string; totalAmount?: number }) {
+    const result = await this.promoCodesService.validatePromoCode(dto.code, Number(dto.totalAmount) || 0);
+    return { status: 'success', data: result, promo: result.promo };
+  }
+
+  @Get('validate/:code')
+  @ApiOperation({ summary: 'Validate coupon promo code by URL parameter' })
+  async validateByParam(@Param('code') code: string, @Query('totalAmount') totalAmount?: string) {
+    const total = totalAmount ? parseFloat(totalAmount) : 0;
+    const result = await this.promoCodesService.validatePromoCode(code, total);
+    return { status: 'success', data: result, promo: result.promo };
   }
 
   @Get()
@@ -101,5 +110,14 @@ export class PromoCodesController {
     const promoCode = await this.promoCodesService.toggleStatus(id);
     return { status: 'success', message: 'Status updated.', data: { promoCode } };
   }
-}
 
+  @Patch(':id/toggle-product-detail')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiOperation({ summary: 'Admin: Toggle promo code show in product detail page' })
+  async toggleProductDetail(@Param('id') id: string) {
+    const promoCode = await this.promoCodesService.toggleShowInProductDetail(id);
+    return { status: 'success', message: 'Product detail display toggle updated.', data: { promoCode } };
+  }
+}
