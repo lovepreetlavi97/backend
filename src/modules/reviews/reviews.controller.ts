@@ -9,6 +9,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) { }
 
+  @Get()
+  @ApiOperation({ summary: 'Get top customer reviews across products' })
+  async getTopReviews() {
+    const reviews = await this.reviewsService.getTopReviews();
+    return { status: 'success', data: { reviews } };
+  }
+
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get all reviews for a product' })
   async getReviews(@Param('productId') productId: string) {

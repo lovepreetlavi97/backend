@@ -59,7 +59,7 @@ export class UploadsService {
     const useLocal = process.env.NODE_ENV === 'development' || !process.env.AWS_ACCESS_KEY_ID;
     if (useLocal) {
       const uploadUrl = `http://localhost:5000/api/v1/upload/local-presigned?key=${key}`;
-      const localKey = `http://localhost:5000/uploads/${key}`;
+      const localKey = `/uploads/${key}`;
       return {
         uploadUrl,
         key: localKey,
@@ -238,7 +238,7 @@ export class UploadsService {
       const filePath = path.join(uploadDir, filename);
       fs.writeFileSync(filePath, finalBuffer);
 
-      const localUrl = `http://localhost:5000/uploads/${cleanFolderName}/${filename}`;
+      const localUrl = `/uploads/${cleanFolderName}/${filename}`;
       return { url: localUrl, key: localUrl };
     }
   }

@@ -5,6 +5,21 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) { }
 
+  async getTopReviews() {
+    return this.prisma.review.findMany({
+      where: { rating: { gte: 4 } },
+      include: {
+        user: { select: { id: true, name: true } },
+        product: { select: { id: true, title: true, slug: true, images: true } },
+      },
+      orderBy: [
+        { rating: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 20,
+    });
+  }
+
   async getProductReviews(productId: string) {
     return this.prisma.review.findMany({
       where: { productId },
