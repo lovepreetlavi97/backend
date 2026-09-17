@@ -231,7 +231,9 @@ export class FilterConfigService {
   async invalidateGiftStoreConfigCache(): Promise<void> {
     try {
       await this.redis.del(this.CACHE_KEY);
-      this.logger.log(`Redis cache invalidated for ${this.CACHE_KEY}`);
+      await this.redis.del('cache:festivals_public');
+      await this.redis.delPattern('cache:festivals_public*');
+      this.logger.log(`Redis cache invalidated for ${this.CACHE_KEY} and festivals`);
     } catch (err: any) {
       this.logger.warn(`Redis cache invalidation failed for ${this.CACHE_KEY}: ${err.message}`);
     }
@@ -258,12 +260,13 @@ export class FilterConfigService {
     if (occasions.some((o: any) => o.slug === finalSlug)) {
       finalSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
     }
+    const rawImg = typeof dto.image === 'string' ? dto.image : (typeof dto.mainImage === 'string' ? dto.mainImage : '');
     const newOccasion = {
       _id: Math.random().toString(36).slice(2, 11),
       name: dto.name || 'Festival',
       description: dto.description || '',
       slug: finalSlug,
-      image: dto.image || dto.mainImage || '/uploads/gifts/default.png',
+      image: rawImg,
       link: dto.link || dto.url || '',
       startDate: dto.startDate || '',
       endDate: dto.endDate || '',
@@ -283,9 +286,14 @@ export class FilterConfigService {
     const occasions = config.occasions || [];
     const index = occasions.findIndex((o: any) => o._id === id);
     if (index === -1) throw new NotFoundException('Occasion not found');
+
+    const currentImg = typeof occasions[index].image === 'string' ? occasions[index].image : '';
+    const newImg = typeof dto.image === 'string' ? dto.image : (typeof dto.mainImage === 'string' ? dto.mainImage : currentImg);
+
     occasions[index] = {
       ...occasions[index],
       ...dto,
+      image: newImg,
       metalIds: Array.isArray(dto.metalIds) ? dto.metalIds : dto.metalIds ? [dto.metalIds] : occasions[index].metalIds || [],
       isActive: dto.isActive !== undefined ? (dto.isActive === 'false' || dto.isActive === false ? false : true) : occasions[index].isActive,
       link: dto.link !== undefined ? dto.link : dto.url !== undefined ? dto.url : occasions[index].link || '',

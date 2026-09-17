@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -8,6 +8,18 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) { }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all reviews (public / homepage testimonials)' })
+  async getAllReviews(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? Math.max(parseInt(page, 10), 1) : 1;
+    const limitNum = limit ? Math.max(parseInt(limit, 10), 1) : 20;
+    const data = await this.reviewsService.getAllReviews(pageNum, limitNum);
+    return { status: 'success', data };
+  }
 
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get all reviews for a product' })

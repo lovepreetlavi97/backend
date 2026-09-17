@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Patch, Query, UseGuards, UseInterceptors, UploadedFiles } from '@nestjs/common';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { Controller, Get, Post, Put, Delete, Body, Param, Patch, Query, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FilterConfigService } from './filter-config.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -17,30 +17,55 @@ export class FestivalsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get festivals/occasions (defaults to active for public)' })
-  async getAllFestivals(@Query('status') status?: string) {
+  @ApiOperation({ summary: 'Get all festivals/occasions for admin (active and inactive)' })
+  async getAllFestivals(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     let festivals = await this.filterConfigService.getOccasionsList();
-    if (status !== 'all') {
+
+    if (status === 'active') {
       festivals = festivals.filter((f: any) => f.isActive !== false && f.status !== 'inactive');
+    } else if (status === 'inactive') {
+      festivals = festivals.filter((f: any) => f.isActive === false || f.status === 'inactive');
     }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      festivals = festivals.filter(
+        (f: any) =>
+          (f.name && f.name.toLowerCase().includes(q)) ||
+          (f.description && f.description.toLowerCase().includes(q)),
+      );
+    }
+
+    const total = festivals.length;
+    const pageNum = page ? Math.max(parseInt(page, 10), 1) : 1;
+    const limitNum = limit ? Math.max(parseInt(limit, 10), 1) : 100;
+    const pages = Math.ceil(total / limitNum) || 1;
+
     const mapped = festivals.map((f: any) => ({
       _id: f._id,
       id: f._id,
       name: f.name,
       description: f.description || '',
       slug: f.slug,
-      image: f.image || f.mainImage || '',
+      image: typeof f.image === 'string' ? f.image : typeof f.mainImage === 'string' ? f.mainImage : '',
+      mainImage: typeof f.image === 'string' ? f.image : typeof f.mainImage === 'string' ? f.mainImage : '',
       link: f.link || f.url || '',
       startDate: f.startDate || '',
       endDate: f.endDate || '',
       metalIds: f.metalIds || [],
-      isActive: f.isActive !== undefined ? f.isActive : true,
+      isActive: f.isActive !== false && f.status !== 'inactive',
     }));
+
     return {
       status: 'success',
       data: {
         festivals: mapped,
-        pagination: { total: mapped.length, page: 1, limit: 100, pages: 1 },
+        pagination: { total, page: pageNum, limit: limitNum, pages },
       },
     };
   }
@@ -49,57 +74,13 @@ export class FestivalsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({ summary: 'Create new festival/occasion' })
   async createFestival(
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: any,
   ) {
-    const file = files && files.length > 0 ? files[0] : null;
-    let imageKey = dto.image || dto.mainImage;
-    if (file) {
-      const uploadRes = await this.uploadsService.uploadAndCompressImage(
-        file.buffer,
-        file.originalname,
-        file.mimetype,
-        'festivals',
-      );
-      imageKey = uploadRes.key || uploadRes.url;
-    }
-
-    let metalIds = dto.metalIds;
-    if (typeof metalIds === 'string') {
-      try {
-        metalIds = JSON.parse(metalIds);
-      } catch {
-        metalIds = [metalIds];
-      }
-    }
-
-    const payload = {
-      ...dto,
-      metalIds: Array.isArray(metalIds) ? metalIds : [],
-      isActive: dto.isActive === 'false' || dto.isActive === false ? false : true,
-      image: imageKey,
-    };
-
-    const festival = await this.filterConfigService.addOccasion(payload);
-    return { status: 'success', data: { festival } };
-  }
-
-  @Put(':id')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
-  @UseInterceptors(AnyFilesInterceptor())
-  @ApiOperation({ summary: 'Update festival/occasion by ID' })
-  async updateFestival(
-    @Param('id') id: string,
-    @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: any,
-  ) {
-    const file = files && files.length > 0 ? files[0] : null;
-    let imageKey = dto.image;
+    let imageKey = typeof dto.image === 'string' ? dto.image : typeof dto.mainImage === 'string' ? dto.mainImage : '';
     if (file) {
       const uploadRes = await this.uploadsService.uploadAndCompressImage(
         file.buffer,
@@ -119,13 +100,63 @@ export class FestivalsController {
           metalIds = [metalIds];
         }
       }
+    } else {
+      metalIds = [];
     }
 
     const payload = {
       ...dto,
-      ...(metalIds !== undefined ? { metalIds: Array.isArray(metalIds) ? metalIds : [] } : {}),
+      metalIds: Array.isArray(metalIds) ? metalIds : [metalIds],
+      isActive: dto.isActive === 'false' || dto.isActive === false ? false : true,
+      image: typeof imageKey === 'string' ? imageKey : '',
+    };
+
+    const festival = await this.filterConfigService.addOccasion(payload);
+    return { status: 'success', data: { festival } };
+  }
+
+  @Put(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({ summary: 'Update festival/occasion by ID' })
+  async updateFestival(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: any,
+  ) {
+    let imageKey: string | undefined = undefined;
+    if (file) {
+      const uploadRes = await this.uploadsService.uploadAndCompressImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        'festivals',
+      );
+      imageKey = uploadRes.key || uploadRes.url;
+    } else if (typeof dto.image === 'string' && dto.image) {
+      imageKey = dto.image;
+    } else if (typeof dto.mainImage === 'string' && dto.mainImage) {
+      imageKey = dto.mainImage;
+    }
+
+    let metalIds = dto.metalIds;
+    if (metalIds !== undefined) {
+      if (typeof metalIds === 'string') {
+        try {
+          metalIds = JSON.parse(metalIds);
+        } catch {
+          metalIds = [metalIds];
+        }
+      }
+    }
+
+    const payload = {
+      ...dto,
+      ...(metalIds !== undefined ? { metalIds: Array.isArray(metalIds) ? metalIds : [metalIds] } : {}),
       ...(dto.isActive !== undefined ? { isActive: dto.isActive === 'false' || dto.isActive === false ? false : true } : {}),
-      ...(imageKey ? { image: imageKey } : {}),
+      ...(imageKey !== undefined ? { image: imageKey } : {}),
     };
 
     const festival = await this.filterConfigService.updateOccasion(id, payload);

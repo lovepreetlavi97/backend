@@ -111,8 +111,8 @@ export class PublicController {
 
   @Get('user/festivals')
   @ApiOperation({ summary: 'Get active festivals list' })
-  async getFestivals() {
-    return this.publicCatalogService.getFestivals();
+  async getFestivals(@Query('metalId') metalId?: string) {
+    return this.publicCatalogService.getFestivals(metalId);
   }
 
   @Get('user/home-search')

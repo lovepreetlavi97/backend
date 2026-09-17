@@ -43,7 +43,8 @@ export class PublicCatalogService {
       : (Array.isArray((product as any).sizes) ? (product as any).sizes : []);
     rawAttributes.sizes = rawSizes;
 
-    const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : 'Bestseller');
+    const isRecent = product.createdAt && (Date.now() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000);
+    const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : (isRecent ? 'New' : ''));
 
     return {
       _id: product.id,
@@ -276,22 +277,46 @@ export class PublicCatalogService {
     return response;
   }
 
-  async getFestivals() {
-    const cacheKey = 'cache:festivals_public';
+  async getFestivals(metalId?: string) {
+    const cacheKey = metalId ? `cache:festivals_public_${metalId}` : 'cache:festivals_public';
     const cached = await this.redis.get<any>(cacheKey);
     if (cached) return cached;
 
-    const subcategories = await this.prisma.subCategory.findMany({
-      where: { isDeleted: false },
-      take: 5,
+    let occasions: any[] = [];
+    if (this.filterConfigService) {
+      occasions = await this.filterConfigService.getOccasionsList();
+    } else {
+      const setting = await this.prisma.setting.findUnique({ where: { key: 'gift_store_config' } });
+      occasions = (setting?.value as any)?.occasions || [];
+    }
+
+    let activeFestivals = (occasions || []).filter((f: any) => f.isActive !== false && f.status !== 'inactive');
+
+    if (metalId) {
+      activeFestivals = activeFestivals.filter((f: any) => {
+        if (!f.metalIds || !Array.isArray(f.metalIds) || f.metalIds.length === 0) return true;
+        return f.metalIds.includes(metalId);
+      });
+    }
+
+    const festivals = activeFestivals.map((f: any) => {
+      const rawImg = typeof f.image === 'string' ? f.image : typeof f.mainImage === 'string' ? f.mainImage : '';
+      return {
+        _id: f._id || f.id,
+        id: f._id || f.id,
+        name: f.name,
+        description: f.description || '',
+        slug: f.slug,
+        image: rawImg,
+        mainImage: rawImg,
+        link: f.link || f.url || (f.slug ? `/collections/${f.slug}` : ''),
+        startDate: f.startDate || '',
+        endDate: f.endDate || '',
+        metalIds: Array.isArray(f.metalIds) ? f.metalIds : [],
+        isActive: f.isActive !== undefined ? f.isActive : true,
+      };
     });
-    const festivals = subcategories.map((sub) => ({
-      _id: sub.id,
-      name: sub.name,
-      slug: sub.slug,
-      mainImage: sub.image || '/images/default-festival.jpg',
-      description: sub.description || 'Celebrate seasons with luxury',
-    }));
+
     const response = {
       status: 'success',
       data: { festivals },
@@ -575,7 +600,31 @@ export class PublicCatalogService {
       }
     }
 
-    // 6. Search filter
+    // 6. Tag filter (e.g. tag=new or tag=bestseller)
+    if (query?.tag) {
+      const targetTag = String(query.tag).trim().toLowerCase();
+      filtered = filtered.filter((p) => {
+        const rawValues = [
+          p.tag,
+          p.tags,
+          p.attributes?.tag,
+          p.attributes?.tags,
+        ].filter(Boolean);
+
+        return rawValues.some((val) => {
+          if (Array.isArray(val)) {
+            return val.some((v) => {
+              const str = String(v).trim().toLowerCase();
+              return str === targetTag || str.includes(targetTag);
+            });
+          }
+          const str = String(val).trim().toLowerCase();
+          return str === targetTag || str.includes(targetTag);
+        });
+      });
+    }
+
+    // 7. Search filter
     if (query?.search && String(query.search).trim()) {
       const q = String(query.search).trim().toLowerCase();
       filtered = filtered.filter(

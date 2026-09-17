@@ -188,7 +188,9 @@ export class ProductsService {
       : (Array.isArray((product as any).sizes) ? (product as any).sizes : []);
     rawAttributes.sizes = rawSizes;
 
-    const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : 'Bestseller');
+    const rawShortDesc = (product as any).shortDescription || rawAttributes.shortDescription || rawAttributes.shortDesc || '';
+    const isRecent = product.createdAt && (Date.now() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000);
+    const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : (isRecent ? 'New' : ''));
 
     return {
       _id: product.id,
@@ -198,6 +200,7 @@ export class ProductsService {
       slug: product.slug,
       sku: product.sku,
       description: product.description,
+      shortDescription: rawShortDesc,
       image: safeImages[0] || '',
       mainImage: safeImages[0] || '',
       images: safeImages,
@@ -445,6 +448,9 @@ export class ProductsService {
       attributes.tags = dto.tags;
       attributes.tag = dto.tags;
     }
+    if (dto.shortDescription) {
+      attributes.shortDescription = dto.shortDescription;
+    }
     const specifications = parseSafeArray(parseSafeJson(dto.specifications) || dto.specifications);
 
     // Collect all images from dto.images, dto.image, dto.mainImage
@@ -577,7 +583,7 @@ export class ProductsService {
         .map((item: any) => typeof item === 'object' ? (item._id || item.id) : item)
         .filter(Boolean);
     }
-    if (dto.attributes !== undefined || dto.tags !== undefined || dto.sizes !== undefined) {
+    if (dto.attributes !== undefined || dto.tags !== undefined || dto.sizes !== undefined || dto.shortDescription !== undefined) {
       const existingAttrs = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
         ? { ...(product.attributes as any) }
         : {};
@@ -596,6 +602,9 @@ export class ProductsService {
       if (dto.tags !== undefined) {
         newAttrs.tags = dto.tags;
         newAttrs.tag = dto.tags;
+      }
+      if (dto.shortDescription !== undefined) {
+        newAttrs.shortDescription = dto.shortDescription;
       }
       data.attributes = newAttrs;
     }
