@@ -10,6 +10,7 @@ export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) { }
 
   @Get()
+<<<<<<< HEAD
   @ApiOperation({ summary: 'Get all reviews (public / homepage testimonials)' })
   async getAllReviews(
     @Query('page') page?: string,
@@ -19,6 +20,12 @@ export class ReviewsController {
     const limitNum = limit ? Math.max(parseInt(limit, 10), 1) : 20;
     const data = await this.reviewsService.getAllReviews(pageNum, limitNum);
     return { status: 'success', data };
+=======
+  @ApiOperation({ summary: 'Get top customer reviews across products' })
+  async getTopReviews() {
+    const reviews = await this.reviewsService.getTopReviews();
+    return { status: 'success', data: { reviews } };
+>>>>>>> b7100c139e07102ff29462b892c84ffd664cc6a8
   }
 
   @Get('product/:productId')
