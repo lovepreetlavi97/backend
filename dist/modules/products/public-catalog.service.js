@@ -1,0 +1,851 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PublicCatalogService = void 0;
+const common_1 = require("@nestjs/common");
+const crypto = require("crypto");
+const prisma_service_1 = require("../prisma/prisma.service");
+const products_service_1 = require("./products.service");
+const redis_service_1 = require("../../shared/redis/redis.service");
+const filter_config_service_1 = require("../settings/filter-config.service");
+let PublicCatalogService = class PublicCatalogService {
+    constructor(prisma, productsService, redis, filterConfigService) {
+        this.prisma = prisma;
+        this.productsService = productsService;
+        this.redis = redis;
+        this.filterConfigService = filterConfigService;
+    }
+    mapProduct(product) {
+        const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
+        const priceBreakdown = this.productsService.calculatePrice(Number(product.weightGrams || 0), ratePerGram, product.isPriceFixed, product.actualPrice ? Number(product.actualPrice) : null, product.discountedPrice ? Number(product.discountedPrice) : null, product.grossWeight ? Number(product.grossWeight) : null, product.netGoldWeight ? Number(product.netGoldWeight) : null, product.stoneWeight ? Number(product.stoneWeight) : null, product.wastagePercent ? Number(product.wastagePercent) : null, product.priceRule);
+        const safeImages = Array.isArray(product?.images) ? product.images : [];
+        const festivalIds = Array.isArray(product?.festivalIds) ? product.festivalIds : [];
+        const relationIds = Array.isArray(product?.relationIds) ? product.relationIds : [];
+        const collectionIds = Array.isArray(product?.collectionIds) ? product.collectionIds : [];
+        const rawAttributes = product?.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+            ? { ...product.attributes }
+            : {};
+        const rawSizes = Array.isArray(rawAttributes.sizes)
+            ? rawAttributes.sizes
+            : (Array.isArray(product.sizes) ? product.sizes : []);
+        rawAttributes.sizes = rawSizes;
+        const isRecent = product.createdAt && (Date.now() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000);
+        const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : (isRecent ? 'New' : ''));
+        return {
+            _id: product.id,
+            id: product.id,
+            name: product.title,
+            title: product.title,
+            slug: product.slug,
+            sku: product.sku,
+            description: product.description,
+            image: safeImages[0] || '',
+            mainImage: safeImages[0] || '',
+            images: safeImages,
+            tags: rawTag,
+            tag: rawTag,
+            weight: Number(product.weightGrams || 0),
+            weightGrams: Number(product.weightGrams || 0),
+            grossWeight: product.grossWeight ? Number(product.grossWeight) : Number(product.weightGrams || 0),
+            netGoldWeight: product.netGoldWeight ? Number(product.netGoldWeight) : Number(product.weightGrams || 0),
+            stoneWeight: product.stoneWeight ? Number(product.stoneWeight) : 0,
+            purity: product.purity || '22KT',
+            wastagePercent: product.wastagePercent ? Number(product.wastagePercent) : 0,
+            bisHallmark: product.bisHallmark ?? true,
+            stock: product.stockQuantity,
+            stockQuantity: product.stockQuantity,
+            isActive: product.isActive ?? true,
+            isPublished: product.isPublished,
+            isFeatured: product.isFeatured,
+            isPriceFixed: product.isPriceFixed,
+            actualPrice: priceBreakdown.finalPrice,
+            discountedPrice: priceBreakdown.finalPrice,
+            festivalIds,
+            relationIds,
+            collectionIds,
+            attributes: rawAttributes,
+            sizes: rawSizes,
+            specifications: product.specifications || [],
+            metalId: product.metalId,
+            categoryId: product.categoryId,
+            subcategoryId: product.subcategoryId,
+            priceRuleId: product.priceRuleId,
+            calculatedPrice: priceBreakdown,
+            metal: product.metal,
+            category: product.category,
+            subcategory: product.subcategory,
+            priceRule: product.priceRule,
+        };
+    }
+    async getFeaturedSubcategories(defaultImage, defaultDesc) {
+        const subcategories = await this.prisma.subCategory.findMany({
+            where: { isDeleted: false },
+            take: 5,
+        });
+        return subcategories.map((sub) => ({
+            _id: sub.id,
+            name: sub.name,
+            slug: sub.slug,
+            image: sub.image || defaultImage,
+            mainImage: sub.image || defaultImage,
+            description: sub.description || defaultDesc,
+        }));
+    }
+    async getHomepage() {
+        const cacheKey = 'cache:homepage';
+        const cachedData = await this.redis.get(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
+        const banners = await this.prisma.banner.findMany({
+            where: { isDeleted: false, status: 'active' },
+            orderBy: { position: 'asc' },
+        });
+        const categories = await this.prisma.category.findMany({
+            where: { isDeleted: false },
+            include: { subcategories: { where: { isDeleted: false } } },
+        });
+        const rawProducts = await this.prisma.product.findMany({
+            where: { isDeleted: false, isPublished: true, approvalStatus: 'APPROVED' },
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+        });
+        const products = rawProducts.map((p) => this.mapProduct(p));
+        const response = {
+            status: 'success',
+            data: {
+                banners,
+                categories,
+                featuredProducts: products,
+                newArrivals: products,
+            },
+        };
+        await this.redis.set(cacheKey, response, 60);
+        return response;
+    }
+    async getCategoryMenu() {
+        const cacheKey = 'cache:category_menu';
+        const cachedData = await this.redis.get(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
+        const categories = await this.prisma.category.findMany({
+            where: { isDeleted: false },
+            include: { subcategories: { where: { isDeleted: false } } },
+            orderBy: { name: 'asc' },
+        });
+        const response = {
+            status: 'success',
+            data: categories,
+        };
+        await this.redis.set(cacheKey, response, 300);
+        return response;
+    }
+    async getEssentials() {
+        const cacheKey = 'cache:essentials';
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        const rawProducts = await this.prisma.product.findMany({
+            where: { isDeleted: false, isPublished: true, approvalStatus: 'APPROVED' },
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 8,
+        });
+        const products = rawProducts.map((p) => this.mapProduct(p));
+        const response = {
+            status: 'success',
+            data: { products },
+        };
+        await this.redis.set(cacheKey, response, 300).catch(() => null);
+        return response;
+    }
+    async getTrendingProducts(metalParam, limit = 4) {
+        const cacheKey = `cache:trending:${metalParam || 'all'}:${limit}`;
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        let targetMetalId = undefined;
+        if (metalParam && metalParam.trim() !== '' && metalParam.toLowerCase() !== 'all') {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metalParam);
+            if (isUuid) {
+                targetMetalId = metalParam;
+            }
+            else {
+                const foundMetal = await this.prisma.metal.findFirst({
+                    where: {
+                        OR: [
+                            { slug: { equals: metalParam.toLowerCase() } },
+                            { name: { equals: metalParam, mode: 'insensitive' } },
+                        ],
+                    },
+                });
+                if (foundMetal) {
+                    targetMetalId = foundMetal.id;
+                }
+                else {
+                    return {
+                        status: 'success',
+                        data: { products: [] },
+                    };
+                }
+            }
+        }
+        const rawProducts = await this.prisma.product.findMany({
+            where: {
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                metalId: targetMetalId || undefined,
+            },
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            orderBy: [
+                { isFeatured: 'desc' },
+                { createdAt: 'desc' },
+                { id: 'desc' },
+            ],
+            take: Math.max(limit, 12),
+        });
+        const sorted = [...rawProducts].sort((a, b) => {
+            const aTag = ((a.attributes?.tags || a.attributes?.tag || '') + (a.isFeatured ? ' bestseller' : '')).toLowerCase();
+            const bTag = ((b.attributes?.tags || b.attributes?.tag || '') + (b.isFeatured ? ' bestseller' : '')).toLowerCase();
+            const aScore = aTag.includes('bestseller') ? 3 : aTag.includes('new') ? 2 : aTag.includes('sale') || a.isFeatured ? 1 : 0;
+            const bScore = bTag.includes('bestseller') ? 3 : bTag.includes('new') ? 2 : bTag.includes('sale') || b.isFeatured ? 1 : 0;
+            return bScore - aScore;
+        });
+        const products = sorted.slice(0, limit).map((p) => this.mapProduct(p));
+        const response = {
+            status: 'success',
+            data: { products },
+        };
+        await this.redis.set(cacheKey, response, 300).catch(() => null);
+        return response;
+    }
+    async getCuratedCollections() {
+        const cacheKey = 'cache:curated_collections';
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        const subcategories = await this.prisma.subCategory.findMany({
+            where: { isDeleted: false },
+            take: 5,
+        });
+        const curatedCollections = subcategories.map((sub) => ({
+            _id: sub.id,
+            name: sub.name,
+            slug: sub.slug,
+            image: sub.image || '/images/default-collection.jpg',
+            description: sub.description || 'Exclusive curated collection',
+        }));
+        const response = {
+            status: 'success',
+            data: { curatedCollections },
+        };
+        await this.redis.set(cacheKey, response, 300).catch(() => null);
+        return response;
+    }
+    async getFestivals(metalId) {
+        const cacheKey = metalId ? `cache:festivals_public_${metalId}` : 'cache:festivals_public';
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        let occasions = [];
+        if (this.filterConfigService) {
+            occasions = await this.filterConfigService.getOccasionsList();
+        }
+        else {
+            const setting = await this.prisma.setting.findUnique({ where: { key: 'gift_store_config' } });
+            occasions = setting?.value?.occasions || [];
+        }
+        let activeFestivals = (occasions || []).filter((f) => f.isActive !== false && f.status !== 'inactive');
+        if (metalId) {
+            activeFestivals = activeFestivals.filter((f) => {
+                if (!f.metalIds || !Array.isArray(f.metalIds) || f.metalIds.length === 0)
+                    return true;
+                return f.metalIds.includes(metalId);
+            });
+        }
+        const festivals = activeFestivals.map((f) => {
+            const rawImg = typeof f.image === 'string' ? f.image : typeof f.mainImage === 'string' ? f.mainImage : '';
+            return {
+                _id: f._id || f.id,
+                id: f._id || f.id,
+                name: f.name,
+                description: f.description || '',
+                slug: f.slug,
+                image: rawImg,
+                mainImage: rawImg,
+                link: f.link || f.url || (f.slug ? `/collections/${f.slug}` : ''),
+                startDate: f.startDate || '',
+                endDate: f.endDate || '',
+                metalIds: Array.isArray(f.metalIds) ? f.metalIds : [],
+                isActive: f.isActive !== undefined ? f.isActive : true,
+            };
+        });
+        const response = {
+            status: 'success',
+            data: { festivals },
+        };
+        await this.redis.set(cacheKey, response, 300).catch(() => null);
+        return response;
+    }
+    async getHomeSearch(queryStr) {
+        const subcategories = await this.prisma.subCategory.findMany({
+            where: {
+                isDeleted: false,
+                name: queryStr ? { contains: queryStr, mode: 'insensitive' } : undefined,
+            },
+            take: 5,
+        });
+        const rawProducts = await this.prisma.product.findMany({
+            where: {
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                OR: queryStr
+                    ? [
+                        { title: { contains: queryStr, mode: 'insensitive' } },
+                        { description: { contains: queryStr, mode: 'insensitive' } },
+                    ]
+                    : undefined,
+            },
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            take: 10,
+        });
+        const products = rawProducts.map((p) => this.mapProduct(p));
+        return {
+            status: 'success',
+            data: {
+                subcategories,
+                products,
+            },
+        };
+    }
+    async getUserCategories() {
+        const cacheKey = 'cache:user_categories';
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        const categories = await this.prisma.category.findMany({
+            where: { isDeleted: false },
+            include: { subcategories: { where: { isDeleted: false } } },
+        });
+        const response = {
+            status: 'success',
+            data: { categories },
+        };
+        await this.redis.set(cacheKey, response, 300).catch(() => null);
+        return response;
+    }
+    async getRelatedProducts(idsParam) {
+        const ids = idsParam
+            ? idsParam
+                .split(',')
+                .map((id) => id.trim())
+                .filter((id) => id.length > 0)
+            : [];
+        let categoryIds = [];
+        let subcategoryIds = [];
+        if (ids.length > 0) {
+            const sourceProducts = await this.prisma.product.findMany({
+                where: { id: { in: ids }, isDeleted: false },
+                select: { categoryId: true, subcategoryId: true },
+            });
+            categoryIds = sourceProducts.map((p) => p.categoryId).filter((id) => !!id);
+            subcategoryIds = sourceProducts.map((p) => p.subcategoryId).filter((id) => !!id);
+        }
+        const rawProducts = await this.prisma.product.findMany({
+            where: {
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                ...(ids.length > 0 ? { id: { notIn: ids } } : {}),
+                ...(categoryIds.length > 0 || subcategoryIds.length > 0
+                    ? {
+                        OR: [
+                            ...(categoryIds.length > 0 ? [{ categoryId: { in: categoryIds } }] : []),
+                            ...(subcategoryIds.length > 0 ? [{ subcategoryId: { in: subcategoryIds } }] : []),
+                        ],
+                    }
+                    : {}),
+            },
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+        });
+        let finalProducts = rawProducts;
+        if (finalProducts.length === 0) {
+            finalProducts = await this.prisma.product.findMany({
+                where: { isDeleted: false, isPublished: true, approvalStatus: 'APPROVED' },
+                include: { category: true, subcategory: true, metal: true, priceRule: true },
+                orderBy: { createdAt: 'desc' },
+                take: 8,
+            });
+        }
+        const products = finalProducts.map((p) => this.mapProduct(p));
+        return {
+            status: 'success',
+            data: {
+                products,
+            },
+        };
+    }
+    parsePriceRanges(query, configuredPriceFilters) {
+        const ranges = [];
+        const defaultPresets = {
+            '1': { min: 0, max: 10000 },
+            '2': { min: 10000, max: 25000 },
+            '3': { min: 25000, max: 50000 },
+            '4': { min: 50000, max: 100000 },
+            '5': { min: 100000, max: Infinity },
+            'under-10000': { min: 0, max: 10000 },
+            '10000-25000': { min: 10000, max: 25000 },
+            '25000-50000': { min: 25000, max: 50000 },
+            '50000-100000': { min: 50000, max: 100000 },
+            'above-100000': { min: 100000, max: Infinity },
+        };
+        if (query?.price !== undefined && query?.price !== null && query?.price !== '') {
+            const rawPriceValues = Array.isArray(query.price)
+                ? query.price
+                : String(query.price).split(',');
+            for (const valRaw of rawPriceValues) {
+                const val = String(valRaw).trim().toLowerCase();
+                if (!val)
+                    continue;
+                if (defaultPresets[val]) {
+                    ranges.push(defaultPresets[val]);
+                    continue;
+                }
+                if (configuredPriceFilters && configuredPriceFilters.length > 0) {
+                    const found = configuredPriceFilters.find((pf) => String(pf._id || pf.id).toLowerCase() === val ||
+                        String(pf.label || '').toLowerCase() === val ||
+                        `${pf.min}-${pf.max}`.toLowerCase() === val);
+                    if (found) {
+                        ranges.push({
+                            min: Number(found.min || 0),
+                            max: found.max !== undefined && Number(found.max) > 0 && Number(found.max) < 9999999 ? Number(found.max) : Infinity,
+                        });
+                        continue;
+                    }
+                }
+                const underMatch = val.match(/^under[-_]?(\d+)$/i);
+                if (underMatch) {
+                    ranges.push({ min: 0, max: Number(underMatch[1]) });
+                    continue;
+                }
+                const aboveMatch = val.match(/^above[-_]?(\d+)$/i);
+                if (aboveMatch) {
+                    ranges.push({ min: Number(aboveMatch[1]), max: Infinity });
+                    continue;
+                }
+                const betweenMatch = val.match(/^(\d+)[-_](\d+)$/i);
+                if (betweenMatch) {
+                    ranges.push({ min: Number(betweenMatch[1]), max: Number(betweenMatch[2]) });
+                    continue;
+                }
+            }
+        }
+        if (ranges.length === 0 && (query?.minPrice !== undefined || query?.maxPrice !== undefined)) {
+            const minVal = query.minPrice !== undefined && query.minPrice !== ''
+                ? Number(Array.isArray(query.minPrice) ? query.minPrice[0] : query.minPrice)
+                : 0;
+            const maxVal = query.maxPrice !== undefined && query.maxPrice !== ''
+                ? Number(Array.isArray(query.maxPrice) ? query.maxPrice[0] : query.maxPrice)
+                : Infinity;
+            const min = isNaN(minVal) ? 0 : Math.max(0, minVal);
+            const max = isNaN(maxVal) ? Infinity : maxVal;
+            if (min > 0 || max < Infinity) {
+                ranges.push({ min, max });
+            }
+        }
+        return ranges;
+    }
+    applyFiltersAndSort(products, query, priceRanges) {
+        let filtered = [...products];
+        if (priceRanges.length > 0) {
+            filtered = filtered.filter((p) => {
+                const price = Number(p.calculatedPrice?.finalPrice ?? p.actualPrice ?? p.discountedPrice ?? 0);
+                return priceRanges.some((range) => price >= range.min && (range.max === Infinity || price <= range.max));
+            });
+        }
+        if (query?.purity) {
+            const purities = (Array.isArray(query.purity) ? query.purity : String(query.purity).split(','))
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
+            if (purities.length > 0) {
+                filtered = filtered.filter((p) => {
+                    const prodPurity = String(p.purity || '').toLowerCase();
+                    const metalName = String(p.metal?.name || '').toLowerCase();
+                    return purities.some((pur) => prodPurity.includes(pur) || metalName.includes(pur));
+                });
+            }
+        }
+        if (query?.category) {
+            const categories = (Array.isArray(query.category) ? query.category : String(query.category).split(','))
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
+            if (categories.length > 0) {
+                filtered = filtered.filter((p) => {
+                    const catSlug = String(p.category?.slug || '').toLowerCase();
+                    const catId = String(p.categoryId || '').toLowerCase();
+                    const catName = String(p.category?.name || '').toLowerCase();
+                    const subSlug = String(p.subcategory?.slug || '').toLowerCase();
+                    const subId = String(p.subcategoryId || '').toLowerCase();
+                    return categories.some((c) => c === catSlug || c === catId || c === catName || c === subSlug || c === subId);
+                });
+            }
+        }
+        if (query?.subcategoryId) {
+            const subcategoryIds = (Array.isArray(query.subcategoryId) ? query.subcategoryId : String(query.subcategoryId).split(','))
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
+            if (subcategoryIds.length > 0) {
+                filtered = filtered.filter((p) => {
+                    const subId = String(p.subcategoryId || '').toLowerCase();
+                    const subSlug = String(p.subcategory?.slug || '').toLowerCase();
+                    return subcategoryIds.some((s) => s === subId || s === subSlug);
+                });
+            }
+        }
+        if (query?.inStock === 'true' || query?.inStock === true) {
+            filtered = filtered.filter((p) => Number(p.stockQuantity || p.stock || 0) > 0);
+        }
+        if (query?.gender) {
+            const genders = (Array.isArray(query.gender) ? query.gender : String(query.gender).split(','))
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
+            if (genders.length > 0) {
+                filtered = filtered.filter((p) => {
+                    const attrGender = String(p.attributes?.gender || p.attributes?.Gender || '').toLowerCase();
+                    return genders.some((g) => attrGender.includes(g));
+                });
+            }
+        }
+        if (query?.tag) {
+            const targetTag = String(query.tag).trim().toLowerCase();
+            filtered = filtered.filter((p) => {
+                const rawValues = [
+                    p.tag,
+                    p.tags,
+                    p.attributes?.tag,
+                    p.attributes?.tags,
+                ].filter(Boolean);
+                return rawValues.some((val) => {
+                    if (Array.isArray(val)) {
+                        return val.some((v) => {
+                            const str = String(v).trim().toLowerCase();
+                            return str === targetTag || str.includes(targetTag);
+                        });
+                    }
+                    const str = String(val).trim().toLowerCase();
+                    return str === targetTag || str.includes(targetTag);
+                });
+            });
+        }
+        if (query?.search && String(query.search).trim()) {
+            const q = String(query.search).trim().toLowerCase();
+            filtered = filtered.filter((p) => String(p.title || '').toLowerCase().includes(q) ||
+                String(p.name || '').toLowerCase().includes(q) ||
+                String(p.sku || '').toLowerCase().includes(q) ||
+                String(p.description || '').toLowerCase().includes(q));
+        }
+        const sort = String(query?.sortBy || query?.sort || '').toLowerCase();
+        if (sort === 'price_asc' || sort === 'price_low_to_high' || sort === 'low_to_high') {
+            filtered.sort((a, b) => {
+                const priceA = Number(a.calculatedPrice?.finalPrice ?? a.actualPrice ?? 0);
+                const priceB = Number(b.calculatedPrice?.finalPrice ?? b.actualPrice ?? 0);
+                return priceA - priceB;
+            });
+        }
+        else if (sort === 'price_desc' || sort === 'price_high_to_low' || sort === 'high_to_low') {
+            filtered.sort((a, b) => {
+                const priceA = Number(a.calculatedPrice?.finalPrice ?? a.actualPrice ?? 0);
+                const priceB = Number(b.calculatedPrice?.finalPrice ?? b.actualPrice ?? 0);
+                return priceB - priceA;
+            });
+        }
+        else if (sort === 'oldest') {
+            filtered.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+        }
+        else {
+            filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        }
+        return filtered;
+    }
+    async getProductsByCategorySlug(slug, pageOrQuery = 1, limitParam = 20, metalIdParam) {
+        let page = 1;
+        let limit = 20;
+        let metalId = undefined;
+        let queryObj = {};
+        if (typeof pageOrQuery === 'object' && pageOrQuery !== null) {
+            queryObj = pageOrQuery;
+            page = Math.max(1, parseInt(queryObj.page || '1', 10));
+            limit = Math.min(100, Math.max(1, parseInt(queryObj.limit || '20', 10)));
+            metalId = queryObj.metalId;
+        }
+        else {
+            page = Math.max(1, typeof pageOrQuery === 'number' ? pageOrQuery : parseInt(pageOrQuery || '1', 10));
+            limit = Math.min(100, Math.max(1, typeof limitParam === 'number' ? limitParam : parseInt(limitParam || '20', 10)));
+            metalId = metalIdParam;
+        }
+        const priceRanges = this.parsePriceRanges(queryObj);
+        const filterKeyStr = JSON.stringify({ slug, page, limit, metalId, queryObj });
+        const filterHash = crypto.createHash('md5').update(filterKeyStr).digest('hex');
+        const cacheKey = `cache:category_slug:${slug}:${filterHash}`;
+        const cached = await this.redis.get(cacheKey);
+        if (cached)
+            return cached;
+        const skip = (page - 1) * limit;
+        let metalCondition = {};
+        if (metalId && metalId !== 'all') {
+            metalCondition = {
+                OR: [
+                    { metalId: metalId },
+                    { metal: { slug: { equals: metalId, mode: 'insensitive' } } },
+                    { metal: { name: { contains: metalId, mode: 'insensitive' } } },
+                ],
+            };
+        }
+        const metalRecord = await this.prisma.metal.findFirst({
+            where: {
+                OR: [
+                    { slug: { equals: slug, mode: 'insensitive' } },
+                    { name: { equals: slug, mode: 'insensitive' } },
+                ],
+                isActive: true,
+            },
+        });
+        if (metalRecord) {
+            const condition = {
+                metalId: metalRecord.id,
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+            };
+            const rawProducts = await this.prisma.product.findMany({
+                where: condition,
+                include: { category: true, subcategory: true, metal: true, priceRule: true },
+                orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            });
+            const mappedProducts = rawProducts.map((product) => this.mapProduct(product));
+            const filteredProducts = this.applyFiltersAndSort(mappedProducts, queryObj, priceRanges);
+            const total = filteredProducts.length;
+            const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+            const response = {
+                status: 'success',
+                data: {
+                    products: paginatedProducts,
+                    metal: metalRecord,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages: Math.ceil(total / limit),
+                        hasMore: page * limit < total,
+                    },
+                    hasMore: page * limit < total,
+                },
+            };
+            await this.redis.set(cacheKey, response, 120).catch(() => null);
+            return response;
+        }
+        if (slug === 'all') {
+            const whereCondition = {
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                ...metalCondition,
+            };
+            const rawProducts = await this.prisma.product.findMany({
+                where: whereCondition,
+                include: { category: true, subcategory: true, metal: true, priceRule: true },
+                orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            });
+            const mappedProducts = rawProducts.map((product) => this.mapProduct(product));
+            const filteredProducts = this.applyFiltersAndSort(mappedProducts, queryObj, priceRanges);
+            const total = filteredProducts.length;
+            const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+            const response = {
+                status: 'success',
+                data: {
+                    products: paginatedProducts,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages: Math.ceil(total / limit),
+                        hasMore: page * limit < total,
+                    },
+                    hasMore: page * limit < total,
+                },
+            };
+            await this.redis.set(cacheKey, response, 120).catch(() => null);
+            return response;
+        }
+        const category = await this.prisma.category.findFirst({
+            where: {
+                OR: [
+                    { slug: { equals: slug, mode: 'insensitive' } },
+                    { name: { equals: slug, mode: 'insensitive' } },
+                ],
+                isDeleted: false,
+            },
+            include: { subcategories: { where: { isDeleted: false } } },
+        });
+        if (category) {
+            const subcategoryIds = category.subcategories.map((s) => s.id);
+            const condition = {
+                OR: [
+                    { categoryId: category.id },
+                    ...(subcategoryIds.length > 0 ? [{ subcategoryId: { in: subcategoryIds } }] : []),
+                ],
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                ...metalCondition,
+            };
+            const rawProducts = await this.prisma.product.findMany({
+                where: condition,
+                include: { category: true, subcategory: true, metal: true, priceRule: true },
+                orderBy: { createdAt: 'desc' },
+            });
+            const mappedProducts = rawProducts.map((product) => this.mapProduct(product));
+            const filteredProducts = this.applyFiltersAndSort(mappedProducts, queryObj, priceRanges);
+            const total = filteredProducts.length;
+            const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+            const response = {
+                status: 'success',
+                data: {
+                    products: paginatedProducts,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages: Math.ceil(total / limit),
+                        hasMore: page * limit < total,
+                    },
+                    hasMore: page * limit < total,
+                },
+            };
+            await this.redis.set(cacheKey, response, 120).catch(() => null);
+            return response;
+        }
+        const subcategory = await this.prisma.subCategory.findFirst({
+            where: {
+                OR: [
+                    { slug: { equals: slug, mode: 'insensitive' } },
+                    { name: { equals: slug, mode: 'insensitive' } },
+                ],
+                isDeleted: false,
+            },
+        });
+        if (subcategory) {
+            const condition = {
+                subcategoryId: subcategory.id,
+                isDeleted: false,
+                isPublished: true,
+                approvalStatus: 'APPROVED',
+                ...metalCondition,
+            };
+            const rawProducts = await this.prisma.product.findMany({
+                where: condition,
+                include: { category: true, subcategory: true, metal: true, priceRule: true },
+                orderBy: { createdAt: 'desc' },
+            });
+            const mappedProducts = rawProducts.map((product) => this.mapProduct(product));
+            const filteredProducts = this.applyFiltersAndSort(mappedProducts, queryObj, priceRanges);
+            const total = filteredProducts.length;
+            const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+            const response = {
+                status: 'success',
+                data: {
+                    products: paginatedProducts,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages: Math.ceil(total / limit),
+                        hasMore: page * limit < total,
+                    },
+                    hasMore: page * limit < total,
+                },
+            };
+            await this.redis.set(cacheKey, response, 120).catch(() => null);
+            return response;
+        }
+        const multiTaxonomyCondition = {
+            isDeleted: false,
+            isPublished: true,
+            approvalStatus: 'APPROVED',
+            OR: [
+                { festivalIds: { has: slug } },
+                { relationIds: { has: slug } },
+                { collectionIds: { has: slug } },
+            ],
+            ...metalCondition,
+        };
+        const taxProducts = await this.prisma.product.findMany({
+            where: multiTaxonomyCondition,
+            include: { category: true, subcategory: true, metal: true, priceRule: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        });
+        if (taxProducts.length > 0) {
+            const mappedProducts = taxProducts.map((product) => this.mapProduct(product));
+            const filteredProducts = this.applyFiltersAndSort(mappedProducts, queryObj, priceRanges);
+            const total = filteredProducts.length;
+            const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+            const response = {
+                status: 'success',
+                data: {
+                    products: paginatedProducts,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages: Math.ceil(total / limit),
+                        hasMore: page * limit < total,
+                    },
+                    hasMore: page * limit < total,
+                },
+            };
+            await this.redis.set(cacheKey, response, 120).catch(() => null);
+            return response;
+        }
+        return {
+            status: 'success',
+            data: {
+                products: [],
+                pagination: {
+                    page,
+                    limit,
+                    total: 0,
+                    totalPages: 0,
+                    hasMore: false,
+                },
+                hasMore: false,
+            },
+        };
+    }
+};
+exports.PublicCatalogService = PublicCatalogService;
+exports.PublicCatalogService = PublicCatalogService = __decorate([
+    (0, common_1.Injectable)(),
+    __param(3, (0, common_1.Optional)()),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        products_service_1.ProductsService,
+        redis_service_1.RedisService,
+        filter_config_service_1.FilterConfigService])
+], PublicCatalogService);
+//# sourceMappingURL=public-catalog.service.js.map
