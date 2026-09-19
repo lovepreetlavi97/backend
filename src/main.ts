@@ -35,7 +35,14 @@ async function bootstrap() {
   });
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || config.allowedOrigins.includes(origin) || config.nodeEnv === 'development') {
+      if (
+        !origin ||
+        config.nodeEnv === 'development' ||
+        config.allowedOrigins.includes(origin) ||
+        origin.endsWith('.gurujewellers.in') ||
+        origin.endsWith('.vercel.app') ||
+        origin === 'https://gurujewellers.in'
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked for origin: ${origin}`));
