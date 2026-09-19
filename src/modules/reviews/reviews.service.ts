@@ -5,7 +5,6 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) { }
 
-<<<<<<< HEAD
   async getAllReviews(page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
     const [reviews, total] = await Promise.all([
@@ -51,7 +50,8 @@ export class ReviewsService {
       pages: Math.ceil(total / limit) || 1,
       reviews: mapped,
     };
-=======
+  }
+
   async getTopReviews() {
     return this.prisma.review.findMany({
       where: { rating: { gte: 4 } },
@@ -65,7 +65,6 @@ export class ReviewsService {
       ],
       take: 20,
     });
->>>>>>> b7100c139e07102ff29462b892c84ffd664cc6a8
   }
 
   async getProductReviews(productId: string) {
