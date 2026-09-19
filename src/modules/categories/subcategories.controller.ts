@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { normalizeMediaKey } from '../../common/utils/storage.util';
 import slugify from 'slugify';
 
 @ApiTags('Admin - Subcategories Management')
@@ -126,7 +127,7 @@ export class SubCategoriesController {
       data: {
         name: dto.name,
         slug,
-        image: dto.image || null,
+        image: dto.image ? normalizeMediaKey(dto.image) : null,
         description: dto.description || null,
         categoryId,
       },
@@ -150,7 +151,7 @@ export class SubCategoriesController {
     }
     const data: any = {};
     if (dto.name !== undefined) data.name = dto.name;
-    if (dto.image !== undefined) data.image = dto.image;
+    if (dto.image !== undefined) data.image = normalizeMediaKey(dto.image);
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
     else if (dto.category !== undefined) data.categoryId = dto.category;

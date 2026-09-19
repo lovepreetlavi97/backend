@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const uploads_service_1 = require("../uploads/uploads.service");
 const redis_service_1 = require("../../shared/redis/redis.service");
+const storage_util_1 = require("../../common/utils/storage.util");
 let BannersService = class BannersService {
     constructor(prisma, uploadsService, redis) {
         this.prisma = prisma;
@@ -121,12 +122,12 @@ let BannersService = class BannersService {
         };
     }
     async createBanner(dto, file) {
-        let imageUrl = '';
-        let imageKey = '';
+        let imageUrl = (0, storage_util_1.normalizeMediaKey)(dto.imageUrl || dto.image || '');
+        let imageKey = imageUrl;
         if (file) {
             const result = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'banners');
-            imageUrl = result.key;
-            imageKey = result.key;
+            imageUrl = (0, storage_util_1.normalizeMediaKey)(result.key);
+            imageKey = imageUrl;
         }
         let metalIdsArray = [];
         if (dto.metalIds) {
@@ -167,12 +168,16 @@ let BannersService = class BannersService {
         if (!existing || existing.isDeleted) {
             throw new common_1.NotFoundException(`Banner with ID '${id}' not found.`);
         }
-        let imageUrl = existing.imageUrl;
-        let imageKey = existing.image;
+        let imageUrl = (0, storage_util_1.normalizeMediaKey)(existing.imageUrl);
+        let imageKey = (0, storage_util_1.normalizeMediaKey)(existing.image);
         if (file) {
             const result = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'banners');
-            imageUrl = result.key;
-            imageKey = result.key;
+            imageUrl = (0, storage_util_1.normalizeMediaKey)(result.key);
+            imageKey = imageUrl;
+        }
+        else if (dto.imageUrl !== undefined || dto.image !== undefined) {
+            imageUrl = (0, storage_util_1.normalizeMediaKey)(dto.imageUrl || dto.image || '');
+            imageKey = imageUrl;
         }
         let metalIdsArray = existing.metalIds;
         if (dto.metalIds !== undefined) {

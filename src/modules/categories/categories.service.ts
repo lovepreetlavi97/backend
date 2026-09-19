@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { RedisService } from '../../shared/redis/redis.service';
+import { normalizeMediaKey } from '../../common/utils/storage.util';
 import slugify from 'slugify';
 
 export interface CreateCategoryDto {
@@ -172,7 +173,7 @@ export class CategoriesService {
       throw new ConflictException('Category with this name already exists.');
     }
 
-    let imageUrl = typeof dto.image === 'string' ? dto.image : null;
+    let imageUrl = typeof dto.image === 'string' ? normalizeMediaKey(dto.image) : null;
     if (file) {
       const uploadRes = await this.uploadsService.uploadAndCompressImage(
         file.buffer,
@@ -180,7 +181,7 @@ export class CategoriesService {
         file.mimetype,
         'categories',
       );
-      imageUrl = uploadRes.key;
+      imageUrl = normalizeMediaKey(uploadRes.key);
     }
 
     const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
@@ -245,9 +246,9 @@ export class CategoriesService {
         file.mimetype,
         'categories',
       );
-      dataToUpdate.image = uploadRes.key;
+      dataToUpdate.image = normalizeMediaKey(uploadRes.key);
     } else if (typeof dto.image === 'string') {
-      dataToUpdate.image = dto.image;
+      dataToUpdate.image = normalizeMediaKey(dto.image);
     }
 
     const updated = await this.prisma.category.update({

@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../shared/redis/redis.service';
+import { normalizeMediaKeyList } from '../../common/utils/storage.util';
 import slugify from 'slugify';
 import * as crypto from 'crypto';
 
@@ -482,7 +483,7 @@ export class ProductsService {
         slug,
         sku,
         description: dto.description || '',
-        images: imagesList,
+        images: normalizeMediaKeyList(imagesList),
         weightGrams,
         grossWeight,
         netGoldWeight,
@@ -545,7 +546,7 @@ export class ProductsService {
           imagesList.unshift(cleanMain);
         }
       }
-      data.images = imagesList;
+      data.images = normalizeMediaKeyList(imagesList);
     }
 
     if (dto.weightGrams !== undefined || dto.weight !== undefined) {

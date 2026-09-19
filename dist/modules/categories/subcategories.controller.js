@@ -20,6 +20,7 @@ const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
+const storage_util_1 = require("../../common/utils/storage.util");
 const slugify_1 = require("slugify");
 let SubCategoriesController = class SubCategoriesController {
     constructor(prisma) {
@@ -107,7 +108,7 @@ let SubCategoriesController = class SubCategoriesController {
             data: {
                 name: dto.name,
                 slug,
-                image: dto.image || null,
+                image: dto.image ? (0, storage_util_1.normalizeMediaKey)(dto.image) : null,
                 description: dto.description || null,
                 categoryId,
             },
@@ -127,7 +128,7 @@ let SubCategoriesController = class SubCategoriesController {
         if (dto.name !== undefined)
             data.name = dto.name;
         if (dto.image !== undefined)
-            data.image = dto.image;
+            data.image = (0, storage_util_1.normalizeMediaKey)(dto.image);
         if (dto.description !== undefined)
             data.description = dto.description;
         if (dto.categoryId !== undefined)

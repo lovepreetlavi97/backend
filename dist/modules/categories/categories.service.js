@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const uploads_service_1 = require("../uploads/uploads.service");
 const redis_service_1 = require("../../shared/redis/redis.service");
+const storage_util_1 = require("../../common/utils/storage.util");
 const slugify_1 = require("slugify");
 let CategoriesService = class CategoriesService {
     constructor(prisma, uploadsService, redis) {
@@ -157,10 +158,10 @@ let CategoriesService = class CategoriesService {
         if (existing) {
             throw new common_1.ConflictException('Category with this name already exists.');
         }
-        let imageUrl = typeof dto.image === 'string' ? dto.image : null;
+        let imageUrl = typeof dto.image === 'string' ? (0, storage_util_1.normalizeMediaKey)(dto.image) : null;
         if (file) {
             const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
-            imageUrl = uploadRes.key;
+            imageUrl = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
         }
         const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
         const category = await this.prisma.category.create({
@@ -210,10 +211,10 @@ let CategoriesService = class CategoriesService {
         }
         if (file) {
             const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
-            dataToUpdate.image = uploadRes.key;
+            dataToUpdate.image = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
         }
         else if (typeof dto.image === 'string') {
-            dataToUpdate.image = dto.image;
+            dataToUpdate.image = (0, storage_util_1.normalizeMediaKey)(dto.image);
         }
         const updated = await this.prisma.category.update({
             where: { id },

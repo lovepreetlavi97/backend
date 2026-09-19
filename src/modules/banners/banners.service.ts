@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { RedisService } from '../../shared/redis/redis.service';
+import { normalizeMediaKey } from '../../common/utils/storage.util';
 
 @Injectable()
 export class BannersService {
@@ -126,8 +127,8 @@ export class BannersService {
   }
 
   async createBanner(dto: any, file?: Express.Multer.File) {
-    let imageUrl = '';
-    let imageKey = '';
+    let imageUrl = normalizeMediaKey(dto.imageUrl || dto.image || '');
+    let imageKey = imageUrl;
 
     if (file) {
       const result = await this.uploadsService.uploadAndCompressImage(
@@ -136,8 +137,8 @@ export class BannersService {
         file.mimetype,
         'banners',
       );
-      imageUrl = result.key;
-      imageKey = result.key;
+      imageUrl = normalizeMediaKey(result.key);
+      imageKey = imageUrl;
     }
 
     let metalIdsArray: string[] = [];
@@ -182,8 +183,8 @@ export class BannersService {
       throw new NotFoundException(`Banner with ID '${id}' not found.`);
     }
 
-    let imageUrl = existing.imageUrl;
-    let imageKey = existing.image;
+    let imageUrl = normalizeMediaKey(existing.imageUrl);
+    let imageKey = normalizeMediaKey(existing.image);
 
     if (file) {
       const result = await this.uploadsService.uploadAndCompressImage(
@@ -192,8 +193,11 @@ export class BannersService {
         file.mimetype,
         'banners',
       );
-      imageUrl = result.key;
-      imageKey = result.key;
+      imageUrl = normalizeMediaKey(result.key);
+      imageKey = imageUrl;
+    } else if (dto.imageUrl !== undefined || dto.image !== undefined) {
+      imageUrl = normalizeMediaKey(dto.imageUrl || dto.image || '');
+      imageKey = imageUrl;
     }
 
     let metalIdsArray = existing.metalIds;

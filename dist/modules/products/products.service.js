@@ -13,6 +13,7 @@ exports.ProductsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const redis_service_1 = require("../../shared/redis/redis.service");
+const storage_util_1 = require("../../common/utils/storage.util");
 const slugify_1 = require("slugify");
 const crypto = require("crypto");
 const isValidUUID = (str) => {
@@ -383,7 +384,7 @@ let ProductsService = class ProductsService {
                 slug,
                 sku,
                 description: dto.description || '',
-                images: imagesList,
+                images: (0, storage_util_1.normalizeMediaKeyList)(imagesList),
                 weightGrams,
                 grossWeight,
                 netGoldWeight,
@@ -444,7 +445,7 @@ let ProductsService = class ProductsService {
                     imagesList.unshift(cleanMain);
                 }
             }
-            data.images = imagesList;
+            data.images = (0, storage_util_1.normalizeMediaKeyList)(imagesList);
         }
         if (dto.weightGrams !== undefined || dto.weight !== undefined) {
             data.weightGrams = dto.weightGrams !== undefined ? Number(dto.weightGrams) : Number(dto.weight);
