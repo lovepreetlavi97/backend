@@ -14,15 +14,18 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RelationsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const filter_config_service_1 = require("./filter-config.service");
+const uploads_service_1 = require("../uploads/uploads.service");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
 let RelationsController = class RelationsController {
-    constructor(filterConfigService) {
+    constructor(filterConfigService, uploadsService) {
         this.filterConfigService = filterConfigService;
+        this.uploadsService = uploadsService;
     }
     async getAllRelations(status) {
         let relations = await this.filterConfigService.getRecipientsList();
@@ -33,6 +36,9 @@ let RelationsController = class RelationsController {
             _id: r._id,
             id: r._id,
             name: r.name,
+            description: r.description || '',
+            image: r.image || r.icon || '',
+            icon: r.image || r.icon || '',
             slug: r.slug,
             isActive: r.isActive !== undefined ? r.isActive : true,
         }));
@@ -44,12 +50,33 @@ let RelationsController = class RelationsController {
             },
         };
     }
-    async createRelation(dto) {
-        const relation = await this.filterConfigService.addRecipient(dto);
+    async createRelation(file, dto) {
+        let imageUrl = dto.image || dto.icon || '';
+        if (file) {
+            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'relations');
+            imageUrl = uploadRes.key || uploadRes.url;
+        }
+        const payload = {
+            ...dto,
+            image: imageUrl,
+            icon: imageUrl,
+            isActive: dto.isActive !== undefined ? (dto.isActive === true || dto.isActive === 'true') : true,
+        };
+        const relation = await this.filterConfigService.addRecipient(payload);
         return { status: 'success', data: { relation } };
     }
-    async updateRelation(id, dto) {
-        const relation = await this.filterConfigService.updateRecipient(id, dto);
+    async updateRelation(id, file, dto) {
+        let imageUrl = dto.image || dto.icon;
+        if (file) {
+            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'relations');
+            imageUrl = uploadRes.key || uploadRes.url;
+        }
+        const payload = {
+            ...dto,
+            ...(imageUrl !== undefined ? { image: imageUrl, icon: imageUrl } : {}),
+            ...(dto.isActive !== undefined ? { isActive: dto.isActive === true || dto.isActive === 'true' } : {}),
+        };
+        const relation = await this.filterConfigService.updateRecipient(id, payload);
         return { status: 'success', data: { relation } };
     }
     async toggleRelationStatus(id) {
@@ -78,10 +105,12 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.SUPERADMIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('image')),
     (0, swagger_1.ApiOperation)({ summary: 'Create new relation/recipient' }),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], RelationsController.prototype, "createRelation", null);
 __decorate([
@@ -89,11 +118,13 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.SUPERADMIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('image')),
     (0, swagger_1.ApiOperation)({ summary: 'Update relation/recipient by ID' }),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], RelationsController.prototype, "updateRelation", null);
 __decorate([
@@ -121,6 +152,7 @@ __decorate([
 exports.RelationsController = RelationsController = __decorate([
     (0, swagger_1.ApiTags)('Admin - Relations/Recipients'),
     (0, common_1.Controller)('relations'),
-    __metadata("design:paramtypes", [filter_config_service_1.FilterConfigService])
+    __metadata("design:paramtypes", [filter_config_service_1.FilterConfigService,
+        uploads_service_1.UploadsService])
 ], RelationsController);
 //# sourceMappingURL=relations.controller.js.map

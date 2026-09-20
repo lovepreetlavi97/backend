@@ -40,8 +40,11 @@ export declare class FilterConfigService {
     addRecipient(dto: any): Promise<{
         _id: string;
         name: any;
+        description: any;
+        image: any;
+        icon: any;
         slug: string;
-        isActive: any;
+        isActive: boolean;
     }>;
     updateRecipient(id: string, dto: any): Promise<RecipientDto>;
     deleteRecipient(id: string): Promise<{

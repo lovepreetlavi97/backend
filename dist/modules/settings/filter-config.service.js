@@ -265,8 +265,11 @@ let FilterConfigService = FilterConfigService_1 = class FilterConfigService {
         const newRecipient = {
             _id: Math.random().toString(36).slice(2, 11),
             name: dto.name,
-            slug: (0, slugify_1.default)(dto.name, { lower: true, strict: true }),
-            isActive: dto.isActive !== undefined ? dto.isActive : true,
+            description: dto.description || '',
+            image: dto.image || dto.icon || '',
+            icon: dto.image || dto.icon || '',
+            slug: (0, slugify_1.default)(dto.name || 'relation', { lower: true, strict: true }),
+            isActive: dto.isActive !== undefined ? (dto.isActive === true || dto.isActive === 'true') : true,
         };
         recipients.unshift(newRecipient);
         config.recipients = recipients;
@@ -282,6 +285,11 @@ let FilterConfigService = FilterConfigService_1 = class FilterConfigService {
         recipients[index] = {
             ...recipients[index],
             ...dto,
+            name: dto.name !== undefined ? dto.name : recipients[index].name,
+            description: dto.description !== undefined ? dto.description : recipients[index].description,
+            image: dto.image !== undefined ? dto.image : recipients[index].image,
+            icon: dto.icon !== undefined ? dto.icon : (dto.image !== undefined ? dto.image : recipients[index].icon),
+            slug: dto.name ? (0, slugify_1.default)(dto.name, { lower: true, strict: true }) : recipients[index].slug,
         };
         config.recipients = recipients;
         await this.updateGiftStoreConfig(config);

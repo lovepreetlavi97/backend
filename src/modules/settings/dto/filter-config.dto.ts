@@ -94,6 +94,21 @@ export class RecipientDto {
   @IsString()
   @IsNotEmpty()
   slug: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsString()
+  @IsOptional()
+  icon?: string;
+
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class UpdateGiftStoreConfigDto {

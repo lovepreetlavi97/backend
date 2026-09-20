@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Patch, Query, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FilterConfigService } from './filter-config.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,7 +11,10 @@ import { Role } from '@prisma/client';
 @ApiTags('Admin - Relations/Recipients')
 @Controller('relations')
 export class RelationsController {
-  constructor(private readonly filterConfigService: FilterConfigService) {}
+  constructor(
+    private readonly filterConfigService: FilterConfigService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get relations/recipients (defaults to active for public)' })
@@ -22,6 +27,9 @@ export class RelationsController {
       _id: r._id,
       id: r._id,
       name: r.name,
+      description: r.description || '',
+      image: r.image || r.icon || '',
+      icon: r.image || r.icon || '',
       slug: r.slug,
       isActive: r.isActive !== undefined ? r.isActive : true,
     }));
@@ -38,9 +46,29 @@ export class RelationsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({ summary: 'Create new relation/recipient' })
-  async createRelation(@Body() dto: any) {
-    const relation = await this.filterConfigService.addRecipient(dto);
+  async createRelation(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: any,
+  ) {
+    let imageUrl = dto.image || dto.icon || '';
+    if (file) {
+      const uploadRes = await this.uploadsService.uploadAndCompressImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        'relations',
+      );
+      imageUrl = uploadRes.key || uploadRes.url;
+    }
+    const payload = {
+      ...dto,
+      image: imageUrl,
+      icon: imageUrl,
+      isActive: dto.isActive !== undefined ? (dto.isActive === true || dto.isActive === 'true') : true,
+    };
+    const relation = await this.filterConfigService.addRecipient(payload);
     return { status: 'success', data: { relation } };
   }
 
@@ -48,9 +76,29 @@ export class RelationsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({ summary: 'Update relation/recipient by ID' })
-  async updateRelation(@Param('id') id: string, @Body() dto: any) {
-    const relation = await this.filterConfigService.updateRecipient(id, dto);
+  async updateRelation(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: any,
+  ) {
+    let imageUrl = dto.image || dto.icon;
+    if (file) {
+      const uploadRes = await this.uploadsService.uploadAndCompressImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        'relations',
+      );
+      imageUrl = uploadRes.key || uploadRes.url;
+    }
+    const payload = {
+      ...dto,
+      ...(imageUrl !== undefined ? { image: imageUrl, icon: imageUrl } : {}),
+      ...(dto.isActive !== undefined ? { isActive: dto.isActive === true || dto.isActive === 'true' } : {}),
+    };
+    const relation = await this.filterConfigService.updateRecipient(id, payload);
     return { status: 'success', data: { relation } };
   }
 
