@@ -34,12 +34,32 @@ export class CategoriesService {
       select: { id: true, name: true, slug: true },
     });
 
-    const defaultMetals = allActiveMetals.map((m) => ({
-      _id: m.id,
-      id: m.id,
-      name: m.name,
-      slug: m.slug,
-    }));
+    const getCategoryMetals = (cat: any) => {
+      if (cat.metalIds && Array.isArray(cat.metalIds) && cat.metalIds.length > 0) {
+        return allActiveMetals
+          .filter((m) => cat.metalIds.includes(m.id))
+          .map((m) => ({
+            _id: m.id,
+            id: m.id,
+            name: m.name,
+            slug: m.slug,
+          }));
+      }
+
+      const metalMap = new Map<string, any>();
+      (cat.products || []).forEach((p: any) => {
+        if (p.metal) {
+          metalMap.set(p.metal.id, {
+            _id: p.metal.id,
+            id: p.metal.id,
+            name: p.metal.name,
+            slug: p.metal.slug,
+          });
+        }
+      });
+
+      return Array.from(metalMap.values());
+    };
 
     if (page && limit) {
       const skip = (page - 1) * limit;
@@ -58,18 +78,7 @@ export class CategoriesService {
       ]);
 
       const mapped = categories.map((cat) => {
-        const metalMap = new Map<string, any>();
-        cat.products.forEach((p: any) => {
-          if (p.metal) {
-            metalMap.set(p.metal.id, {
-              _id: p.metal.id,
-              id: p.metal.id,
-              name: p.metal.name,
-              slug: p.metal.slug,
-            });
-          }
-        });
-        const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+        const categoryMetals = getCategoryMetals(cat);
 
         return {
           ...cat,
@@ -106,18 +115,7 @@ export class CategoriesService {
     });
 
     return categories.map((cat) => {
-      const metalMap = new Map<string, any>();
-      cat.products.forEach((p: any) => {
-        if (p.metal) {
-          metalMap.set(p.metal.id, {
-            _id: p.metal.id,
-            id: p.metal.id,
-            name: p.metal.name,
-            slug: p.metal.slug,
-          });
-        }
-      });
-      const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+      const categoryMetals = getCategoryMetals(cat);
 
       return {
         ...cat,
@@ -142,7 +140,7 @@ export class CategoriesService {
       },
       include: {
         subcategories: { where: { isDeleted: false } },
-        products: { where: { isDeleted: false, isPublished: true } },
+        products: { where: { isDeleted: false, isPublished: true }, select: { id: true, metal: true } },
       },
     });
 
@@ -150,10 +148,41 @@ export class CategoriesService {
       throw new NotFoundException(`Category '${identifier}' not found.`);
     }
 
+    const allActiveMetals = await this.prisma.metal.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true },
+    });
+
+    let categoryMetals: any[] = [];
+    if (category.metalIds && Array.isArray(category.metalIds) && category.metalIds.length > 0) {
+      categoryMetals = allActiveMetals
+        .filter((m) => category.metalIds.includes(m.id))
+        .map((m) => ({
+          _id: m.id,
+          id: m.id,
+          name: m.name,
+          slug: m.slug,
+        }));
+    } else {
+      const metalMap = new Map<string, any>();
+      (category.products || []).forEach((p: any) => {
+        if (p.metal) {
+          metalMap.set(p.metal.id, {
+            _id: p.metal.id,
+            id: p.metal.id,
+            name: p.metal.name,
+            slug: p.metal.slug,
+          });
+        }
+      });
+      categoryMetals = Array.from(metalMap.values());
+    }
+
     return {
       ...category,
       _id: category.id,
-      metalIds: [],
+      metalIds: categoryMetals,
+      metals: categoryMetals,
       isActive: true,
     };
   }
@@ -186,6 +215,17 @@ export class CategoriesService {
 
     const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
 
+    let metalIdsArray: string[] = [];
+    if (dto.metalIds) {
+      if (Array.isArray(dto.metalIds)) {
+        metalIdsArray = dto.metalIds;
+      } else if (typeof dto.metalIds === 'string') {
+        metalIdsArray = dto.metalIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+      } else {
+        metalIdsArray = [dto.metalIds];
+      }
+    }
+
     const category = await this.prisma.category.create({
       data: {
         name: rawName,
@@ -193,17 +233,13 @@ export class CategoriesService {
         description: dto.description || null,
         image: imageUrl,
         isFeatured,
+        metalIds: metalIdsArray,
       },
     });
 
     await this.redis.delPattern('cache:*').catch(() => null);
 
-    return {
-      ...category,
-      _id: category.id,
-      metalIds: [],
-      isActive: true,
-    };
+    return this.findBySlugOrId(category.id);
   }
 
   async update(id: string, dto: any, file?: Express.Multer.File) {
@@ -239,6 +275,18 @@ export class CategoriesService {
       dataToUpdate.isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
     }
 
+    if (dto.metalIds !== undefined) {
+      let metalIdsArray: string[] = [];
+      if (Array.isArray(dto.metalIds)) {
+        metalIdsArray = dto.metalIds;
+      } else if (typeof dto.metalIds === 'string') {
+        metalIdsArray = dto.metalIds.split(',').map((mId: string) => mId.trim()).filter(Boolean);
+      } else {
+        metalIdsArray = [dto.metalIds];
+      }
+      dataToUpdate.metalIds = metalIdsArray;
+    }
+
     if (file) {
       const uploadRes = await this.uploadsService.uploadAndCompressImage(
         file.buffer,
@@ -258,12 +306,7 @@ export class CategoriesService {
 
     await this.redis.delPattern('cache:*').catch(() => null);
 
-    return {
-      ...updated,
-      _id: updated.id,
-      metalIds: [],
-      isActive: true,
-    };
+    return this.findBySlugOrId(updated.id);
   }
 
   async delete(id: string) {
