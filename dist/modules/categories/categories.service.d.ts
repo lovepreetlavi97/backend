@@ -150,6 +150,7 @@ export declare class CategoriesService {
         isFeatured: boolean;
         image: string | null;
     }>;
+    private generateUniqueSlug;
     create(dto: any, file?: Express.Multer.File): Promise<{
         _id: string;
         metalIds: any[];

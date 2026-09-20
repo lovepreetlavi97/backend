@@ -172,24 +172,59 @@ let CategoriesService = class CategoriesService {
             isActive: true,
         };
     }
+    async generateUniqueSlug(baseName, metalIds = [], excludeId) {
+        const baseSlug = (0, slugify_1.default)(baseName, { lower: true, strict: true }) || 'category';
+        const existingBase = await this.prisma.category.findFirst({
+            where: {
+                slug: baseSlug,
+                ...(excludeId ? { id: { not: excludeId } } : {}),
+                isDeleted: false,
+            },
+        });
+        if (!existingBase) {
+            return baseSlug;
+        }
+        if (metalIds && metalIds.length > 0) {
+            const metals = await this.prisma.metal.findMany({
+                where: { id: { in: metalIds } },
+                select: { slug: true, name: true },
+            });
+            for (const m of metals) {
+                const metalSuffix = (0, slugify_1.default)(m.slug || m.name, { lower: true, strict: true });
+                const candidate = `${baseSlug}-${metalSuffix}`;
+                const existingCandidate = await this.prisma.category.findFirst({
+                    where: {
+                        slug: candidate,
+                        ...(excludeId ? { id: { not: excludeId } } : {}),
+                        isDeleted: false,
+                    },
+                });
+                if (!existingCandidate) {
+                    return candidate;
+                }
+            }
+        }
+        let counter = 1;
+        while (true) {
+            const candidate = `${baseSlug}-${counter}`;
+            const exists = await this.prisma.category.findFirst({
+                where: {
+                    slug: candidate,
+                    ...(excludeId ? { id: { not: excludeId } } : {}),
+                    isDeleted: false,
+                },
+            });
+            if (!exists) {
+                return candidate;
+            }
+            counter++;
+        }
+    }
     async create(dto, file) {
         const rawName = typeof dto.name === 'string' ? dto.name.trim() : '';
         if (!rawName) {
             throw new common_1.ConflictException('Category name is required.');
         }
-        const slug = (0, slugify_1.default)(rawName, { lower: true, strict: true }) || `cat-${Date.now()}`;
-        const existing = await this.prisma.category.findFirst({
-            where: { OR: [{ name: rawName }, { slug }], isDeleted: false },
-        });
-        if (existing) {
-            throw new common_1.ConflictException('Category with this name already exists.');
-        }
-        let imageUrl = typeof dto.image === 'string' ? (0, storage_util_1.normalizeMediaKey)(dto.image) : null;
-        if (file) {
-            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
-            imageUrl = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
-        }
-        const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
         let metalIdsArray = [];
         if (dto.metalIds) {
             if (Array.isArray(dto.metalIds)) {
@@ -202,6 +237,28 @@ let CategoriesService = class CategoriesService {
                 metalIdsArray = [dto.metalIds];
             }
         }
+        const sameNameCategories = await this.prisma.category.findMany({
+            where: {
+                name: { equals: rawName, mode: 'insensitive' },
+                isDeleted: false,
+            },
+        });
+        const duplicate = sameNameCategories.find((cat) => {
+            const catMetals = cat.metalIds || [];
+            if (metalIdsArray.length === 0 && catMetals.length === 0)
+                return true;
+            return metalIdsArray.some((mId) => catMetals.includes(mId));
+        });
+        if (duplicate) {
+            throw new common_1.ConflictException('A category with this name already exists for the selected metal(s).');
+        }
+        const slug = await this.generateUniqueSlug(rawName, metalIdsArray);
+        let imageUrl = typeof dto.image === 'string' ? (0, storage_util_1.normalizeMediaKey)(dto.image) : null;
+        if (file) {
+            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
+            imageUrl = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
+        }
+        const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
         const category = await this.prisma.category.create({
             data: {
                 name: rawName,
@@ -223,28 +280,8 @@ let CategoriesService = class CategoriesService {
             throw new common_1.NotFoundException(`Category with ID '${id}' not found.`);
         }
         const dataToUpdate = {};
-        if (dto.name) {
-            const rawName = dto.name.trim();
-            if (rawName && rawName !== existing.name) {
-                const slug = (0, slugify_1.default)(rawName, { lower: true, strict: true }) || `cat-${Date.now()}`;
-                const duplicate = await this.prisma.category.findFirst({
-                    where: { OR: [{ name: rawName }, { slug }], id: { not: id }, isDeleted: false },
-                });
-                if (duplicate) {
-                    throw new common_1.ConflictException('Category with this name already exists.');
-                }
-                dataToUpdate.name = rawName;
-                dataToUpdate.slug = slug;
-            }
-        }
-        if (dto.description !== undefined) {
-            dataToUpdate.description = dto.description;
-        }
-        if (dto.isFeatured !== undefined) {
-            dataToUpdate.isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
-        }
+        let metalIdsArray = existing.metalIds || [];
         if (dto.metalIds !== undefined) {
-            let metalIdsArray = [];
             if (Array.isArray(dto.metalIds)) {
                 metalIdsArray = dto.metalIds;
             }
@@ -255,6 +292,31 @@ let CategoriesService = class CategoriesService {
                 metalIdsArray = [dto.metalIds];
             }
             dataToUpdate.metalIds = metalIdsArray;
+        }
+        if (dto.name) {
+            const rawName = dto.name.trim();
+            if (rawName) {
+                const sameNameCategories = await this.prisma.category.findMany({
+                    where: {
+                        name: { equals: rawName, mode: 'insensitive' },
+                        id: { not: id },
+                        isDeleted: false,
+                    },
+                });
+                const duplicate = sameNameCategories.find((cat) => {
+                    const catMetals = cat.metalIds || [];
+                    if (metalIdsArray.length === 0 && catMetals.length === 0)
+                        return true;
+                    return metalIdsArray.some((mId) => catMetals.includes(mId));
+                });
+                if (duplicate) {
+                    throw new common_1.ConflictException('A category with this name already exists for the selected metal(s).');
+                }
+                dataToUpdate.name = rawName;
+                if (rawName !== existing.name) {
+                    dataToUpdate.slug = await this.generateUniqueSlug(rawName, metalIdsArray, id);
+                }
+            }
         }
         if (file) {
             const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
