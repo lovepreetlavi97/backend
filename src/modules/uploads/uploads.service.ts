@@ -56,7 +56,7 @@ export class UploadsService {
       key = `${cleanFolder}/${filename}`;
     }
 
-    const useLocal = process.env.NODE_ENV === 'development' || !process.env.AWS_ACCESS_KEY_ID;
+    const useLocal = !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY;
     if (useLocal) {
       const uploadUrl = `http://localhost:5000/api/v1/upload/local-presigned?key=${key}`;
       return {
