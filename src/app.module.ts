@@ -31,7 +31,7 @@ import { VendorModule } from './modules/vendor/vendor.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 100,
+        limit: 500,
       },
     ]),
     PrismaModule,
