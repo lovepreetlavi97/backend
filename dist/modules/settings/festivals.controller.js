@@ -27,13 +27,21 @@ let FestivalsController = class FestivalsController {
         this.filterConfigService = filterConfigService;
         this.uploadsService = uploadsService;
     }
-    async getAllFestivals(status, search, page, limit) {
+    async getAllFestivals(status, search, page, limit, metalId) {
         let festivals = await this.filterConfigService.getOccasionsList();
         if (status === 'active') {
             festivals = festivals.filter((f) => f.isActive !== false && f.status !== 'inactive');
         }
         else if (status === 'inactive') {
             festivals = festivals.filter((f) => f.isActive === false || f.status === 'inactive');
+        }
+        if (metalId && metalId.trim() !== '' && metalId.toLowerCase() !== 'all') {
+            const mid = metalId.trim();
+            festivals = festivals.filter((f) => {
+                if (!f.metalIds || !Array.isArray(f.metalIds) || f.metalIds.length === 0)
+                    return false;
+                return f.metalIds.includes(mid);
+            });
         }
         if (search && search.trim()) {
             const q = search.trim().toLowerCase();
@@ -147,8 +155,9 @@ __decorate([
     __param(1, (0, common_1.Query)('search')),
     __param(2, (0, common_1.Query)('page')),
     __param(3, (0, common_1.Query)('limit')),
+    __param(4, (0, common_1.Query)('metalId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], FestivalsController.prototype, "getAllFestivals", null);
 __decorate([

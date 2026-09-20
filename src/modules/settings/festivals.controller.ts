@@ -23,6 +23,7 @@ export class FestivalsController {
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('metalId') metalId?: string,
   ) {
     let festivals = await this.filterConfigService.getOccasionsList();
 
@@ -30,6 +31,14 @@ export class FestivalsController {
       festivals = festivals.filter((f: any) => f.isActive !== false && f.status !== 'inactive');
     } else if (status === 'inactive') {
       festivals = festivals.filter((f: any) => f.isActive === false || f.status === 'inactive');
+    }
+
+    if (metalId && metalId.trim() !== '' && metalId.toLowerCase() !== 'all') {
+      const mid = metalId.trim();
+      festivals = festivals.filter((f: any) => {
+        if (!f.metalIds || !Array.isArray(f.metalIds) || f.metalIds.length === 0) return false;
+        return f.metalIds.includes(mid);
+      });
     }
 
     if (search && search.trim()) {

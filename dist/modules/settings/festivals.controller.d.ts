@@ -4,7 +4,7 @@ export declare class FestivalsController {
     private readonly filterConfigService;
     private readonly uploadsService;
     constructor(filterConfigService: FilterConfigService, uploadsService: UploadsService);
-    getAllFestivals(status?: string, search?: string, page?: string, limit?: string): Promise<{
+    getAllFestivals(status?: string, search?: string, page?: string, limit?: string, metalId?: string): Promise<{
         status: string;
         data: {
             festivals: {

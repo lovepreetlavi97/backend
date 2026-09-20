@@ -40,10 +40,24 @@ export class BannersService {
     }
 
     if (params?.metalId && params.metalId.trim() !== '' && params.metalId.toLowerCase() !== 'all') {
-      where.OR = [
-        { metalIds: { has: params.metalId } },
-        { metalIds: { isEmpty: true } },
-      ];
+      const metalParam = params.metalId.trim();
+      let targetMetalId = metalParam;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metalParam);
+      if (!isUuid) {
+        const foundMetal = await this.prisma.metal.findFirst({
+          where: {
+            OR: [
+              { slug: { equals: metalParam.toLowerCase() } },
+              { name: { equals: metalParam, mode: 'insensitive' } },
+            ],
+          },
+        });
+        if (foundMetal) {
+          targetMetalId = foundMetal.id;
+        }
+      }
+
+      where.metalIds = { has: targetMetalId };
     }
 
     const banners = await this.prisma.banner.findMany({
