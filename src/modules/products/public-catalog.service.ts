@@ -178,7 +178,6 @@ export class PublicCatalogService {
     if (targetMetalId) {
       where.OR = [
         { metalIds: { has: targetMetalId } },
-        { metalIds: { isEmpty: true } },
         { products: { some: { metalId: targetMetalId, isDeleted: false, isPublished: true } } },
       ];
     }
