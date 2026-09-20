@@ -141,6 +141,7 @@ export declare class VendorController {
                     slug: string;
                     isFeatured: boolean;
                     image: string | null;
+                    metalIds: string[];
                 };
                 metal: {
                     type: import(".prisma/client").$Enums.MetalType;
@@ -231,6 +232,7 @@ export declare class VendorController {
                     slug: string;
                     isFeatured: boolean;
                     image: string | null;
+                    metalIds: string[];
                 };
                 metal: {
                     type: import(".prisma/client").$Enums.MetalType;

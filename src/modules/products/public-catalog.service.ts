@@ -147,15 +147,44 @@ export class PublicCatalogService {
     return response;
   }
 
-  async getCategoryMenu() {
-    const cacheKey = 'cache:category_menu';
+  async getCategoryMenu(metalParam?: string) {
+    const cacheKey = `cache:category_menu:${metalParam || 'all'}`;
     const cachedData = await this.redis.get<any>(cacheKey);
     if (cachedData) {
       return cachedData;
     }
 
+    let targetMetalId: string | undefined = undefined;
+    if (metalParam && metalParam.trim() !== '' && metalParam.toLowerCase() !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metalParam);
+      if (isUuid) {
+        targetMetalId = metalParam;
+      } else {
+        const foundMetal = await this.prisma.metal.findFirst({
+          where: {
+            OR: [
+              { slug: { equals: metalParam.toLowerCase() } },
+              { name: { equals: metalParam, mode: 'insensitive' } },
+            ],
+          },
+        });
+        if (foundMetal) {
+          targetMetalId = foundMetal.id;
+        }
+      }
+    }
+
+    const where: any = { isDeleted: false };
+    if (targetMetalId) {
+      where.OR = [
+        { metalIds: { has: targetMetalId } },
+        { metalIds: { isEmpty: true } },
+        { products: { some: { metalId: targetMetalId, isDeleted: false, isPublished: true } } },
+      ];
+    }
+
     const categories = await this.prisma.category.findMany({
-      where: { isDeleted: false },
+      where,
       include: { subcategories: { where: { isDeleted: false } } },
       orderBy: { name: 'asc' },
     });
@@ -165,17 +194,42 @@ export class PublicCatalogService {
       data: categories,
     };
 
-    await this.redis.set(cacheKey, response, 300);
+    await this.redis.set(cacheKey, response, 120);
     return response;
   }
 
-  async getEssentials() {
-    const cacheKey = 'cache:essentials';
+  async getEssentials(metalParam?: string) {
+    const cacheKey = `cache:essentials:${metalParam || 'all'}`;
     const cached = await this.redis.get<any>(cacheKey);
     if (cached) return cached;
 
+    let targetMetalId: string | undefined = undefined;
+    if (metalParam && metalParam.trim() !== '' && metalParam.toLowerCase() !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metalParam);
+      if (isUuid) {
+        targetMetalId = metalParam;
+      } else {
+        const foundMetal = await this.prisma.metal.findFirst({
+          where: {
+            OR: [
+              { slug: { equals: metalParam.toLowerCase() } },
+              { name: { equals: metalParam, mode: 'insensitive' } },
+            ],
+          },
+        });
+        if (foundMetal) {
+          targetMetalId = foundMetal.id;
+        }
+      }
+    }
+
     const rawProducts = await this.prisma.product.findMany({
-      where: { isDeleted: false, isPublished: true, approvalStatus: 'APPROVED' },
+      where: {
+        isDeleted: false,
+        isPublished: true,
+        approvalStatus: 'APPROVED',
+        ...(targetMetalId ? { metalId: targetMetalId } : {}),
+      },
       include: { category: true, subcategory: true, metal: true, priceRule: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 8,
@@ -185,7 +239,7 @@ export class PublicCatalogService {
       status: 'success',
       data: { products },
     };
-    await this.redis.set(cacheKey, response, 300).catch(() => null);
+    await this.redis.set(cacheKey, response, 120).catch(() => null);
     return response;
   }
 

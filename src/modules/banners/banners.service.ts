@@ -39,6 +39,13 @@ export class BannersService {
       where.isActive = true;
     }
 
+    if (params?.metalId && params.metalId.trim() !== '' && params.metalId.toLowerCase() !== 'all') {
+      where.OR = [
+        { metalIds: { has: params.metalId } },
+        { metalIds: { isEmpty: true } },
+      ];
+    }
+
     const banners = await this.prisma.banner.findMany({
       where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

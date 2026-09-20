@@ -21,8 +21,8 @@ export class PublicController {
 
   @Get('categories/menu')
   @ApiOperation({ summary: 'Get category dropdown menu' })
-  async getCategoryMenu() {
-    return this.publicCatalogService.getCategoryMenu();
+  async getCategoryMenu(@Query('metalId') metalId?: string) {
+    return this.publicCatalogService.getCategoryMenu(metalId);
   }
 
   @Get('curated-collections')
@@ -93,8 +93,8 @@ export class PublicController {
 
   @Get('user/products/essentials')
   @ApiOperation({ summary: 'Get shop essentials' })
-  async getEssentials() {
-    return this.publicCatalogService.getEssentials();
+  async getEssentials(@Query('metalId') metalId?: string) {
+    return this.publicCatalogService.getEssentials(metalId);
   }
 
   @Get('user/trending-products')
@@ -123,8 +123,8 @@ export class PublicController {
 
   @Get('user/categories')
   @ApiOperation({ summary: 'Get list of categories (user view)' })
-  async getUserCategories() {
-    return this.publicCatalogService.getUserCategories();
+  async getUserCategories(@Query('metalId') metalId?: string) {
+    return this.publicCatalogService.getCategoryMenu(metalId);
   }
 
   @Get('user/product/:slug')

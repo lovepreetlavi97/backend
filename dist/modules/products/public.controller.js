@@ -27,8 +27,8 @@ let PublicController = class PublicController {
     async getHomepage() {
         return this.publicCatalogService.getHomepage();
     }
-    async getCategoryMenu() {
-        return this.publicCatalogService.getCategoryMenu();
+    async getCategoryMenu(metalId) {
+        return this.publicCatalogService.getCategoryMenu(metalId);
     }
     async getCuratedCollectionsAdmin() {
         const collections = await this.publicCatalogService.getFeaturedSubcategories('/images/default-collection.jpg', 'Exclusive curated collection');
@@ -75,8 +75,8 @@ let PublicController = class PublicController {
             data: recipients,
         };
     }
-    async getEssentials() {
-        return this.publicCatalogService.getEssentials();
+    async getEssentials(metalId) {
+        return this.publicCatalogService.getEssentials(metalId);
     }
     async getTrendingProducts(metalId, limit) {
         return this.publicCatalogService.getTrendingProducts(metalId, limit ? Number(limit) : 4);
@@ -90,8 +90,8 @@ let PublicController = class PublicController {
     async getHomeSearch(queryStr) {
         return this.publicCatalogService.getHomeSearch(queryStr);
     }
-    async getUserCategories() {
-        return this.publicCatalogService.getUserCategories();
+    async getUserCategories(metalId) {
+        return this.publicCatalogService.getCategoryMenu(metalId);
     }
     async getProductBySlug(slug) {
         const product = await this.productsService.findBySlug(slug);
@@ -156,8 +156,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)('categories/menu'),
     (0, swagger_1.ApiOperation)({ summary: 'Get category dropdown menu' }),
+    __param(0, (0, common_1.Query)('metalId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], PublicController.prototype, "getCategoryMenu", null);
 __decorate([
@@ -198,8 +199,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)('user/products/essentials'),
     (0, swagger_1.ApiOperation)({ summary: 'Get shop essentials' }),
+    __param(0, (0, common_1.Query)('metalId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], PublicController.prototype, "getEssentials", null);
 __decorate([
@@ -237,8 +239,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)('user/categories'),
     (0, swagger_1.ApiOperation)({ summary: 'Get list of categories (user view)' }),
+    __param(0, (0, common_1.Query)('metalId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], PublicController.prototype, "getUserCategories", null);
 __decorate([

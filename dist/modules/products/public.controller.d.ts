@@ -7,7 +7,7 @@ export declare class PublicController {
     private readonly filterConfigService;
     constructor(productsService: ProductsService, publicCatalogService: PublicCatalogService, filterConfigService: FilterConfigService);
     getHomepage(): Promise<any>;
-    getCategoryMenu(): Promise<any>;
+    getCategoryMenu(metalId?: string): Promise<any>;
     getCuratedCollectionsAdmin(): Promise<{
         status: string;
         data: {
@@ -68,7 +68,7 @@ export declare class PublicController {
         status: string;
         data: import("../settings/dto/filter-config.dto").RecipientDto[];
     }>;
-    getEssentials(): Promise<any>;
+    getEssentials(metalId?: string): Promise<any>;
     getTrendingProducts(metalId?: string, limit?: number): Promise<any>;
     getCuratedCollections(): Promise<any>;
     getFestivals(metalId?: string): Promise<any>;
@@ -133,7 +133,7 @@ export declare class PublicController {
             }[];
         };
     }>;
-    getUserCategories(): Promise<any>;
+    getUserCategories(metalId?: string): Promise<any>;
     getProductBySlug(slug: string): Promise<{
         status: string;
         data: {

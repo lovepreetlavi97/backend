@@ -62,8 +62,8 @@ export declare class PublicCatalogService {
         description: string;
     }[]>;
     getHomepage(): Promise<any>;
-    getCategoryMenu(): Promise<any>;
-    getEssentials(): Promise<any>;
+    getCategoryMenu(metalParam?: string): Promise<any>;
+    getEssentials(metalParam?: string): Promise<any>;
     getTrendingProducts(metalParam?: string, limit?: number): Promise<any>;
     getCuratedCollections(): Promise<any>;
     getFestivals(metalId?: string): Promise<any>;

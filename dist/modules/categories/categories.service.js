@@ -33,12 +33,30 @@ let CategoriesService = class CategoriesService {
             where: { isActive: true },
             select: { id: true, name: true, slug: true },
         });
-        const defaultMetals = allActiveMetals.map((m) => ({
-            _id: m.id,
-            id: m.id,
-            name: m.name,
-            slug: m.slug,
-        }));
+        const getCategoryMetals = (cat) => {
+            if (cat.metalIds && Array.isArray(cat.metalIds) && cat.metalIds.length > 0) {
+                return allActiveMetals
+                    .filter((m) => cat.metalIds.includes(m.id))
+                    .map((m) => ({
+                    _id: m.id,
+                    id: m.id,
+                    name: m.name,
+                    slug: m.slug,
+                }));
+            }
+            const metalMap = new Map();
+            (cat.products || []).forEach((p) => {
+                if (p.metal) {
+                    metalMap.set(p.metal.id, {
+                        _id: p.metal.id,
+                        id: p.metal.id,
+                        name: p.metal.name,
+                        slug: p.metal.slug,
+                    });
+                }
+            });
+            return Array.from(metalMap.values());
+        };
         if (page && limit) {
             const skip = (page - 1) * limit;
             const [categories, total] = await Promise.all([
@@ -55,18 +73,7 @@ let CategoriesService = class CategoriesService {
                 this.prisma.category.count({ where }),
             ]);
             const mapped = categories.map((cat) => {
-                const metalMap = new Map();
-                cat.products.forEach((p) => {
-                    if (p.metal) {
-                        metalMap.set(p.metal.id, {
-                            _id: p.metal.id,
-                            id: p.metal.id,
-                            name: p.metal.name,
-                            slug: p.metal.slug,
-                        });
-                    }
-                });
-                const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+                const categoryMetals = getCategoryMetals(cat);
                 return {
                     ...cat,
                     _id: cat.id,
@@ -99,18 +106,7 @@ let CategoriesService = class CategoriesService {
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         });
         return categories.map((cat) => {
-            const metalMap = new Map();
-            cat.products.forEach((p) => {
-                if (p.metal) {
-                    metalMap.set(p.metal.id, {
-                        _id: p.metal.id,
-                        id: p.metal.id,
-                        name: p.metal.name,
-                        slug: p.metal.slug,
-                    });
-                }
-            });
-            const categoryMetals = metalMap.size > 0 ? Array.from(metalMap.values()) : defaultMetals;
+            const categoryMetals = getCategoryMetals(cat);
             return {
                 ...cat,
                 _id: cat.id,
@@ -133,16 +129,46 @@ let CategoriesService = class CategoriesService {
             },
             include: {
                 subcategories: { where: { isDeleted: false } },
-                products: { where: { isDeleted: false, isPublished: true } },
+                products: { where: { isDeleted: false, isPublished: true }, select: { id: true, metal: true } },
             },
         });
         if (!category) {
             throw new common_1.NotFoundException(`Category '${identifier}' not found.`);
         }
+        const allActiveMetals = await this.prisma.metal.findMany({
+            where: { isActive: true },
+            select: { id: true, name: true, slug: true },
+        });
+        let categoryMetals = [];
+        if (category.metalIds && Array.isArray(category.metalIds) && category.metalIds.length > 0) {
+            categoryMetals = allActiveMetals
+                .filter((m) => category.metalIds.includes(m.id))
+                .map((m) => ({
+                _id: m.id,
+                id: m.id,
+                name: m.name,
+                slug: m.slug,
+            }));
+        }
+        else {
+            const metalMap = new Map();
+            (category.products || []).forEach((p) => {
+                if (p.metal) {
+                    metalMap.set(p.metal.id, {
+                        _id: p.metal.id,
+                        id: p.metal.id,
+                        name: p.metal.name,
+                        slug: p.metal.slug,
+                    });
+                }
+            });
+            categoryMetals = Array.from(metalMap.values());
+        }
         return {
             ...category,
             _id: category.id,
-            metalIds: [],
+            metalIds: categoryMetals,
+            metals: categoryMetals,
             isActive: true,
         };
     }
@@ -164,6 +190,18 @@ let CategoriesService = class CategoriesService {
             imageUrl = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
         }
         const isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
+        let metalIdsArray = [];
+        if (dto.metalIds) {
+            if (Array.isArray(dto.metalIds)) {
+                metalIdsArray = dto.metalIds;
+            }
+            else if (typeof dto.metalIds === 'string') {
+                metalIdsArray = dto.metalIds.split(',').map((id) => id.trim()).filter(Boolean);
+            }
+            else {
+                metalIdsArray = [dto.metalIds];
+            }
+        }
         const category = await this.prisma.category.create({
             data: {
                 name: rawName,
@@ -171,15 +209,11 @@ let CategoriesService = class CategoriesService {
                 description: dto.description || null,
                 image: imageUrl,
                 isFeatured,
+                metalIds: metalIdsArray,
             },
         });
         await this.redis.delPattern('cache:*').catch(() => null);
-        return {
-            ...category,
-            _id: category.id,
-            metalIds: [],
-            isActive: true,
-        };
+        return this.findBySlugOrId(category.id);
     }
     async update(id, dto, file) {
         const existing = await this.prisma.category.findFirst({
@@ -209,6 +243,19 @@ let CategoriesService = class CategoriesService {
         if (dto.isFeatured !== undefined) {
             dataToUpdate.isFeatured = dto.isFeatured === true || dto.isFeatured === 'true';
         }
+        if (dto.metalIds !== undefined) {
+            let metalIdsArray = [];
+            if (Array.isArray(dto.metalIds)) {
+                metalIdsArray = dto.metalIds;
+            }
+            else if (typeof dto.metalIds === 'string') {
+                metalIdsArray = dto.metalIds.split(',').map((mId) => mId.trim()).filter(Boolean);
+            }
+            else {
+                metalIdsArray = [dto.metalIds];
+            }
+            dataToUpdate.metalIds = metalIdsArray;
+        }
         if (file) {
             const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'categories');
             dataToUpdate.image = (0, storage_util_1.normalizeMediaKey)(uploadRes.key);
@@ -221,12 +268,7 @@ let CategoriesService = class CategoriesService {
             data: dataToUpdate,
         });
         await this.redis.delPattern('cache:*').catch(() => null);
-        return {
-            ...updated,
-            _id: updated.id,
-            metalIds: [],
-            isActive: true,
-        };
+        return this.findBySlugOrId(updated.id);
     }
     async delete(id) {
         const existing = await this.prisma.category.findFirst({
