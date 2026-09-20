@@ -36,19 +36,19 @@ export declare class ReviewsController {
         data: {
             reviews: ({
                 user: {
-                    id: string;
                     name: string;
+                    id: string;
                 };
                 product: {
                     id: string;
-                    title: string;
                     slug: string;
+                    title: string;
                     images: string[];
                 };
             } & {
                 id: string;
-                userId: string;
                 createdAt: Date;
+                userId: string;
                 productId: string;
                 rating: number;
                 comment: string | null;
@@ -60,13 +60,13 @@ export declare class ReviewsController {
         data: {
             reviews: ({
                 user: {
-                    id: string;
                     name: string;
+                    id: string;
                 };
             } & {
                 id: string;
-                userId: string;
                 createdAt: Date;
+                userId: string;
                 productId: string;
                 rating: number;
                 comment: string | null;
@@ -83,8 +83,8 @@ export declare class ReviewsController {
         data: {
             review: {
                 id: string;
-                userId: string;
                 createdAt: Date;
+                userId: string;
                 productId: string;
                 rating: number;
                 comment: string | null;

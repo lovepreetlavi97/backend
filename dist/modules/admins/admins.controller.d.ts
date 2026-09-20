@@ -6,12 +6,12 @@ export declare class AdminsController {
         status: string;
         data: {
             admins: {
-                id: string;
-                createdAt: Date;
+                role: import(".prisma/client").$Enums.Role;
                 name: string;
                 isActive: boolean;
+                id: string;
                 email: string;
-                role: import(".prisma/client").$Enums.Role;
+                createdAt: Date;
                 permissions: import("@prisma/client/runtime/library").JsonValue;
                 lastLogin: Date;
             }[];
@@ -28,11 +28,11 @@ export declare class AdminsController {
         message: string;
         data: {
             admin: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                email: string;
                 role: import(".prisma/client").$Enums.Role;
+                name: string;
+                id: string;
+                email: string;
+                createdAt: Date;
                 permissions: import("@prisma/client/runtime/library").JsonValue;
             };
         };

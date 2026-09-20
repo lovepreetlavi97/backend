@@ -219,6 +219,7 @@ let FilterConfigService = FilterConfigService_1 = class FilterConfigService {
             isActive: dto.isActive === 'false' || dto.isActive === false ? false : true,
         };
         occasions.unshift(newOccasion);
+        config.banner = config.banner || DEFAULT_GIFT_STORE_CONFIG.banner;
         config.occasions = occasions;
         config.priceFilters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
         config.recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
@@ -241,6 +242,7 @@ let FilterConfigService = FilterConfigService_1 = class FilterConfigService {
             isActive: dto.isActive !== undefined ? (dto.isActive === 'false' || dto.isActive === false ? false : true) : occasions[index].isActive,
             link: dto.link !== undefined ? dto.link : dto.url !== undefined ? dto.url : occasions[index].link || '',
         };
+        config.banner = config.banner || DEFAULT_GIFT_STORE_CONFIG.banner;
         config.occasions = occasions;
         config.priceFilters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
         config.recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
@@ -251,7 +253,10 @@ let FilterConfigService = FilterConfigService_1 = class FilterConfigService {
         const config = await this.getGiftStoreConfig();
         const occasions = config.occasions || [];
         const filtered = occasions.filter((o) => o._id !== id);
+        config.banner = config.banner || DEFAULT_GIFT_STORE_CONFIG.banner;
         config.occasions = filtered;
+        config.priceFilters = config.priceFilters || DEFAULT_GIFT_STORE_CONFIG.priceFilters;
+        config.recipients = config.recipients || DEFAULT_GIFT_STORE_CONFIG.recipients;
         await this.updateGiftStoreConfig(config);
         return { success: true };
     }

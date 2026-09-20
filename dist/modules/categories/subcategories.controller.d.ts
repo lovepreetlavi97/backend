@@ -61,12 +61,12 @@ export declare class SubCategoriesController {
         message: string;
         data: {
             subcategory: {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 name: string;
                 description: string | null;
+                id: string;
                 isDeleted: boolean;
+                createdAt: Date;
+                updatedAt: Date;
                 slug: string;
                 categoryId: string;
                 image: string | null;
@@ -78,12 +78,12 @@ export declare class SubCategoriesController {
         message: string;
         data: {
             subcategory: {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 name: string;
                 description: string | null;
+                id: string;
                 isDeleted: boolean;
+                createdAt: Date;
+                updatedAt: Date;
                 slug: string;
                 categoryId: string;
                 image: string | null;

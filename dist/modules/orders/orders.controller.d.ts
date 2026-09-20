@@ -9,11 +9,11 @@ export declare class OrdersController {
             order: {
                 _id: string;
                 id: string;
-                userId: string | null;
                 createdAt: Date;
                 updatedAt: Date;
+                userId: string | null;
+                items: import("@prisma/client/runtime/library").JsonValue;
                 orderNumber: string;
-                razorpayOrderId: string | null;
                 guestName: string | null;
                 guestEmail: string | null;
                 guestPhone: string | null;
@@ -22,8 +22,8 @@ export declare class OrdersController {
                 finalAmount: import("@prisma/client/runtime/library").Decimal;
                 orderStatus: import(".prisma/client").$Enums.OrderStatus;
                 paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
-                items: import("@prisma/client/runtime/library").JsonValue;
                 shippingAddress: import("@prisma/client/runtime/library").JsonValue;
+                razorpayOrderId: string | null;
             };
         };
     }>;

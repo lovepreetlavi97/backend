@@ -10,15 +10,15 @@ export declare class AuthController {
             accessToken: string;
             refreshToken: string;
             user: {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
+                role: import(".prisma/client").$Enums.Role;
                 name: string;
                 isActive: boolean;
+                id: string;
                 email: string;
                 phone: string | null;
-                role: import(".prisma/client").$Enums.Role;
                 isDeleted: boolean;
+                createdAt: Date;
+                updatedAt: Date;
             };
         };
     }>;

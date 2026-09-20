@@ -71,12 +71,12 @@ export declare class PublicCatalogService {
         status: string;
         data: {
             subcategories: {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 name: string;
                 description: string | null;
+                id: string;
                 isDeleted: boolean;
+                createdAt: Date;
+                updatedAt: Date;
                 slug: string;
                 categoryId: string;
                 image: string | null;

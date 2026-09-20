@@ -72,11 +72,11 @@ export declare class GrievancesController {
         status: string;
         data: {
             grievance: {
+                description: string;
                 id: string;
+                createdAt: Date;
                 userId: string;
                 status: string;
-                createdAt: Date;
-                description: string;
                 subject: string;
             };
         };

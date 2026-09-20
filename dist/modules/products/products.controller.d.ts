@@ -78,14 +78,14 @@ export declare class ProductsController {
         status: string;
         data: {
             product: {
+                description: string;
                 id: string;
+                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
-                description: string;
-                isDeleted: boolean;
-                title: string;
                 slug: string;
                 sku: string;
+                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;
@@ -119,14 +119,14 @@ export declare class ProductsController {
         status: string;
         data: {
             product: {
+                description: string;
                 id: string;
+                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
-                description: string;
-                isDeleted: boolean;
-                title: string;
                 slug: string;
                 sku: string;
+                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;
@@ -164,14 +164,14 @@ export declare class ProductsController {
         status: string;
         data: {
             product: {
+                description: string;
                 id: string;
+                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
-                description: string;
-                isDeleted: boolean;
-                title: string;
                 slug: string;
                 sku: string;
+                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;
