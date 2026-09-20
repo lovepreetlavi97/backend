@@ -1,6 +1,7 @@
 export interface AppEnvConfig {
     port: number;
     nodeEnv: string;
+    backendUrl: string;
     databaseUrl: string;
     redisHost: string;
     redisPort: number;

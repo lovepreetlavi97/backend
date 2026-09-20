@@ -12,17 +12,17 @@ export declare class DashboardController {
             totalRevenue: number;
             recentOrders: ({
                 user: {
-                    name: string;
                     id: string;
+                    name: string;
                     email: string;
                 };
             } & {
                 id: string;
+                userId: string | null;
                 createdAt: Date;
                 updatedAt: Date;
-                userId: string | null;
-                items: import("@prisma/client/runtime/library").JsonValue;
                 orderNumber: string;
+                razorpayOrderId: string | null;
                 guestName: string | null;
                 guestEmail: string | null;
                 guestPhone: string | null;
@@ -31,8 +31,8 @@ export declare class DashboardController {
                 finalAmount: import("@prisma/client/runtime/library").Decimal;
                 orderStatus: import(".prisma/client").$Enums.OrderStatus;
                 paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
+                items: import("@prisma/client/runtime/library").JsonValue;
                 shippingAddress: import("@prisma/client/runtime/library").JsonValue;
-                razorpayOrderId: string | null;
             })[];
         };
     }>;

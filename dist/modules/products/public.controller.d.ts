@@ -76,12 +76,12 @@ export declare class PublicController {
         status: string;
         data: {
             subcategories: {
-                name: string;
-                description: string | null;
                 id: string;
-                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
+                name: string;
+                description: string | null;
+                isDeleted: boolean;
                 slug: string;
                 categoryId: string;
                 image: string | null;

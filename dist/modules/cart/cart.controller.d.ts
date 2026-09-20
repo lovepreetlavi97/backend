@@ -102,11 +102,11 @@ export declare class CartController {
     }): Promise<({
         product: {
             metal: {
-                type: import(".prisma/client").$Enums.MetalType;
-                name: string;
-                isActive: boolean;
                 id: string;
                 updatedAt: Date;
+                name: string;
+                isActive: boolean;
+                type: import(".prisma/client").$Enums.MetalType;
                 slug: string;
                 purity: string;
                 colorCode: string | null;
@@ -114,22 +114,22 @@ export declare class CartController {
                 ratePerGram: import("@prisma/client/runtime/library").Decimal;
             };
             priceRule: {
-                name: string;
                 id: string;
                 updatedAt: Date;
+                name: string;
                 makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                 gstPercentage: import("@prisma/client/runtime/library").Decimal;
                 discountPercent: import("@prisma/client/runtime/library").Decimal;
             };
         } & {
-            description: string;
             id: string;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
+            description: string;
+            isDeleted: boolean;
+            title: string;
             slug: string;
             sku: string;
-            title: string;
             images: string[];
             weightGrams: import("@prisma/client/runtime/library").Decimal;
             stockQuantity: number;
@@ -159,11 +159,11 @@ export declare class CartController {
         };
     } & {
         id: string;
-        createdAt: Date;
         userId: string | null;
+        createdAt: Date;
+        guestId: string | null;
         productId: string;
         quantity: number;
-        guestId: string | null;
     })[]>;
     checkStock(body: {
         items: {
@@ -186,11 +186,11 @@ export declare class CartController {
             items: ({
                 product: {
                     metal: {
-                        type: import(".prisma/client").$Enums.MetalType;
-                        name: string;
-                        isActive: boolean;
                         id: string;
                         updatedAt: Date;
+                        name: string;
+                        isActive: boolean;
+                        type: import(".prisma/client").$Enums.MetalType;
                         slug: string;
                         purity: string;
                         colorCode: string | null;
@@ -198,22 +198,22 @@ export declare class CartController {
                         ratePerGram: import("@prisma/client/runtime/library").Decimal;
                     };
                     priceRule: {
-                        name: string;
                         id: string;
                         updatedAt: Date;
+                        name: string;
                         makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                         gstPercentage: import("@prisma/client/runtime/library").Decimal;
                         discountPercent: import("@prisma/client/runtime/library").Decimal;
                     };
                 } & {
-                    description: string;
                     id: string;
-                    isDeleted: boolean;
                     createdAt: Date;
                     updatedAt: Date;
+                    description: string;
+                    isDeleted: boolean;
+                    title: string;
                     slug: string;
                     sku: string;
-                    title: string;
                     images: string[];
                     weightGrams: import("@prisma/client/runtime/library").Decimal;
                     stockQuantity: number;
@@ -243,11 +243,11 @@ export declare class CartController {
                 };
             } & {
                 id: string;
-                createdAt: Date;
                 userId: string | null;
+                createdAt: Date;
+                guestId: string | null;
                 productId: string;
                 quantity: number;
-                guestId: string | null;
             })[];
         };
     }>;

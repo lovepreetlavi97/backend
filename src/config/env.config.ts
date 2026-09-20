@@ -1,6 +1,7 @@
 export interface AppEnvConfig {
   port: number;
   nodeEnv: string;
+  backendUrl: string;
   databaseUrl: string;
   redisHost: string;
   redisPort: number;
@@ -14,6 +15,8 @@ export interface AppEnvConfig {
 
 export const getEnvConfig = (): AppEnvConfig => {
   const nodeEnv = process.env.NODE_ENV || 'development';
+  const port = parseInt(process.env.PORT || '5000', 10);
+  const backendUrl = (process.env.BACKEND_URL || process.env.APP_URL || `http://localhost:${port}`).replace(/\/+$/, '');
   const defaultOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
   const customOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
@@ -22,8 +25,9 @@ export const getEnvConfig = (): AppEnvConfig => {
   const allowedOrigins = Array.from(new Set([...defaultOrigins, ...customOrigins]));
 
   return {
-    port: parseInt(process.env.PORT || '5000', 10),
+    port,
     nodeEnv,
+    backendUrl,
     databaseUrl: process.env.DATABASE_URL || 'postgresql://myg_admin:123456@localhost:5432/mygold_db?schema=public',
     redisHost: process.env.REDIS_HOST || 'localhost',
     redisPort: parseInt(process.env.REDIS_PORT || '6379', 10),

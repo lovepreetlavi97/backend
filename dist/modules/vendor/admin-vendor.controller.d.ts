@@ -10,23 +10,23 @@ export declare class AdminVendorController {
         data: {
             vendors: ({
                 user: {
-                    name: string;
                     id: string;
+                    name: string;
                     email: string;
                     phone: string;
                 };
                 _count: {
-                    products: number;
                     vendorOrders: number;
+                    products: number;
                 };
             } & {
                 id: string;
-                email: string | null;
-                phone: string | null;
-                createdAt: Date;
-                updatedAt: Date;
                 userId: string;
                 status: import(".prisma/client").$Enums.VendorStatus;
+                createdAt: Date;
+                updatedAt: Date;
+                email: string | null;
+                phone: string | null;
                 rejectionReason: string | null;
                 shopName: string;
                 legalName: string | null;
@@ -44,12 +44,12 @@ export declare class AdminVendorController {
         data: {
             vendor: {
                 id: string;
-                email: string | null;
-                phone: string | null;
-                createdAt: Date;
-                updatedAt: Date;
                 userId: string;
                 status: import(".prisma/client").$Enums.VendorStatus;
+                createdAt: Date;
+                updatedAt: Date;
+                email: string | null;
+                phone: string | null;
                 rejectionReason: string | null;
                 shopName: string;
                 legalName: string | null;
@@ -67,12 +67,12 @@ export declare class AdminVendorController {
         data: {
             vendor: {
                 id: string;
-                email: string | null;
-                phone: string | null;
-                createdAt: Date;
-                updatedAt: Date;
                 userId: string;
                 status: import(".prisma/client").$Enums.VendorStatus;
+                createdAt: Date;
+                updatedAt: Date;
+                email: string | null;
+                phone: string | null;
                 rejectionReason: string | null;
                 shopName: string;
                 legalName: string | null;
@@ -90,12 +90,12 @@ export declare class AdminVendorController {
         data: {
             vendor: {
                 id: string;
-                email: string | null;
-                phone: string | null;
-                createdAt: Date;
-                updatedAt: Date;
                 userId: string;
                 status: import(".prisma/client").$Enums.VendorStatus;
+                createdAt: Date;
+                updatedAt: Date;
+                email: string | null;
+                phone: string | null;
                 rejectionReason: string | null;
                 shopName: string;
                 legalName: string | null;
@@ -117,23 +117,23 @@ export declare class AdminVendorController {
                     shopName: string;
                 };
                 category: {
-                    name: string;
-                    description: string | null;
                     id: string;
-                    isDeleted: boolean;
                     createdAt: Date;
                     updatedAt: Date;
+                    name: string;
+                    description: string | null;
+                    isDeleted: boolean;
                     slug: string;
                     isFeatured: boolean;
                     image: string | null;
                     metalIds: string[];
                 };
                 metal: {
-                    type: import(".prisma/client").$Enums.MetalType;
-                    name: string;
-                    isActive: boolean;
                     id: string;
                     updatedAt: Date;
+                    name: string;
+                    isActive: boolean;
+                    type: import(".prisma/client").$Enums.MetalType;
                     slug: string;
                     purity: string;
                     colorCode: string | null;
@@ -141,33 +141,33 @@ export declare class AdminVendorController {
                     ratePerGram: import("@prisma/client/runtime/library").Decimal;
                 };
                 priceRule: {
-                    name: string;
                     id: string;
                     updatedAt: Date;
+                    name: string;
                     makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                     gstPercentage: import("@prisma/client/runtime/library").Decimal;
                     discountPercent: import("@prisma/client/runtime/library").Decimal;
                 };
                 subcategory: {
-                    name: string;
-                    description: string | null;
                     id: string;
-                    isDeleted: boolean;
                     createdAt: Date;
                     updatedAt: Date;
+                    name: string;
+                    description: string | null;
+                    isDeleted: boolean;
                     slug: string;
                     categoryId: string;
                     image: string | null;
                 };
             } & {
-                description: string;
                 id: string;
-                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string;
+                isDeleted: boolean;
+                title: string;
                 slug: string;
                 sku: string;
-                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;
@@ -202,14 +202,14 @@ export declare class AdminVendorController {
         message: string;
         data: {
             product: {
-                description: string;
                 id: string;
-                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string;
+                isDeleted: boolean;
+                title: string;
                 slug: string;
                 sku: string;
-                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;
@@ -244,14 +244,14 @@ export declare class AdminVendorController {
         message: string;
         data: {
             product: {
-                description: string;
                 id: string;
-                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string;
+                isDeleted: boolean;
+                title: string;
                 slug: string;
                 sku: string;
-                title: string;
                 images: string[];
                 weightGrams: import("@prisma/client/runtime/library").Decimal;
                 stockQuantity: number;

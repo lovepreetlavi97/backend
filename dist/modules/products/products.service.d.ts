@@ -235,14 +235,14 @@ export declare class ProductsService {
         priceRule: any;
     }>;
     create(dto: any): Promise<{
-        description: string;
         id: string;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
+        description: string;
+        isDeleted: boolean;
+        title: string;
         slug: string;
         sku: string;
-        title: string;
         images: string[];
         weightGrams: import("@prisma/client/runtime/library").Decimal;
         stockQuantity: number;
@@ -271,14 +271,14 @@ export declare class ProductsService {
         discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
     }>;
     update(id: string, dto: any): Promise<{
-        description: string;
         id: string;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
+        description: string;
+        isDeleted: boolean;
+        title: string;
         slug: string;
         sku: string;
-        title: string;
         images: string[];
         weightGrams: import("@prisma/client/runtime/library").Decimal;
         stockQuantity: number;
@@ -308,14 +308,14 @@ export declare class ProductsService {
     }>;
     delete(id: string): Promise<void>;
     toggleBlock(id: string): Promise<{
-        description: string;
         id: string;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
+        description: string;
+        isDeleted: boolean;
+        title: string;
         slug: string;
         sku: string;
-        title: string;
         images: string[];
         weightGrams: import("@prisma/client/runtime/library").Decimal;
         stockQuantity: number;

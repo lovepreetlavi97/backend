@@ -106,12 +106,12 @@ export declare class SettingsController {
         message: string;
         data: {
             contact: {
-                name: string;
                 id: string;
-                email: string;
                 createdAt: Date;
-                subject: string;
+                name: string;
+                email: string;
                 message: string;
+                subject: string;
             };
         };
     }>;
@@ -123,11 +123,11 @@ export declare class SettingsController {
         message: string;
         data: {
             grievance: {
-                description: string;
                 id: string;
-                createdAt: Date;
                 userId: string;
                 status: string;
+                createdAt: Date;
+                description: string;
                 subject: string;
             };
         };
@@ -140,11 +140,11 @@ export declare class SettingsController {
         message: string;
         data: {
             request: {
-                description: string;
                 id: string;
-                createdAt: Date;
                 userId: string;
                 status: string;
+                createdAt: Date;
+                description: string;
                 images: string[];
                 quoteAmount: import("@prisma/client/runtime/library").Decimal | null;
             };

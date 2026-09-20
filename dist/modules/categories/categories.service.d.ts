@@ -25,39 +25,39 @@ export declare class CategoriesService {
         subcategories: {
             _id: string;
             id: string;
-            image: string | null;
-            description: string | null;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
             name: string;
+            description: string | null;
+            isDeleted: boolean;
             slug: string;
             categoryId: string;
+            image: string | null;
         }[];
         products: {
             id: string;
             metal: {
                 id: string;
-                type: import(".prisma/client").$Enums.MetalType;
-                isActive: boolean;
                 updatedAt: Date;
                 name: string;
+                isActive: boolean;
+                type: import(".prisma/client").$Enums.MetalType;
                 slug: string;
+                purity: string;
                 colorCode: string | null;
                 gradient: string | null;
                 ratePerGram: import("@prisma/client/runtime/library").Decimal;
-                purity: string;
             };
         }[];
         id: string;
-        image: string | null;
-        description: string | null;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
         name: string;
+        description: string | null;
+        isDeleted: boolean;
         slug: string;
         isFeatured: boolean;
+        image: string | null;
     }[] | {
         categories: {
             _id: string;
@@ -68,39 +68,39 @@ export declare class CategoriesService {
             subcategories: {
                 _id: string;
                 id: string;
-                image: string | null;
-                description: string | null;
-                isDeleted: boolean;
                 createdAt: Date;
                 updatedAt: Date;
                 name: string;
+                description: string | null;
+                isDeleted: boolean;
                 slug: string;
                 categoryId: string;
+                image: string | null;
             }[];
             products: {
                 id: string;
                 metal: {
                     id: string;
-                    type: import(".prisma/client").$Enums.MetalType;
-                    isActive: boolean;
                     updatedAt: Date;
                     name: string;
+                    isActive: boolean;
+                    type: import(".prisma/client").$Enums.MetalType;
                     slug: string;
+                    purity: string;
                     colorCode: string | null;
                     gradient: string | null;
                     ratePerGram: import("@prisma/client/runtime/library").Decimal;
-                    purity: string;
                 };
             }[];
             id: string;
-            image: string | null;
-            description: string | null;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
             name: string;
+            description: string | null;
+            isDeleted: boolean;
             slug: string;
             isFeatured: boolean;
+            image: string | null;
         }[];
         pagination: {
             total: number;
@@ -118,37 +118,37 @@ export declare class CategoriesService {
             id: string;
             metal: {
                 id: string;
-                type: import(".prisma/client").$Enums.MetalType;
-                isActive: boolean;
                 updatedAt: Date;
                 name: string;
+                isActive: boolean;
+                type: import(".prisma/client").$Enums.MetalType;
                 slug: string;
+                purity: string;
                 colorCode: string | null;
                 gradient: string | null;
                 ratePerGram: import("@prisma/client/runtime/library").Decimal;
-                purity: string;
             };
         }[];
         subcategories: {
             id: string;
-            image: string | null;
-            description: string | null;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
             name: string;
+            description: string | null;
+            isDeleted: boolean;
             slug: string;
             categoryId: string;
+            image: string | null;
         }[];
         id: string;
-        image: string | null;
-        description: string | null;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
         name: string;
+        description: string | null;
+        isDeleted: boolean;
         slug: string;
         isFeatured: boolean;
+        image: string | null;
     }>;
     private generateUniqueSlug;
     create(dto: any, file?: Express.Multer.File): Promise<{
@@ -160,37 +160,37 @@ export declare class CategoriesService {
             id: string;
             metal: {
                 id: string;
-                type: import(".prisma/client").$Enums.MetalType;
-                isActive: boolean;
                 updatedAt: Date;
                 name: string;
+                isActive: boolean;
+                type: import(".prisma/client").$Enums.MetalType;
                 slug: string;
+                purity: string;
                 colorCode: string | null;
                 gradient: string | null;
                 ratePerGram: import("@prisma/client/runtime/library").Decimal;
-                purity: string;
             };
         }[];
         subcategories: {
             id: string;
-            image: string | null;
-            description: string | null;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
             name: string;
+            description: string | null;
+            isDeleted: boolean;
             slug: string;
             categoryId: string;
+            image: string | null;
         }[];
         id: string;
-        image: string | null;
-        description: string | null;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
         name: string;
+        description: string | null;
+        isDeleted: boolean;
         slug: string;
         isFeatured: boolean;
+        image: string | null;
     }>;
     update(id: string, dto: any, file?: Express.Multer.File): Promise<{
         _id: string;
@@ -201,37 +201,37 @@ export declare class CategoriesService {
             id: string;
             metal: {
                 id: string;
-                type: import(".prisma/client").$Enums.MetalType;
-                isActive: boolean;
                 updatedAt: Date;
                 name: string;
+                isActive: boolean;
+                type: import(".prisma/client").$Enums.MetalType;
                 slug: string;
+                purity: string;
                 colorCode: string | null;
                 gradient: string | null;
                 ratePerGram: import("@prisma/client/runtime/library").Decimal;
-                purity: string;
             };
         }[];
         subcategories: {
             id: string;
-            image: string | null;
-            description: string | null;
-            isDeleted: boolean;
             createdAt: Date;
             updatedAt: Date;
             name: string;
+            description: string | null;
+            isDeleted: boolean;
             slug: string;
             categoryId: string;
+            image: string | null;
         }[];
         id: string;
-        image: string | null;
-        description: string | null;
-        isDeleted: boolean;
         createdAt: Date;
         updatedAt: Date;
         name: string;
+        description: string | null;
+        isDeleted: boolean;
         slug: string;
         isFeatured: boolean;
+        image: string | null;
     }>;
     delete(id: string): Promise<{
         message: string;
