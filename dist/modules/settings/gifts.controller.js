@@ -14,15 +14,18 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GiftsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const filter_config_service_1 = require("./filter-config.service");
+const uploads_service_1 = require("../uploads/uploads.service");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
 let GiftsController = class GiftsController {
-    constructor(filterConfigService) {
+    constructor(filterConfigService, uploadsService) {
         this.filterConfigService = filterConfigService;
+        this.uploadsService = uploadsService;
     }
     async getAllGifts() {
         const occasions = await this.filterConfigService.getOccasionsList();
@@ -30,18 +33,39 @@ let GiftsController = class GiftsController {
             _id: f._id,
             id: f._id,
             name: f.name,
+            description: f.description || '',
             slug: f.slug,
             image: f.image,
             isActive: f.isActive !== undefined ? f.isActive : true,
         }));
         return { status: 'success', data: mapped };
     }
-    async createGift(dto) {
-        const gift = await this.filterConfigService.addOccasion(dto);
+    async createGift(file, dto) {
+        let imageUrl = dto.image;
+        if (file) {
+            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'gifts');
+            imageUrl = uploadRes.key || uploadRes.url;
+        }
+        const payload = {
+            ...dto,
+            ...(imageUrl ? { image: imageUrl } : {}),
+            isActive: dto.isActive !== undefined ? (dto.isActive === true || dto.isActive === 'true') : true,
+        };
+        const gift = await this.filterConfigService.addOccasion(payload);
         return { status: 'success', data: gift };
     }
-    async updateGift(id, dto) {
-        const gift = await this.filterConfigService.updateOccasion(id, dto);
+    async updateGift(id, file, dto) {
+        let imageUrl = dto.image;
+        if (file) {
+            const uploadRes = await this.uploadsService.uploadAndCompressImage(file.buffer, file.originalname, file.mimetype, 'gifts');
+            imageUrl = uploadRes.key || uploadRes.url;
+        }
+        const payload = {
+            ...dto,
+            ...(imageUrl ? { image: imageUrl } : {}),
+            ...(dto.isActive !== undefined ? { isActive: dto.isActive === true || dto.isActive === 'true' } : {}),
+        };
+        const gift = await this.filterConfigService.updateOccasion(id, payload);
         return { status: 'success', data: gift };
     }
     async deleteGift(id) {
@@ -65,10 +89,12 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.SUPERADMIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('image')),
     (0, swagger_1.ApiOperation)({ summary: 'Create new gift' }),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], GiftsController.prototype, "createGift", null);
 __decorate([
@@ -76,11 +102,13 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.SUPERADMIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('image')),
     (0, swagger_1.ApiOperation)({ summary: 'Update gift by ID' }),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], GiftsController.prototype, "updateGift", null);
 __decorate([
@@ -97,6 +125,7 @@ __decorate([
 exports.GiftsController = GiftsController = __decorate([
     (0, swagger_1.ApiTags)('Admin - Gifts'),
     (0, common_1.Controller)('admin/gift'),
-    __metadata("design:paramtypes", [filter_config_service_1.FilterConfigService])
+    __metadata("design:paramtypes", [filter_config_service_1.FilterConfigService,
+        uploads_service_1.UploadsService])
 ], GiftsController);
 //# sourceMappingURL=gifts.controller.js.map

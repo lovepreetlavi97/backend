@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FilterConfigService } from './filter-config.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,7 +11,10 @@ import { Role } from '@prisma/client';
 @ApiTags('Admin - Gifts')
 @Controller('admin/gift')
 export class GiftsController {
-  constructor(private readonly filterConfigService: FilterConfigService) {}
+  constructor(
+    private readonly filterConfigService: FilterConfigService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   @Get('all')
   @ApiBearerAuth()
@@ -22,6 +27,7 @@ export class GiftsController {
       _id: f._id,
       id: f._id,
       name: f.name,
+      description: f.description || '',
       slug: f.slug,
       image: f.image,
       isActive: f.isActive !== undefined ? f.isActive : true,
@@ -33,9 +39,28 @@ export class GiftsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({ summary: 'Create new gift' })
-  async createGift(@Body() dto: any) {
-    const gift = await this.filterConfigService.addOccasion(dto);
+  async createGift(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: any,
+  ) {
+    let imageUrl = dto.image;
+    if (file) {
+      const uploadRes = await this.uploadsService.uploadAndCompressImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        'gifts',
+      );
+      imageUrl = uploadRes.key || uploadRes.url;
+    }
+    const payload = {
+      ...dto,
+      ...(imageUrl ? { image: imageUrl } : {}),
+      isActive: dto.isActive !== undefined ? (dto.isActive === true || dto.isActive === 'true') : true,
+    };
+    const gift = await this.filterConfigService.addOccasion(payload);
     return { status: 'success', data: gift };
   }
 
@@ -43,9 +68,29 @@ export class GiftsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({ summary: 'Update gift by ID' })
-  async updateGift(@Param('id') id: string, @Body() dto: any) {
-    const gift = await this.filterConfigService.updateOccasion(id, dto);
+  async updateGift(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: any,
+  ) {
+    let imageUrl = dto.image;
+    if (file) {
+      const uploadRes = await this.uploadsService.uploadAndCompressImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        'gifts',
+      );
+      imageUrl = uploadRes.key || uploadRes.url;
+    }
+    const payload = {
+      ...dto,
+      ...(imageUrl ? { image: imageUrl } : {}),
+      ...(dto.isActive !== undefined ? { isActive: dto.isActive === true || dto.isActive === 'true' } : {}),
+    };
+    const gift = await this.filterConfigService.updateOccasion(id, payload);
     return { status: 'success', data: gift };
   }
 

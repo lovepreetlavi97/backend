@@ -1,19 +1,22 @@
 import { FilterConfigService } from './filter-config.service';
+import { UploadsService } from '../uploads/uploads.service';
 export declare class GiftsController {
     private readonly filterConfigService;
-    constructor(filterConfigService: FilterConfigService);
+    private readonly uploadsService;
+    constructor(filterConfigService: FilterConfigService, uploadsService: UploadsService);
     getAllGifts(): Promise<{
         status: string;
         data: {
             _id: any;
             id: any;
             name: any;
+            description: any;
             slug: any;
             image: any;
             isActive: any;
         }[];
     }>;
-    createGift(dto: any): Promise<{
+    createGift(file: Express.Multer.File, dto: any): Promise<{
         status: string;
         data: {
             _id: string;
@@ -28,7 +31,7 @@ export declare class GiftsController {
             isActive: boolean;
         };
     }>;
-    updateGift(id: string, dto: any): Promise<{
+    updateGift(id: string, file: Express.Multer.File, dto: any): Promise<{
         status: string;
         data: import("./dto/filter-config.dto").OccasionDto;
     }>;
