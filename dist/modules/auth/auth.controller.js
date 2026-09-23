@@ -41,6 +41,12 @@ let AuthController = class AuthController {
     async verifyPhoneOtp(dto, res) {
         const result = await this.authService.verifyPhoneOtp(dto);
         if (result.accessToken) {
+            res.cookie('authToken', result.accessToken, {
+                httpOnly: false,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000,
+            });
             res.cookie('accessToken', result.accessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
@@ -66,6 +72,12 @@ let AuthController = class AuthController {
     }
     async register(dto, res) {
         const result = await this.authService.register(dto);
+        res.cookie('authToken', result.accessToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
         res.cookie('accessToken', result.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -88,6 +100,12 @@ let AuthController = class AuthController {
     }
     async login(dto, res) {
         const result = await this.authService.login(dto);
+        res.cookie('authToken', result.accessToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
         res.cookie('accessToken', result.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -110,6 +128,12 @@ let AuthController = class AuthController {
     }
     async googleLogin(dto, res) {
         const result = await this.authService.googleLogin(dto.code);
+        res.cookie('authToken', result.accessToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
         res.cookie('accessToken', result.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -133,6 +157,12 @@ let AuthController = class AuthController {
     async refresh(req, res) {
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         const result = await this.authService.refreshToken(refreshToken);
+        res.cookie('authToken', result.accessToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
         res.cookie('accessToken', result.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -148,6 +178,7 @@ let AuthController = class AuthController {
         const refreshToken = req.cookies?.refreshToken;
         const accessToken = req.cookies?.accessToken || req.headers.authorization?.substring(7);
         await this.authService.logout(refreshToken, accessToken);
+        res.clearCookie('authToken');
         res.clearCookie('accessToken');
         res.clearCookie('refreshToken');
         return {
