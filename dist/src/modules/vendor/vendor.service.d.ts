@@ -1,0 +1,143 @@
+import { PrismaService } from '../prisma/prisma.service';
+import { RegisterVendorDto, UpdateVendorProfileDto } from './dto/vendor.dto';
+export declare class VendorService {
+    private readonly prisma;
+    constructor(prisma: PrismaService);
+    registerVendor(userId: string, dto: RegisterVendorDto): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+    getVendorStatus(userId: string): Promise<{
+        vendorId: string;
+        shopName: string;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        rejectionReason: string;
+        createdAt: Date;
+    }>;
+    getVendorProfile(vendorId: string): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+    updateVendorProfile(vendorId: string, dto: UpdateVendorProfileDto): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+    getAllVendors(status?: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            name: string;
+            phone: string;
+        };
+        _count: {
+            products: number;
+            vendorOrders: number;
+        };
+    } & {
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    })[]>;
+    approveVendor(vendorId: string): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+    rejectVendor(vendorId: string, reason: string): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+    suspendVendor(vendorId: string): Promise<{
+        id: string;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        phone: string | null;
+        rejectionReason: string | null;
+        status: import(".prisma/client").$Enums.VendorStatus;
+        address: string | null;
+        userId: string;
+        shopName: string;
+        legalName: string | null;
+        city: string | null;
+        state: string | null;
+        pincode: string | null;
+        gstin: string | null;
+    }>;
+}

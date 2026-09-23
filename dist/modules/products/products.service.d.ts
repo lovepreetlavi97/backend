@@ -23,7 +23,7 @@ export declare class ProductsService {
     private readonly prisma;
     private readonly redis;
     constructor(prisma: PrismaService, redis: RedisService);
-    calculatePrice(weightGrams: number, ratePerGram: number, isPriceFixed?: boolean, actualPrice?: number | null, discountedPrice?: number | null, grossWeight?: number | null, netGoldWeight?: number | null, stoneWeight?: number | null, wastagePercentVal?: number | null, priceRule?: any): CalculatedProductPrice;
+    calculatePrice(weightGrams: number, ratePerGram: number, isPriceFixed?: boolean, actualPrice?: number | null, discountedPrice?: number | null, grossWeight?: number | null, netGoldWeight?: number | null, stoneWeight?: number | null, wastagePercentVal?: number | null, priceRule?: any, isGstApplicableVal?: boolean | null): CalculatedProductPrice;
     mapProductRecord(product: any): {
         _id: any;
         id: any;

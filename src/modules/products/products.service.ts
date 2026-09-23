@@ -79,6 +79,7 @@ export class ProductsService {
     stoneWeight?: number | null,
     wastagePercentVal?: number | null,
     priceRule?: any,
+    isGstApplicableVal?: boolean | null,
   ): CalculatedProductPrice {
     const gross = grossWeight !== undefined && grossWeight !== null && Number(grossWeight) > 0
       ? Number(grossWeight)
@@ -130,13 +131,14 @@ export class ProductsService {
     const wastageAmt = Math.ceil(baseMetal * (wastagePct / 100));
     const hallmarking = 0; // BIS Hallmarking certification covered by business (₹0 to customer)
 
-    const gstPct = priceRule ? Number(priceRule.gstPercentage || 3.0) : 3.0;
+    const isGstEnabled = isGstApplicableVal !== false;
+    const gstPct = isGstEnabled ? (priceRule ? Number(priceRule.gstPercentage ?? 3.0) : 3.0) : 0;
     const discountPct = priceRule ? Number(priceRule.discountPercent || 0.0) : 0.0;
 
     const subtotal = Math.ceil(baseMetal + totalMaking + wastageAmt + hallmarking);
     const discountAmt = Math.ceil(subtotal * (discountPct / 100));
     const taxableSubtotal = Math.max(0, subtotal - discountAmt);
-    const gstAmt = Math.ceil(taxableSubtotal * (gstPct / 100));
+    const gstAmt = isGstEnabled ? Math.ceil(taxableSubtotal * (gstPct / 100)) : 0;
     const finalPrice = Math.ceil(taxableSubtotal + gstAmt);
 
     return {
@@ -163,6 +165,11 @@ export class ProductsService {
   mapProductRecord(product: any) {
     const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
 
+    const rawAttributes = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+      ? { ...product.attributes }
+      : {};
+    const isGstApplicable = (product as any).isGstApplicable !== false && rawAttributes.isGstApplicable !== false && rawAttributes.includeGst !== false;
+
     const priceBreakdown = this.calculatePrice(
       Number(product.weightGrams || 0),
       ratePerGram,
@@ -174,6 +181,7 @@ export class ProductsService {
       product.stoneWeight ? Number(product.stoneWeight) : null,
       product.wastagePercent ? Number(product.wastagePercent) : null,
       product.priceRule,
+      isGstApplicable,
     );
 
     const safeImages = Array.isArray(product.images) ? product.images : [];
@@ -181,9 +189,6 @@ export class ProductsService {
     const relationIds = Array.isArray(product.relationIds) ? product.relationIds : [];
     const collectionIds = Array.isArray(product.collectionIds) ? product.collectionIds : [];
 
-    const rawAttributes = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
-      ? { ...product.attributes }
-      : {};
     const rawSizes = Array.isArray(rawAttributes.sizes)
       ? rawAttributes.sizes
       : (Array.isArray((product as any).sizes) ? (product as any).sizes : []);

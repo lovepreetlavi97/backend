@@ -20,6 +20,50 @@ let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
     }
+    async requestPhoneOtp(dto) {
+        const result = await this.authService.requestPhoneOtp(dto);
+        return {
+            status: 'success',
+            message: 'OTP sent successfully.',
+            userRegistered: result.userRegistered,
+            data: result,
+        };
+    }
+    async resendPhoneOtp(dto) {
+        const result = await this.authService.resendPhoneOtp(dto);
+        return {
+            status: 'success',
+            message: 'OTP resent successfully.',
+            userRegistered: result.userRegistered,
+            data: result,
+        };
+    }
+    async verifyPhoneOtp(dto, res) {
+        const result = await this.authService.verifyPhoneOtp(dto);
+        if (result.accessToken) {
+            res.cookie('accessToken', result.accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 15 * 60 * 1000,
+            });
+        }
+        if (result.refreshToken) {
+            res.cookie('refreshToken', result.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+            });
+        }
+        return {
+            status: 'success',
+            message: 'OTP verified successfully.',
+            user: result.user,
+            token: result.token,
+            data: result,
+        };
+    }
     async register(dto, res) {
         const result = await this.authService.register(dto);
         res.cookie('accessToken', result.accessToken, {
@@ -37,6 +81,8 @@ let AuthController = class AuthController {
         return {
             status: 'success',
             message: 'User registered successfully.',
+            user: result.user,
+            token: result.token,
             data: result,
         };
     }
@@ -57,6 +103,30 @@ let AuthController = class AuthController {
         return {
             status: 'success',
             message: 'Login successful.',
+            user: result.user,
+            token: result.token,
+            data: result,
+        };
+    }
+    async googleLogin(dto, res) {
+        const result = await this.authService.googleLogin(dto.code);
+        res.cookie('accessToken', result.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000,
+        });
+        res.cookie('refreshToken', result.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+        return {
+            status: 'success',
+            message: 'Google login successful.',
+            user: result.user,
+            token: result.token,
             data: result,
         };
     }
@@ -88,7 +158,32 @@ let AuthController = class AuthController {
 };
 exports.AuthController = AuthController;
 __decorate([
-    (0, common_1.Post)('register'),
+    (0, common_1.Post)(['login/phone', 'phone-login']),
+    (0, swagger_1.ApiOperation)({ summary: 'Request OTP for phone login/verification' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "requestPhoneOtp", null);
+__decorate([
+    (0, common_1.Post)('resend-otp'),
+    (0, swagger_1.ApiOperation)({ summary: 'Resend OTP to phone number' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "resendPhoneOtp", null);
+__decorate([
+    (0, common_1.Post)('verify-otp'),
+    (0, swagger_1.ApiOperation)({ summary: 'Verify OTP and authenticate user' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyPhoneOtp", null);
+__decorate([
+    (0, common_1.Post)(['register', '']),
     (0, swagger_1.ApiOperation)({ summary: 'Register a new customer account' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Res)({ passthrough: true })),
@@ -97,14 +192,23 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
-    (0, common_1.Post)('login'),
-    (0, swagger_1.ApiOperation)({ summary: 'Login user and set HTTP-only authentication cookies' }),
+    (0, common_1.Post)(['login', 'login/email']),
+    (0, swagger_1.ApiOperation)({ summary: 'Login user with email/password and set HTTP-only cookies' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Post)('login/google'),
+    (0, swagger_1.ApiOperation)({ summary: 'Login user with Google account' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "googleLogin", null);
 __decorate([
     (0, common_1.Post)('refresh'),
     (0, swagger_1.ApiOperation)({ summary: 'Refresh access token using HTTP-only refresh cookie' }),
@@ -125,7 +229,7 @@ __decorate([
 ], AuthController.prototype, "logout", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Authentication'),
-    (0, common_1.Controller)('auth'),
+    (0, common_1.Controller)(['auth', 'user']),
     __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map

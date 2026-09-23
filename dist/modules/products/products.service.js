@@ -59,7 +59,7 @@ let ProductsService = class ProductsService {
         this.prisma = prisma;
         this.redis = redis;
     }
-    calculatePrice(weightGrams, ratePerGram, isPriceFixed = false, actualPrice, discountedPrice, grossWeight, netGoldWeight, stoneWeight, wastagePercentVal, priceRule) {
+    calculatePrice(weightGrams, ratePerGram, isPriceFixed = false, actualPrice, discountedPrice, grossWeight, netGoldWeight, stoneWeight, wastagePercentVal, priceRule, isGstApplicableVal) {
         const gross = grossWeight !== undefined && grossWeight !== null && Number(grossWeight) > 0
             ? Number(grossWeight)
             : Number(weightGrams || 0);
@@ -101,12 +101,13 @@ let ProductsService = class ProductsService {
         const wastagePct = wastagePercentVal ? Number(wastagePercentVal) : 0;
         const wastageAmt = Math.ceil(baseMetal * (wastagePct / 100));
         const hallmarking = 0;
-        const gstPct = priceRule ? Number(priceRule.gstPercentage || 3.0) : 3.0;
+        const isGstEnabled = isGstApplicableVal !== false;
+        const gstPct = isGstEnabled ? (priceRule ? Number(priceRule.gstPercentage ?? 3.0) : 3.0) : 0;
         const discountPct = priceRule ? Number(priceRule.discountPercent || 0.0) : 0.0;
         const subtotal = Math.ceil(baseMetal + totalMaking + wastageAmt + hallmarking);
         const discountAmt = Math.ceil(subtotal * (discountPct / 100));
         const taxableSubtotal = Math.max(0, subtotal - discountAmt);
-        const gstAmt = Math.ceil(taxableSubtotal * (gstPct / 100));
+        const gstAmt = isGstEnabled ? Math.ceil(taxableSubtotal * (gstPct / 100)) : 0;
         const finalPrice = Math.ceil(taxableSubtotal + gstAmt);
         return {
             isPriceFixed: false,
@@ -130,14 +131,15 @@ let ProductsService = class ProductsService {
     }
     mapProductRecord(product) {
         const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
-        const priceBreakdown = this.calculatePrice(Number(product.weightGrams || 0), ratePerGram, product.isPriceFixed, product.actualPrice ? Number(product.actualPrice) : null, product.discountedPrice ? Number(product.discountedPrice) : null, product.grossWeight ? Number(product.grossWeight) : null, product.netGoldWeight ? Number(product.netGoldWeight) : null, product.stoneWeight ? Number(product.stoneWeight) : null, product.wastagePercent ? Number(product.wastagePercent) : null, product.priceRule);
+        const rawAttributes = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+            ? { ...product.attributes }
+            : {};
+        const isGstApplicable = product.isGstApplicable !== false && rawAttributes.isGstApplicable !== false && rawAttributes.includeGst !== false;
+        const priceBreakdown = this.calculatePrice(Number(product.weightGrams || 0), ratePerGram, product.isPriceFixed, product.actualPrice ? Number(product.actualPrice) : null, product.discountedPrice ? Number(product.discountedPrice) : null, product.grossWeight ? Number(product.grossWeight) : null, product.netGoldWeight ? Number(product.netGoldWeight) : null, product.stoneWeight ? Number(product.stoneWeight) : null, product.wastagePercent ? Number(product.wastagePercent) : null, product.priceRule, isGstApplicable);
         const safeImages = Array.isArray(product.images) ? product.images : [];
         const festivalIds = Array.isArray(product.festivalIds) ? product.festivalIds : [];
         const relationIds = Array.isArray(product.relationIds) ? product.relationIds : [];
         const collectionIds = Array.isArray(product.collectionIds) ? product.collectionIds : [];
-        const rawAttributes = product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
-            ? { ...product.attributes }
-            : {};
         const rawSizes = Array.isArray(rawAttributes.sizes)
             ? rawAttributes.sizes
             : (Array.isArray(product.sizes) ? product.sizes : []);

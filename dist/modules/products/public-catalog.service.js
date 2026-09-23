@@ -28,14 +28,15 @@ let PublicCatalogService = class PublicCatalogService {
     }
     mapProduct(product) {
         const ratePerGram = product.metal ? Number(product.metal.ratePerGram) : 7200;
-        const priceBreakdown = this.productsService.calculatePrice(Number(product.weightGrams || 0), ratePerGram, product.isPriceFixed, product.actualPrice ? Number(product.actualPrice) : null, product.discountedPrice ? Number(product.discountedPrice) : null, product.grossWeight ? Number(product.grossWeight) : null, product.netGoldWeight ? Number(product.netGoldWeight) : null, product.stoneWeight ? Number(product.stoneWeight) : null, product.wastagePercent ? Number(product.wastagePercent) : null, product.priceRule);
+        const rawAttributes = product?.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+            ? { ...product.attributes }
+            : {};
+        const isGstApplicable = product?.isGstApplicable !== false && rawAttributes.isGstApplicable !== false && rawAttributes.includeGst !== false;
+        const priceBreakdown = this.productsService.calculatePrice(Number(product?.weightGrams || 0), ratePerGram, product?.isPriceFixed, product?.actualPrice ? Number(product.actualPrice) : null, product?.discountedPrice ? Number(product.discountedPrice) : null, product?.grossWeight ? Number(product.grossWeight) : null, product?.netGoldWeight ? Number(product.netGoldWeight) : null, product?.stoneWeight ? Number(product.stoneWeight) : null, product?.wastagePercent ? Number(product.wastagePercent) : null, product?.priceRule, isGstApplicable);
         const safeImages = Array.isArray(product?.images) ? product.images : [];
         const festivalIds = Array.isArray(product?.festivalIds) ? product.festivalIds : [];
         const relationIds = Array.isArray(product?.relationIds) ? product.relationIds : [];
         const collectionIds = Array.isArray(product?.collectionIds) ? product.collectionIds : [];
-        const rawAttributes = product?.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
-            ? { ...product.attributes }
-            : {};
         const rawSizes = Array.isArray(rawAttributes.sizes)
             ? rawAttributes.sizes
             : (Array.isArray(product.sizes) ? product.sizes : []);

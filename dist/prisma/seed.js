@@ -1,0 +1,134 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const client_1 = require("@prisma/client");
+const bcrypt = require("bcryptjs");
+const prisma = new client_1.PrismaClient();
+async function main() {
+    console.log('🌱 Starting PostgreSQL database seed...');
+    const hashedPassword = await bcrypt.hash('AdminPassword@2026', 10);
+    const admin = await prisma.admin.upsert({
+        where: { email: 'admin@gurujewellers.com' },
+        update: {
+            password: hashedPassword,
+            role: client_1.Role.SUPERADMIN,
+            isActive: true,
+        },
+        create: {
+            name: 'Super Admin',
+            email: 'admin@gurujewellers.com',
+            password: hashedPassword,
+            role: client_1.Role.SUPERADMIN,
+            permissions: ['ALL', 'MANAGE_USERS', 'MANAGE_PRODUCTS', 'MANAGE_ORDERS', 'MANAGE_KITTY'],
+            isActive: true,
+        },
+    });
+    console.log('✅ SuperAdmin Account Created:', admin.email);
+    const userPassword = await bcrypt.hash('UserPassword@2026', 10);
+    const user = await prisma.user.upsert({
+        where: { email: 'customer@gurujewellers.com' },
+        update: {
+            password: userPassword,
+            isActive: true,
+        },
+        create: {
+            name: 'Demo Customer',
+            email: 'customer@gurujewellers.com',
+            password: userPassword,
+            role: client_1.Role.USER,
+            phone: '+919876543210',
+            isActive: true,
+        },
+    });
+    console.log('✅ Demo Customer Account Created:', user.email);
+    const goldMetal = await prisma.metal.upsert({
+        where: { name: '22K Gold' },
+        update: {
+            ratePerGram: 6850.00,
+            slug: 'gold',
+            colorCode: '#c5a059',
+            gradient: 'linear-gradient(to right, #c5a059, #e0c283)',
+            isActive: true,
+        },
+        create: {
+            name: '22K Gold',
+            slug: 'gold',
+            type: client_1.MetalType.GOLD,
+            ratePerGram: 6850.00,
+            purity: '916',
+            colorCode: '#c5a059',
+            gradient: 'linear-gradient(to right, #c5a059, #e0c283)',
+            isActive: true,
+        },
+    });
+    const silverMetal = await prisma.metal.upsert({
+        where: { name: '925 Silver' },
+        update: {
+            ratePerGram: 88.50,
+            slug: 'silver',
+            colorCode: '#a0a0a0',
+            gradient: 'linear-gradient(to right, #a0a0a0, #d0d0d0)',
+            isActive: true,
+        },
+        create: {
+            name: '925 Silver',
+            slug: 'silver',
+            type: client_1.MetalType.SILVER,
+            ratePerGram: 88.50,
+            purity: '925',
+            colorCode: '#a0a0a0',
+            gradient: 'linear-gradient(to right, #a0a0a0, #d0d0d0)',
+            isActive: true,
+        },
+    });
+    console.log('✅ Default Metals Created (Gold & Silver)');
+    const priceRule = await prisma.priceRule.create({
+        data: {
+            name: 'Standard Jewellery Pricing Rule',
+            makingChargeGram: 450.00,
+            gstPercentage: 3.00,
+            discountPercent: 0.00,
+        },
+    }).catch(() => null);
+    const category = await prisma.category.upsert({
+        where: { slug: 'jewelry' },
+        update: {},
+        create: {
+            name: 'Jewelry',
+            slug: 'jewelry',
+            description: 'Handcrafted gold and silver fine jewelry collection',
+            isFeatured: true,
+        },
+    });
+    console.log('✅ Category Created:', category.name);
+    const kittyPlan = await prisma.kittyPlan.create({
+        data: {
+            name: 'Swarna Savings 11-Month Plan',
+            totalMonths: 11,
+            monthlyAmount: 5000.00,
+            bonusMonths: 1.0,
+            metalType: client_1.MetalType.GOLD,
+            description: 'Pay 11 monthly installments and get 100% bonus month contribution on maturity!',
+            isActive: true,
+        },
+    }).catch(() => null);
+    console.log('✅ Gold Kitty Plan Created');
+    console.log('\n🎉 Database Seed Completed Successfully!');
+    console.log('--------------------------------------------------');
+    console.log('🔑 ADMIN CREDENTIALS:');
+    console.log('   Email:    admin@gurujewellers.com');
+    console.log('   Password: AdminPassword@2026');
+    console.log('--------------------------------------------------');
+    console.log('👤 CUSTOMER CREDENTIALS:');
+    console.log('   Email:    customer@gurujewellers.com');
+    console.log('   Password: UserPassword@2026');
+    console.log('--------------------------------------------------');
+}
+main()
+    .catch((e) => {
+    console.error('❌ Seed error:', e);
+    process.exit(1);
+})
+    .finally(async () => {
+    await prisma.$disconnect();
+});
+//# sourceMappingURL=seed.js.map
