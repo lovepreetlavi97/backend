@@ -40,7 +40,7 @@ export declare class AdminSiteSettingsController {
                     url: string;
                 }[];
             };
-            featureBadges: string[];
+            featureBadges: any[];
             footerAbout: string;
             legal: {
                 termsOfUse: string;

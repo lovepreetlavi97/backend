@@ -40,7 +40,7 @@ export declare const DEFAULT_PUBLIC_SETTINGS: {
         title: string;
         description: string;
     }[];
-    featureBadges: string[];
+    featureBadges: any[];
     footerAbout: string;
     legal: {
         termsOfUse: string;
@@ -86,7 +86,7 @@ export declare class SettingsService {
                 url: string;
             }[];
         };
-        featureBadges: string[];
+        featureBadges: any[];
         footerAbout: string;
         legal: {
             termsOfUse: string;

@@ -18,4 +18,8 @@ export declare class CreateProductDto {
     images?: string[];
     image?: string;
     mainImage?: string;
+    bisHallmark?: boolean;
+    hasLifetimeGuarantee?: boolean;
+    isGstApplicable?: boolean;
+    gstPercentage?: number;
 }

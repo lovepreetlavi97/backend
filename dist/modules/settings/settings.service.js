@@ -69,12 +69,7 @@ exports.DEFAULT_PUBLIC_SETTINGS = {
             description: 'Hassle-free 15-day return policy with full money-back promise.',
         },
     ],
-    featureBadges: [
-        '100% Certified Jewellery',
-        'Free Insured Shipping',
-        'Easy 15-Day Returns',
-        'Lifetime Exchange Policy',
-    ],
+    featureBadges: [],
     footerAbout: 'Guru Jewellers is a premier online jewelry boutique specializing in handcrafted gold, silver, and diamond masterpieces.',
     legal: {
         termsOfUse: '<p>Welcome to Guru Jewellers. By using our services, you agree to our terms of use...</p>',

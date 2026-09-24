@@ -111,6 +111,9 @@ export declare class ProductsController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -152,6 +155,9 @@ export declare class ProductsController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -197,6 +203,9 @@ export declare class ProductsController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;

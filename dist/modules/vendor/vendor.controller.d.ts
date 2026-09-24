@@ -121,6 +121,9 @@ export declare class VendorController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -159,8 +162,8 @@ export declare class VendorController {
                     name: string;
                     id: string;
                     updatedAt: Date;
-                    makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                     gstPercentage: import("@prisma/client/runtime/library").Decimal;
+                    makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                     discountPercent: import("@prisma/client/runtime/library").Decimal;
                 };
                 subcategory: {
@@ -206,6 +209,9 @@ export declare class VendorController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -250,8 +256,8 @@ export declare class VendorController {
                     name: string;
                     id: string;
                     updatedAt: Date;
-                    makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                     gstPercentage: import("@prisma/client/runtime/library").Decimal;
+                    makingChargeGram: import("@prisma/client/runtime/library").Decimal;
                     discountPercent: import("@prisma/client/runtime/library").Decimal;
                 };
                 subcategory: {
@@ -297,6 +303,9 @@ export declare class VendorController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -339,6 +348,9 @@ export declare class VendorController {
                 purity: string | null;
                 wastagePercent: import("@prisma/client/runtime/library").Decimal | null;
                 bisHallmark: boolean;
+                hasLifetimeGuarantee: boolean;
+                isGstApplicable: boolean;
+                gstPercentage: import("@prisma/client/runtime/library").Decimal | null;
                 isPriceFixed: boolean;
                 actualPrice: import("@prisma/client/runtime/library").Decimal | null;
                 discountedPrice: import("@prisma/client/runtime/library").Decimal | null;

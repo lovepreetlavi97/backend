@@ -44,7 +44,7 @@ export declare class SettingsController {
                     url: string;
                 }[];
             };
-            featureBadges: string[];
+            featureBadges: any[];
             footerAbout: string;
             legal: {
                 termsOfUse: string;
@@ -91,7 +91,7 @@ export declare class SettingsController {
                     url: string;
                 }[];
             };
-            featureBadges: string[];
+            featureBadges: any[];
             footerAbout: string;
             legal: {
                 termsOfUse: string;
