@@ -46,6 +46,10 @@ export declare class SettingsController {
             };
             featureBadges: string[];
             footerAbout: string;
+            legal: {
+                termsOfUse: string;
+                privacyPolicy: string;
+            };
         };
     }>;
     getAdminSettings(): Promise<{
@@ -89,6 +93,10 @@ export declare class SettingsController {
             };
             featureBadges: string[];
             footerAbout: string;
+            legal: {
+                termsOfUse: string;
+                privacyPolicy: string;
+            };
         };
     }>;
     updateAdminSettings(dto: any): Promise<{

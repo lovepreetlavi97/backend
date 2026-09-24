@@ -42,6 +42,10 @@ export declare class AdminSiteSettingsController {
             };
             featureBadges: string[];
             footerAbout: string;
+            legal: {
+                termsOfUse: string;
+                privacyPolicy: string;
+            };
         };
     }>;
     updateSiteSettings(dto: any): Promise<{

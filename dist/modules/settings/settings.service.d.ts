@@ -42,6 +42,10 @@ export declare const DEFAULT_PUBLIC_SETTINGS: {
     }[];
     featureBadges: string[];
     footerAbout: string;
+    legal: {
+        termsOfUse: string;
+        privacyPolicy: string;
+    };
 };
 export declare class SettingsService {
     private readonly prisma;
@@ -84,6 +88,10 @@ export declare class SettingsService {
         };
         featureBadges: string[];
         footerAbout: string;
+        legal: {
+            termsOfUse: string;
+            privacyPolicy: string;
+        };
     }>;
     updatePublicSettings(data: any): Promise<import("@prisma/client/runtime/library").JsonValue>;
     submitContactForm(dto: {

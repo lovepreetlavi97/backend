@@ -76,6 +76,10 @@ exports.DEFAULT_PUBLIC_SETTINGS = {
         'Lifetime Exchange Policy',
     ],
     footerAbout: 'Guru Jewellers is a premier online jewelry boutique specializing in handcrafted gold, silver, and diamond masterpieces.',
+    legal: {
+        termsOfUse: '<p>Welcome to Guru Jewellers. By using our services, you agree to our terms of use...</p>',
+        privacyPolicy: '<p>Your privacy is important to us. We secure all your data...</p>',
+    },
 };
 let SettingsService = class SettingsService {
     constructor(prisma) {
