@@ -254,6 +254,9 @@ model Product {
   purity          String?               @default("22KT")
   wastagePercent  Decimal?              @default(0.00) @db.Decimal(5, 2)
   bisHallmark     Boolean               @default(true)
+  hasLifetimeGuarantee Boolean          @default(false)
+  isGstApplicable Boolean               @default(true)
+  gstPercentage   Decimal?              @default(3.00) @db.Decimal(5, 2)
 
   isPriceFixed    Boolean               @default(false)
   actualPrice     Decimal?              @db.Decimal(12, 2)

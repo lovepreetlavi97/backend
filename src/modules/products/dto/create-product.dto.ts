@@ -95,5 +95,25 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   mainImage?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  bisHallmark?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  hasLifetimeGuarantee?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  isGstApplicable?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  gstPercentage?: number;
 }
 
