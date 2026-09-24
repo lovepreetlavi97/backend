@@ -146,7 +146,7 @@ let ProductsService = class ProductsService {
         rawAttributes.sizes = rawSizes;
         const rawShortDesc = product.shortDescription || rawAttributes.shortDescription || rawAttributes.shortDesc || '';
         const isRecent = product.createdAt && (Date.now() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000);
-        const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : (isRecent ? 'New' : ''));
+        const rawTag = rawAttributes.tags || rawAttributes.tag || product.tags || product.tag || '';
         return {
             _id: product.id,
             id: product.id,
@@ -194,6 +194,8 @@ let ProductsService = class ProductsService {
             subcategory: product.subcategory,
             metal: product.metal,
             priceRule: product.priceRule,
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
         };
     }
     async findBySlug(slug) {

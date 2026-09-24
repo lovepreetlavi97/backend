@@ -52,6 +52,8 @@ export declare class PublicCatalogService {
         category: any;
         subcategory: any;
         priceRule: any;
+        createdAt: any;
+        updatedAt: any;
     };
     getFeaturedSubcategories(defaultImage: string, defaultDesc: string): Promise<{
         _id: string;
@@ -125,6 +127,8 @@ export declare class PublicCatalogService {
                 category: any;
                 subcategory: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
         };
     }>;
@@ -176,6 +180,8 @@ export declare class PublicCatalogService {
                 category: any;
                 subcategory: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
         };
     }>;

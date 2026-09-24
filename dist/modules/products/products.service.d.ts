@@ -83,6 +83,8 @@ export declare class ProductsService {
         subcategory: any;
         metal: any;
         priceRule: any;
+        createdAt: any;
+        updatedAt: any;
     };
     findBySlug(slug: string): Promise<any>;
     invalidateProductCache(slug?: string): Promise<void>;
@@ -165,6 +167,8 @@ export declare class ProductsService {
                 subcategory: any;
                 metal: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
             pagination: {
                 total: number;
@@ -233,6 +237,8 @@ export declare class ProductsService {
         subcategory: any;
         metal: any;
         priceRule: any;
+        createdAt: any;
+        updatedAt: any;
     }>;
     create(dto: any): Promise<{
         description: string;

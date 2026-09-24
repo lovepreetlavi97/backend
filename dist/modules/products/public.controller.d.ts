@@ -130,6 +130,8 @@ export declare class PublicController {
                 category: any;
                 subcategory: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
         };
     }>;
@@ -187,6 +189,8 @@ export declare class PublicController {
                 category: any;
                 subcategory: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
         };
     }>;

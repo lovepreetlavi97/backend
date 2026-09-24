@@ -20,6 +20,10 @@ async function bootstrap() {
         crossOriginResourcePolicy: false,
     }));
     app.use(cookieParser());
+    app.use((req, res, next) => {
+        console.log('[INCOMING REQ]', req.method, req.originalUrl || req.url);
+        next();
+    });
     app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
     const expressApp = app.getHttpAdapter().getInstance();
     expressApp.get('/', (req, res) => {

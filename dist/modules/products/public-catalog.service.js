@@ -42,7 +42,7 @@ let PublicCatalogService = class PublicCatalogService {
             : (Array.isArray(product.sizes) ? product.sizes : []);
         rawAttributes.sizes = rawSizes;
         const isRecent = product.createdAt && (Date.now() - new Date(product.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000);
-        const rawTag = rawAttributes.tags || rawAttributes.tag || (product.isFeatured ? 'Bestseller' : (isRecent ? 'New' : ''));
+        const rawTag = rawAttributes.tags || rawAttributes.tag || product.tags || product.tag || '';
         return {
             _id: product.id,
             id: product.id,
@@ -87,6 +87,8 @@ let PublicCatalogService = class PublicCatalogService {
             category: product.category,
             subcategory: product.subcategory,
             priceRule: product.priceRule,
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
         };
     }
     async getFeaturedSubcategories(defaultImage, defaultDesc) {
@@ -228,6 +230,7 @@ let PublicCatalogService = class PublicCatalogService {
     async getTrendingProducts(metalParam, limit = 4) {
         const cacheKey = `cache:trending:${metalParam || 'all'}:${limit}`;
         const cached = await this.redis.get(cacheKey);
+        console.log('>>> [getTrendingProducts] cached hit?', !!cached, 'cacheKey:', cacheKey);
         if (cached)
             return cached;
         let targetMetalId = undefined;
@@ -265,20 +268,22 @@ let PublicCatalogService = class PublicCatalogService {
             },
             include: { category: true, subcategory: true, metal: true, priceRule: true },
             orderBy: [
-                { isFeatured: 'desc' },
                 { createdAt: 'desc' },
                 { id: 'desc' },
             ],
-            take: Math.max(limit, 12),
         });
-        const sorted = [...rawProducts].sort((a, b) => {
-            const aTag = ((a.attributes?.tags || a.attributes?.tag || '') + (a.isFeatured ? ' bestseller' : '')).toLowerCase();
-            const bTag = ((b.attributes?.tags || b.attributes?.tag || '') + (b.isFeatured ? ' bestseller' : '')).toLowerCase();
-            const aScore = aTag.includes('bestseller') ? 3 : aTag.includes('new') ? 2 : aTag.includes('sale') || a.isFeatured ? 1 : 0;
-            const bScore = bTag.includes('bestseller') ? 3 : bTag.includes('new') ? 2 : bTag.includes('sale') || b.isFeatured ? 1 : 0;
-            return bScore - aScore;
-        });
-        const products = sorted.slice(0, limit).map((p) => this.mapProduct(p));
+        const isBestseller = (p) => {
+            const tagVal = p.attributes?.tags || p.attributes?.tag || p.tags || p.tag;
+            if (!tagVal)
+                return false;
+            if (Array.isArray(tagVal)) {
+                return tagVal.some((t) => String(t).trim().toLowerCase() === 'bestseller');
+            }
+            return String(tagVal).trim().toLowerCase() === 'bestseller';
+        };
+        const bestsellerProducts = rawProducts.filter(isBestseller);
+        const products = bestsellerProducts.slice(0, limit).map((p) => this.mapProduct(p));
+        console.log('>>> [getTrendingProducts] returning bestseller products count:', products.length, 'rawProducts count:', rawProducts.length);
         const response = {
             status: 'success',
             data: { products },

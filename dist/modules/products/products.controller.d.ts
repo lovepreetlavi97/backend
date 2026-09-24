@@ -65,6 +65,8 @@ export declare class ProductsController {
                 subcategory: any;
                 metal: any;
                 priceRule: any;
+                createdAt: any;
+                updatedAt: any;
             }[];
             pagination: {
                 total: number;

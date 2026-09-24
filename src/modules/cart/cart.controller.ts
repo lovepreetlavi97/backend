@@ -55,14 +55,23 @@ export class CartController {
       return {
         id: item.id,
         productId: product.id,
+        _id: product.id,
         name: product.title,
+        title: product.title,
         slug: product.slug,
         image: product.images[0] || '',
+        images: product.images || [],
         price: priceBreakdown.finalPrice,
+        discountedPrice: priceBreakdown.finalPrice,
         originalPrice: priceBreakdown.priceBeforeTax,
+        actualPrice: priceBreakdown.priceBeforeTax,
         discount: priceBreakdown.discountAmount,
         quantity: item.quantity,
         stock: product.stockQuantity,
+        metalName: product.metal?.name,
+        purity: product.metal?.purity,
+        grossWeight: product.weightGrams,
+        weight: product.weightGrams,
       };
     });
 
@@ -99,7 +108,11 @@ export class CartController {
     const items = await this.cartService.getCart(userId || undefined, guestId || undefined);
 
     const item = items.find(
-      (i) => i.productId === body.productId || i.id === body.cartItemId,
+      (i) =>
+        i.productId === body.productId ||
+        i.id === body.cartItemId ||
+        i.id === body.productId ||
+        i.product?.id === body.productId,
     );
 
     if (item) {
@@ -119,7 +132,12 @@ export class CartController {
   ) {
     const { userId, guestId } = this.extractCartIdentity(req, headerGuestId, body.guestId);
     const items = await this.cartService.getCart(userId || undefined, guestId || undefined);
-    const item = items.find((i) => i.productId === body.productId);
+    const item = items.find(
+      (i) =>
+        i.productId === body.productId ||
+        i.id === body.productId ||
+        i.product?.id === body.productId,
+    );
 
     if (item) {
       const newQuantity = body.action === 'inc' ? item.quantity + 1 : item.quantity - 1;
@@ -144,6 +162,7 @@ export class CartController {
     @CurrentUser('id') userId: string,
     @Headers('x-guest-id') headerGuestId: string,
     @Body() body: { guestId?: string; items?: { productId: string; quantity: number }[] },
+    @Req() req: any,
   ) {
     const guestId = body.guestId || headerGuestId;
     if (guestId) {
@@ -156,7 +175,7 @@ export class CartController {
       }
     }
 
-    return this.cartService.getUserCart(userId);
+    return this.getWebsiteCart(req, headerGuestId);
   }
 
   @Post('check-stock')

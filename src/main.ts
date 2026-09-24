@@ -20,6 +20,10 @@ async function bootstrap() {
     crossOriginResourcePolicy: false, // Ensure local assets can be loaded across domains
   }));
   app.use(cookieParser());
+  app.use((req: any, res: any, next: any) => {
+    console.log('[INCOMING REQ]', req.method, req.originalUrl || req.url);
+    next();
+  });
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
   const expressApp = app.getHttpAdapter().getInstance();

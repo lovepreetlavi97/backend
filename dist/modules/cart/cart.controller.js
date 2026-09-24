@@ -40,14 +40,23 @@ let CartController = class CartController {
             return {
                 id: item.id,
                 productId: product.id,
+                _id: product.id,
                 name: product.title,
+                title: product.title,
                 slug: product.slug,
                 image: product.images[0] || '',
+                images: product.images || [],
                 price: priceBreakdown.finalPrice,
+                discountedPrice: priceBreakdown.finalPrice,
                 originalPrice: priceBreakdown.priceBeforeTax,
+                actualPrice: priceBreakdown.priceBeforeTax,
                 discount: priceBreakdown.discountAmount,
                 quantity: item.quantity,
                 stock: product.stockQuantity,
+                metalName: product.metal?.name,
+                purity: product.metal?.purity,
+                grossWeight: product.weightGrams,
+                weight: product.weightGrams,
             };
         });
         return {
@@ -65,7 +74,10 @@ let CartController = class CartController {
     async removeWebsiteCart(req, headerGuestId, body) {
         const { userId, guestId } = this.extractCartIdentity(req, headerGuestId, body.guestId);
         const items = await this.cartService.getCart(userId || undefined, guestId || undefined);
-        const item = items.find((i) => i.productId === body.productId || i.id === body.cartItemId);
+        const item = items.find((i) => i.productId === body.productId ||
+            i.id === body.cartItemId ||
+            i.id === body.productId ||
+            i.product?.id === body.productId);
         if (item) {
             await this.cartService.removeFromCart(item.id, userId || undefined, guestId || undefined);
         }
@@ -74,7 +86,9 @@ let CartController = class CartController {
     async updateQuantityWebsiteCart(req, headerGuestId, body) {
         const { userId, guestId } = this.extractCartIdentity(req, headerGuestId, body.guestId);
         const items = await this.cartService.getCart(userId || undefined, guestId || undefined);
-        const item = items.find((i) => i.productId === body.productId);
+        const item = items.find((i) => i.productId === body.productId ||
+            i.id === body.productId ||
+            i.product?.id === body.productId);
         if (item) {
             const newQuantity = body.action === 'inc' ? item.quantity + 1 : item.quantity - 1;
             if (newQuantity <= 0) {
@@ -89,7 +103,7 @@ let CartController = class CartController {
         }
         return this.getWebsiteCart(req, headerGuestId || body.guestId);
     }
-    async syncGuestCart(userId, headerGuestId, body) {
+    async syncGuestCart(userId, headerGuestId, body, req) {
         const guestId = body.guestId || headerGuestId;
         if (guestId) {
             await this.cartService.syncGuestCartToUser(guestId, userId);
@@ -99,7 +113,7 @@ let CartController = class CartController {
                 await this.cartService.addToCart(userId, null, item.productId, item.quantity);
             }
         }
-        return this.cartService.getUserCart(userId);
+        return this.getWebsiteCart(req, headerGuestId);
     }
     async checkStock(body) {
         const items = body.items || [];
@@ -185,8 +199,9 @@ __decorate([
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Headers)('x-guest-id')),
     __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:paramtypes", [String, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], CartController.prototype, "syncGuestCart", null);
 __decorate([
