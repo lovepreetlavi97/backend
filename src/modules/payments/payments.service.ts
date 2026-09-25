@@ -77,7 +77,10 @@ export class PaymentsService {
           transaction: existingOrder.transactions[0] || null,
         };
       }
-
+      
+      const rpOrder = await this.razorpay.orders.fetch(razorpayOrderId);
+      const amountPaid = (rpOrder.amount_paid || 0) / 100;
+      
       const result = await this.prisma.$transaction(async (tx) => {
         const order = await tx.order.update({
           where: { id: existingOrder.id },
@@ -92,10 +95,10 @@ export class PaymentsService {
           data: {
             orderId: order.id,
             paymentId: razorpayPaymentId,
-            amount: order.finalAmount,
+            amount: amountPaid,
             currency: 'INR',
             status: 'PAID',
-            gatewayResponse: { razorpayOrderId, razorpayPaymentId, signature },
+            gatewayResponse: { razorpayOrderId, razorpayPaymentId, signature, amountPaid },
           },
         });
 
@@ -105,7 +108,13 @@ export class PaymentsService {
       // Send Order Confirmation Email
       const userEmail = result.order.guestEmail || (existingOrder.user as any)?.email;
       if (userEmail) {
-        const fullOrderForEmail = { ...existingOrder, ...result.order };
+        const pendingAmount = Number(result.order.finalAmount) - amountPaid;
+        const fullOrderForEmail = { 
+          ...existingOrder, 
+          ...result.order,
+          amountPaid,
+          pendingAmount
+        };
         // Send email asynchronously without blocking the response
         this.emailService.sendOrderConfirmationEmail(fullOrderForEmail, userEmail).catch(console.error);
       }

@@ -93,9 +93,17 @@ let EmailService = EmailService_1 = class EmailService {
                 ${itemsHtml}
               </table>
               <div style="margin-top: 15px; padding-top: 15px; text-align: right;">
-                <p style="margin: 5px 0;"><strong>Shipping:</strong> ₹${order.shippingCharge || 0}</p>
-                <p style="margin: 5px 0;"><strong>Discount:</strong> -₹${order.discountAmount || 0}</p>
-                <p style="margin: 5px 0; font-size: 18px; color: #C6A15B;"><strong>Total: ₹${order.finalAmount}</strong></p>
+                ${order.shippingCharge ? `<p style="margin: 5px 0; color: #555;"><strong>Shipping:</strong> ₹${order.shippingCharge}</p>` : ''}
+                ${order.discountAmount ? `<p style="margin: 5px 0; color: #10B981;"><strong>Discount:</strong> -₹${order.discountAmount}</p>` : ''}
+                <p style="margin: 5px 0; font-size: 16px; color: #1B1B1B;"><strong>Total: ₹${order.finalAmount}</strong></p>
+                ${order.pendingAmount && order.pendingAmount > 0 ? `
+                  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #DDD;">
+                    <p style="margin: 5px 0; color: #10B981;"><strong>Amount Paid: ₹${order.amountPaid}</strong></p>
+                    <p style="margin: 5px 0; font-size: 18px; color: #E11D48;"><strong>Pending (Due on Delivery): ₹${order.pendingAmount}</strong></p>
+                  </div>
+                ` : `
+                  <p style="margin: 5px 0; font-size: 16px; color: #10B981;"><strong>Amount Paid: ₹${order.finalAmount}</strong></p>
+                `}
               </div>
             </div>
             
