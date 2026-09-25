@@ -4,6 +4,7 @@ import Razorpay = require('razorpay');
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../../shared/redis/redis.service';
 import { getEnvConfig } from '../../config/env.config';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class PaymentsService {
@@ -13,6 +14,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly emailService: EmailService,
   ) {
     const config = getEnvConfig();
     this.razorpaySecret = config.razorpayKeySecret;
@@ -58,12 +60,12 @@ export class PaymentsService {
     if (orderId) {
       existingOrder = await this.prisma.order.findUnique({
         where: { id: orderId },
-        include: { transactions: true },
+        include: { transactions: true, user: true },
       });
     } else if (razorpayOrderId) {
       existingOrder = await this.prisma.order.findFirst({
         where: { razorpayOrderId },
-        include: { transactions: true },
+        include: { transactions: true, user: true },
       });
     }
 
@@ -76,7 +78,7 @@ export class PaymentsService {
         };
       }
 
-      return this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const order = await tx.order.update({
           where: { id: existingOrder.id },
           data: {
@@ -99,6 +101,16 @@ export class PaymentsService {
 
         return { order, transaction };
       });
+
+      // Send Order Confirmation Email
+      const userEmail = result.order.guestEmail || (existingOrder.user as any)?.email;
+      if (userEmail) {
+        const fullOrderForEmail = { ...existingOrder, ...result.order };
+        // Send email asynchronously without blocking the response
+        this.emailService.sendOrderConfirmationEmail(fullOrderForEmail, userEmail).catch(console.error);
+      }
+
+      return result;
     }
 
     // Try finding the pending kitty payment mapping in Redis

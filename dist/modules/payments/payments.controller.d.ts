@@ -24,11 +24,9 @@ export declare class PaymentsController {
         data: {
             order: {
                 id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                userId: string | null;
-                items: import("@prisma/client/runtime/library").JsonValue;
                 orderNumber: string;
+                razorpayOrderId: string | null;
+                userId: string | null;
                 guestName: string | null;
                 guestEmail: string | null;
                 guestPhone: string | null;
@@ -37,25 +35,27 @@ export declare class PaymentsController {
                 finalAmount: import("@prisma/client/runtime/library").Decimal;
                 orderStatus: import(".prisma/client").$Enums.OrderStatus;
                 paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
+                items: import("@prisma/client/runtime/library").JsonValue;
                 shippingAddress: import("@prisma/client/runtime/library").JsonValue;
-                razorpayOrderId: string | null;
+                createdAt: Date;
+                updatedAt: Date;
             };
             transaction: {
                 id: string;
                 createdAt: Date;
-                status: import(".prisma/client").$Enums.PaymentStatus;
-                orderId: string | null;
                 paymentId: string;
                 amount: import("@prisma/client/runtime/library").Decimal;
                 currency: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
+                orderId: string | null;
             };
         } | {
             userKitty: {
                 id: string;
+                userId: string;
                 createdAt: Date;
                 updatedAt: Date;
-                userId: string;
                 status: string;
                 planId: string;
                 paidMonths: number;
@@ -65,12 +65,12 @@ export declare class PaymentsController {
             transaction: {
                 id: string;
                 createdAt: Date;
-                status: import(".prisma/client").$Enums.PaymentStatus;
-                orderId: string | null;
                 paymentId: string;
                 amount: import("@prisma/client/runtime/library").Decimal;
                 currency: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
+                orderId: string | null;
             };
         } | {
             message: string;
@@ -81,21 +81,21 @@ export declare class PaymentsController {
             message: string;
             userKitty: {
                 plan: {
-                    name: string;
-                    description: string | null;
-                    isActive: boolean;
                     id: string;
                     createdAt: Date;
+                    name: string;
                     totalMonths: number;
                     monthlyAmount: import("@prisma/client/runtime/library").Decimal;
                     bonusMonths: import("@prisma/client/runtime/library").Decimal;
                     metalType: import(".prisma/client").$Enums.MetalType;
+                    description: string | null;
+                    isActive: boolean;
                 };
             } & {
                 id: string;
+                userId: string;
                 createdAt: Date;
                 updatedAt: Date;
-                userId: string;
                 status: string;
                 planId: string;
                 paidMonths: number;

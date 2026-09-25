@@ -16,10 +16,12 @@ const Razorpay = require("razorpay");
 const prisma_service_1 = require("../prisma/prisma.service");
 const redis_service_1 = require("../../shared/redis/redis.service");
 const env_config_1 = require("../../config/env.config");
+const email_service_1 = require("../email/email.service");
 let PaymentsService = class PaymentsService {
-    constructor(prisma, redis) {
+    constructor(prisma, redis, emailService) {
         this.prisma = prisma;
         this.redis = redis;
+        this.emailService = emailService;
         const config = (0, env_config_1.getEnvConfig)();
         this.razorpaySecret = config.razorpayKeySecret;
         this.razorpay = new Razorpay({
@@ -52,13 +54,13 @@ let PaymentsService = class PaymentsService {
         if (orderId) {
             existingOrder = await this.prisma.order.findUnique({
                 where: { id: orderId },
-                include: { transactions: true },
+                include: { transactions: true, user: true },
             });
         }
         else if (razorpayOrderId) {
             existingOrder = await this.prisma.order.findFirst({
                 where: { razorpayOrderId },
-                include: { transactions: true },
+                include: { transactions: true, user: true },
             });
         }
         if (existingOrder) {
@@ -69,7 +71,7 @@ let PaymentsService = class PaymentsService {
                     transaction: existingOrder.transactions[0] || null,
                 };
             }
-            return this.prisma.$transaction(async (tx) => {
+            const result = await this.prisma.$transaction(async (tx) => {
                 const order = await tx.order.update({
                     where: { id: existingOrder.id },
                     data: {
@@ -90,6 +92,12 @@ let PaymentsService = class PaymentsService {
                 });
                 return { order, transaction };
             });
+            const userEmail = result.order.guestEmail || existingOrder.user?.email;
+            if (userEmail) {
+                const fullOrderForEmail = { ...existingOrder, ...result.order };
+                this.emailService.sendOrderConfirmationEmail(fullOrderForEmail, userEmail).catch(console.error);
+            }
+            return result;
         }
         const kittyPaymentData = await this.redis.get(`pending-kitty-payment:${razorpayOrderId}`);
         if (!kittyPaymentData) {
@@ -170,6 +178,7 @@ exports.PaymentsService = PaymentsService;
 exports.PaymentsService = PaymentsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        redis_service_1.RedisService])
+        redis_service_1.RedisService,
+        email_service_1.EmailService])
 ], PaymentsService);
 //# sourceMappingURL=payments.service.js.map

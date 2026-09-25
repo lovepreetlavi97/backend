@@ -12,12 +12,13 @@ const payments_service_1 = require("./payments.service");
 const payments_controller_1 = require("./payments.controller");
 const auth_module_1 = require("../auth/auth.module");
 const redis_module_1 = require("../../shared/redis/redis.module");
+const email_module_1 = require("../email/email.module");
 let PaymentsModule = class PaymentsModule {
 };
 exports.PaymentsModule = PaymentsModule;
 exports.PaymentsModule = PaymentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule, redis_module_1.RedisModule],
+        imports: [auth_module_1.AuthModule, redis_module_1.RedisModule, email_module_1.EmailModule],
         controllers: [payments_controller_1.PaymentsController],
         providers: [payments_service_1.PaymentsService],
         exports: [payments_service_1.PaymentsService],

@@ -29,6 +29,7 @@ const dashboard_module_1 = require("./modules/dashboard/dashboard.module");
 const settings_module_1 = require("./modules/settings/settings.module");
 const uploads_module_1 = require("./modules/uploads/uploads.module");
 const health_module_1 = require("./modules/health/health.module");
+const email_module_1 = require("./modules/email/email.module");
 const core_1 = require("@nestjs/core");
 const throttler_1 = require("@nestjs/throttler");
 const vendor_module_1 = require("./modules/vendor/vendor.module");
@@ -66,6 +67,7 @@ exports.AppModule = AppModule = __decorate([
             settings_module_1.SettingsModule,
             uploads_module_1.UploadsModule,
             health_module_1.HealthModule,
+            email_module_1.EmailModule,
         ],
         providers: [
             {

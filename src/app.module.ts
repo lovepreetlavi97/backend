@@ -20,6 +20,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthModule } from './modules/health/health.module';
+import { EmailModule } from './modules/email/email.module';
 
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -56,6 +57,7 @@ import { VendorModule } from './modules/vendor/vendor.module';
     SettingsModule,
     UploadsModule,
     HealthModule,
+    EmailModule,
   ],
   providers: [
     {
