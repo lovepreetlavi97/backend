@@ -96,4 +96,58 @@ export declare class PaymentsService {
     createRazorpayOrder(amount: number, orderId: string): Promise<{
         order: any;
     }>;
+    getAllTransactions(query: {
+        page?: number;
+        limit?: number;
+        search?: string;
+    }): Promise<{
+        transactions: ({
+            order: {
+                user: {
+                    id: string;
+                    createdAt: Date;
+                    updatedAt: Date;
+                    name: string;
+                    isActive: boolean;
+                    email: string;
+                    phone: string | null;
+                    password: string;
+                    role: import(".prisma/client").$Enums.Role;
+                    isDeleted: boolean;
+                };
+            } & {
+                id: string;
+                orderNumber: string;
+                razorpayOrderId: string | null;
+                userId: string | null;
+                guestName: string | null;
+                guestEmail: string | null;
+                guestPhone: string | null;
+                totalAmount: import("@prisma/client/runtime/library").Decimal;
+                discountAmount: import("@prisma/client/runtime/library").Decimal;
+                finalAmount: import("@prisma/client/runtime/library").Decimal;
+                orderStatus: import(".prisma/client").$Enums.OrderStatus;
+                paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
+                items: import("@prisma/client/runtime/library").JsonValue;
+                shippingAddress: import("@prisma/client/runtime/library").JsonValue;
+                createdAt: Date;
+                updatedAt: Date;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            paymentId: string;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
+            orderId: string | null;
+        })[];
+        pagination: {
+            total: number;
+            page: number;
+            limit: number;
+            pages: number;
+        };
+    }>;
 }

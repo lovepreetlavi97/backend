@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 export interface VerifyPaymentDto {
@@ -41,6 +41,15 @@ export class PaymentsController {
     return {
       status: 'success',
       message: 'Payment verified successfully.',
+      data: result,
+    };
+  }
+
+  @Get('transactions')
+  async getAllTransactions(@Query() query: { page?: number; limit?: number; search?: string }) {
+    const result = await this.paymentsService.getAllTransactions(query);
+    return {
+      status: 'success',
       data: result,
     };
   }

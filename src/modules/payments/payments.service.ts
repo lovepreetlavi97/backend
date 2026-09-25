@@ -215,4 +215,46 @@ export class PaymentsService {
       throw new BadRequestException(`Razorpay order creation failed: ${error.message}`);
     }
   }
+
+  async getAllTransactions(query: { page?: number; limit?: number; search?: string }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.search) {
+      where.OR = [
+        { paymentId: { contains: query.search, mode: 'insensitive' } },
+        { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
+        { order: { user: { name: { contains: query.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const [total, transactions] = await Promise.all([
+      this.prisma.transaction.count({ where }),
+      this.prisma.transaction.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          order: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      transactions,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
 }

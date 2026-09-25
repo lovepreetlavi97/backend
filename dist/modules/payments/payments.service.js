@@ -176,10 +176,48 @@ let PaymentsService = class PaymentsService {
             return {
                 order,
             };
-        }
-        catch (error) {
             throw new common_1.BadRequestException(`Razorpay order creation failed: ${error.message}`);
         }
+        finally {
+        }
+    }
+    async getAllTransactions(query) {
+        const page = Number(query.page) || 1;
+        const limit = Number(query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const where = {};
+        if (query.search) {
+            where.OR = [
+                { paymentId: { contains: query.search, mode: 'insensitive' } },
+                { order: { orderNumber: { contains: query.search, mode: 'insensitive' } } },
+                { order: { user: { name: { contains: query.search, mode: 'insensitive' } } } },
+            ];
+        }
+        const [total, transactions] = await Promise.all([
+            this.prisma.transaction.count({ where }),
+            this.prisma.transaction.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    order: {
+                        include: {
+                            user: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+        return {
+            transactions,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit),
+            },
+        };
     }
 };
 exports.PaymentsService = PaymentsService;
