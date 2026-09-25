@@ -24,9 +24,11 @@ export declare class PaymentsController {
         data: {
             order: {
                 id: string;
-                orderNumber: string;
-                razorpayOrderId: string | null;
+                createdAt: Date;
+                updatedAt: Date;
                 userId: string | null;
+                items: import("@prisma/client/runtime/library").JsonValue;
+                orderNumber: string;
                 guestName: string | null;
                 guestEmail: string | null;
                 guestPhone: string | null;
@@ -35,27 +37,25 @@ export declare class PaymentsController {
                 finalAmount: import("@prisma/client/runtime/library").Decimal;
                 orderStatus: import(".prisma/client").$Enums.OrderStatus;
                 paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
-                items: import("@prisma/client/runtime/library").JsonValue;
                 shippingAddress: import("@prisma/client/runtime/library").JsonValue;
-                createdAt: Date;
-                updatedAt: Date;
+                razorpayOrderId: string | null;
             };
             transaction: {
                 id: string;
                 createdAt: Date;
+                status: import(".prisma/client").$Enums.PaymentStatus;
+                orderId: string | null;
                 paymentId: string;
                 amount: import("@prisma/client/runtime/library").Decimal;
                 currency: string;
-                status: import(".prisma/client").$Enums.PaymentStatus;
                 gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
-                orderId: string | null;
             };
         } | {
             userKitty: {
                 id: string;
-                userId: string;
                 createdAt: Date;
                 updatedAt: Date;
+                userId: string;
                 status: string;
                 planId: string;
                 paidMonths: number;
@@ -65,12 +65,12 @@ export declare class PaymentsController {
             transaction: {
                 id: string;
                 createdAt: Date;
+                status: import(".prisma/client").$Enums.PaymentStatus;
+                orderId: string | null;
                 paymentId: string;
                 amount: import("@prisma/client/runtime/library").Decimal;
                 currency: string;
-                status: import(".prisma/client").$Enums.PaymentStatus;
                 gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
-                orderId: string | null;
             };
         } | {
             message: string;
@@ -81,21 +81,21 @@ export declare class PaymentsController {
             message: string;
             userKitty: {
                 plan: {
+                    name: string;
+                    description: string | null;
+                    isActive: boolean;
                     id: string;
                     createdAt: Date;
-                    name: string;
                     totalMonths: number;
                     monthlyAmount: import("@prisma/client/runtime/library").Decimal;
                     bonusMonths: import("@prisma/client/runtime/library").Decimal;
                     metalType: import(".prisma/client").$Enums.MetalType;
-                    description: string | null;
-                    isActive: boolean;
                 };
             } & {
                 id: string;
-                userId: string;
                 createdAt: Date;
                 updatedAt: Date;
+                userId: string;
                 status: string;
                 planId: string;
                 paidMonths: number;
@@ -104,6 +104,63 @@ export declare class PaymentsController {
             };
             order?: undefined;
             transaction?: undefined;
+        };
+    }>;
+    getAllTransactions(query: {
+        page?: number;
+        limit?: number;
+        search?: string;
+    }): Promise<{
+        status: string;
+        data: {
+            transactions: ({
+                order: {
+                    user: {
+                        role: import(".prisma/client").$Enums.Role;
+                        password: string;
+                        name: string;
+                        isActive: boolean;
+                        id: string;
+                        email: string;
+                        phone: string | null;
+                        isDeleted: boolean;
+                        createdAt: Date;
+                        updatedAt: Date;
+                    };
+                } & {
+                    id: string;
+                    createdAt: Date;
+                    updatedAt: Date;
+                    userId: string | null;
+                    items: import("@prisma/client/runtime/library").JsonValue;
+                    orderNumber: string;
+                    guestName: string | null;
+                    guestEmail: string | null;
+                    guestPhone: string | null;
+                    totalAmount: import("@prisma/client/runtime/library").Decimal;
+                    discountAmount: import("@prisma/client/runtime/library").Decimal;
+                    finalAmount: import("@prisma/client/runtime/library").Decimal;
+                    orderStatus: import(".prisma/client").$Enums.OrderStatus;
+                    paymentStatus: import(".prisma/client").$Enums.PaymentStatus;
+                    shippingAddress: import("@prisma/client/runtime/library").JsonValue;
+                    razorpayOrderId: string | null;
+                };
+            } & {
+                id: string;
+                createdAt: Date;
+                status: import(".prisma/client").$Enums.PaymentStatus;
+                orderId: string | null;
+                paymentId: string;
+                amount: import("@prisma/client/runtime/library").Decimal;
+                currency: string;
+                gatewayResponse: import("@prisma/client/runtime/library").JsonValue | null;
+            })[];
+            pagination: {
+                total: number;
+                page: number;
+                limit: number;
+                pages: number;
+            };
         };
     }>;
 }

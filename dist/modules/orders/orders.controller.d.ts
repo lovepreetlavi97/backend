@@ -109,6 +109,44 @@ export declare class OrdersController {
             };
         };
     }>;
+    getMyOrders(user: any): Promise<{
+        status: string;
+        data: {
+            orders: {
+                _id: any;
+                id: any;
+                orderNumber: any;
+                userId: {
+                    _id: any;
+                    id: any;
+                    name: any;
+                    email: any;
+                    phone: any;
+                } | {
+                    _id: any;
+                    name: any;
+                    email: any;
+                    phone: any;
+                    id?: undefined;
+                };
+                products: any;
+                subtotal: number;
+                shippingCharge: number;
+                tax: number;
+                taxAmount: number;
+                totalAmount: number;
+                discountAmount: number;
+                finalAmount: number;
+                status: any;
+                orderStatus: any;
+                paymentStatus: any;
+                paymentMethod: string;
+                shippingAddress: any;
+                createdAt: any;
+                updatedAt: any;
+            }[];
+        };
+    }>;
     getUserOrders(userId: string, user: any): Promise<{
         status: string;
         data: {
@@ -191,7 +229,7 @@ export declare class OrdersController {
             };
         };
     }>;
-    getOrderById(id: string): Promise<{
+    getOrderById(id: string, user: any): Promise<{
         status: string;
         data: {
             order: {

@@ -70,6 +70,18 @@ export class OrdersController {
     };
   }
 
+  @Get('user')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get order history for current user' })
+  async getMyOrders(@CurrentUser() user: any) {
+    const orders = await this.ordersService.getUserOrders(user.id);
+    return {
+      status: 'success',
+      data: { orders },
+    };
+  }
+
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -124,11 +136,20 @@ export class OrdersController {
 
   @Get(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
-  @ApiOperation({ summary: 'Admin: Get order details by ID' })
-  async getOrderById(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get order details by ID' })
+  async getOrderById(@Param('id') id: string, @CurrentUser() user: any) {
     const order = await this.ordersService.getOrderById(id);
+    
+    // Check if user is an admin or owns the order
+    const isAdmin = user.role === 'ADMIN' || user.role === 'SUPERADMIN';
+    const isOwner = order.userId && typeof order.userId === 'object' 
+      ? order.userId._id === user.id || order.userId.id === user.id
+      : order.userId === user.id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('Access denied: You can only view your own orders.');
+    }
     return {
       status: 'success',
       data: { order },

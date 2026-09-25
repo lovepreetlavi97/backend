@@ -51,6 +51,13 @@ let OrdersController = class OrdersController {
             data,
         };
     }
+    async getMyOrders(user) {
+        const orders = await this.ordersService.getUserOrders(user.id);
+        return {
+            status: 'success',
+            data: { orders },
+        };
+    }
     async getUserOrders(userId, user) {
         if (user.id !== userId && user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
             throw new common_1.ForbiddenException('Access denied: You can only view your own orders.');
@@ -81,8 +88,15 @@ let OrdersController = class OrdersController {
             data,
         };
     }
-    async getOrderById(id) {
+    async getOrderById(id, user) {
         const order = await this.ordersService.getOrderById(id);
+        const isAdmin = user.role === 'ADMIN' || user.role === 'SUPERADMIN';
+        const isOwner = order.userId && typeof order.userId === 'object'
+            ? order.userId._id === user.id || order.userId.id === user.id
+            : order.userId === user.id;
+        if (!isAdmin && !isOwner) {
+            throw new common_1.ForbiddenException('Access denied: You can only view your own orders.');
+        }
         return {
             status: 'success',
             data: { order },
@@ -159,6 +173,16 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], OrdersController.prototype, "getRefundRequests", null);
 __decorate([
+    (0, common_1.Get)('user'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get order history for current user' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], OrdersController.prototype, "getMyOrders", null);
+__decorate([
     (0, common_1.Get)('user/:userId'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
@@ -192,12 +216,12 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.SUPERADMIN),
-    (0, swagger_1.ApiOperation)({ summary: 'Admin: Get order details by ID' }),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'Get order details by ID' }),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], OrdersController.prototype, "getOrderById", null);
 __decorate([

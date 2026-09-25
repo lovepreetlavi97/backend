@@ -38,6 +38,13 @@ let PaymentsController = class PaymentsController {
             data: result,
         };
     }
+    async getAllTransactions(query) {
+        const result = await this.paymentsService.getAllTransactions(query);
+        return {
+            status: 'success',
+            data: result,
+        };
+    }
 };
 exports.PaymentsController = PaymentsController;
 __decorate([
@@ -54,6 +61,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], PaymentsController.prototype, "verifyPayment", null);
+__decorate([
+    (0, common_1.Get)('transactions'),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], PaymentsController.prototype, "getAllTransactions", null);
 exports.PaymentsController = PaymentsController = __decorate([
     (0, common_1.Controller)('payment'),
     __metadata("design:paramtypes", [payments_service_1.PaymentsService])

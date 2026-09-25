@@ -176,9 +176,9 @@ let PaymentsService = class PaymentsService {
             return {
                 order,
             };
-            throw new common_1.BadRequestException(`Razorpay order creation failed: ${error.message}`);
         }
-        finally {
+        catch (error) {
+            throw new common_1.BadRequestException(`Razorpay order creation failed: ${error.message}`);
         }
     }
     async getAllTransactions(query) {
